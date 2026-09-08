@@ -59,6 +59,9 @@ $googleFontsUrl: "https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;60
   background: linear-gradient(135deg, #0090F0 0%, #0048F0 100%);
 }
 
+.bg-neutral { background-color: var(--bs-neutral) !important; }
+.text-neutral { color: var(--bs-neutral) !important; }
+
 .cloudsuite-auth__panel {
   width: min(100%, 440px);
   border: 0;

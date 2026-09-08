@@ -38,13 +38,14 @@ $colors: (
 );
 // scss-docs-end colors-map
 
-$primary: #0060F0; // CloudSuite primary
-$secondary: $secondary; // change
-$success: $green; // change
+$primary: #0060F0;
+$secondary: #D6008C;
+$success: #10B981;
 $info: $cyan; // change
-$warning: $yellow; // change
-$danger: $red; // change
-$light: $gray-100; // change
+$warning: #F59E0B;
+$danger: #EF4444;
+$light: #F9FAFB;
+$dark: #1F2937;
 
 // scss-docs-start theme-colors-map
 $theme-colors: (
@@ -272,8 +273,8 @@ body {
   font-feature-settings: 'salt';
 }
 
-$body-bg: #F4F7FA; // change
-$body-color: #303030; // CloudSuite base text
+$body-bg: #F9FAFB;
+$body-color: #303030;
 $body-text-align: null;
 
 // Links
@@ -453,11 +454,11 @@ h2 {
 }
 
 $headings-margin-bottom: calc($spacer / 2);
-$headings-font-family: null;
+$headings-font-family: 'Rubik', sans-serif;
 $headings-font-style: null;
-$headings-font-weight: 600;
+$headings-font-weight: 700;
 $headings-line-height: 1.2;
-$headings-color: #29344A;
+$headings-color: $gray-900;
 $label-color: $gray-900;
 
 // scss-docs-start display-headings
@@ -481,7 +482,7 @@ $small-font-size: 80%;
 
 $sub-sup-font-size: 0.75em;
 
-$text-muted: #5B6B79;
+$text-muted: $gray-600;
 
 $initialism-font-size: $small-font-size;
 $blockquote-margin-y: $spacer;
