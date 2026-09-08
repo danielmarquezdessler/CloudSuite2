@@ -35,7 +35,7 @@ const Routing = () => {
 
                 {(nonAuthRoutes || []).map((item, key) => (
                     <Route key={key} path={item.path} element={
-                        item.path === '/register' ? (
+                        ['/register', '/join-invitation'].includes(item.path) ? (
                             <NonLayout>{item.component}</NonLayout>
                         ) : (
                             <PublicOnlyRoute>

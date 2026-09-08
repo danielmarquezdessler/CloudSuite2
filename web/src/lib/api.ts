@@ -1,6 +1,6 @@
 import { User } from 'firebase/auth';
 
-const apiBaseUrl = import.meta.env.VITE_FIREBASE_API_URL ?? 'http://127.0.0.1:8080';
+export const apiBaseUrl = import.meta.env.VITE_FIREBASE_API_URL ?? 'http://127.0.0.1:8080';
 
 export async function authenticatedFetch(user: User, path: string, init: RequestInit = {}) {
   const idToken = await user.getIdToken();
@@ -15,4 +15,11 @@ export async function authenticatedFetch(user: User, path: string, init: Request
   }
 
   return response.json();
+}
+
+export async function publicFetch(path: string) {
+  const response = await fetch(`${apiBaseUrl}${path}`);
+  const body = await response.json().catch(() => ({ message: response.statusText }));
+  if (!response.ok) throw new Error(body.message ?? 'La operación no pudo completarse.');
+  return body;
 }

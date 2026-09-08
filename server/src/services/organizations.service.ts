@@ -38,6 +38,14 @@ export async function bootstrapOrganization(user: DecodedIdToken, input: Bootstr
 
   const orgRef = db.collection('organizations').doc();
   const campaignRef = orgRef.collection('campaigns').doc();
+  const defaultFunctions = [
+    ['Jefe de Campaña', 'Conduce la estrategia general de la campaña.', '#0060F0'],
+    ['Coordinador de Zona', 'Coordina la operación territorial.', '#D6008C'],
+    ['Fiscal', 'Fiscaliza y reporta durante la jornada electoral.', '#198754'],
+    ['Militante', 'Colabora con las acciones de campaña.', '#FD7E14'],
+    ['Apoyo Logístico', 'Apoya la logística y los recursos.', '#6C757D']
+  ] as const;
+  const functionRefs = defaultFunctions.map(() => campaignRef.collection('functions').doc());
 
   await db.runTransaction(async (transaction) => {
     transaction.set(orgRef, {
@@ -52,6 +60,12 @@ export async function bootstrapOrganization(user: DecodedIdToken, input: Bootstr
     transaction.set(campaignRef, {
       nombre: campaignName,
       createdAt: FieldValue.serverTimestamp()
+    });
+    defaultFunctions.forEach(([name, description, color], index) => transaction.set(functionRefs[index], {
+      name, description, color, deleted: false, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp()
+    }));
+    transaction.set(campaignRef.collection('members').doc(user.uid), {
+      email: user.email ?? '', displayName: user.name ?? user.email?.split('@')[0] ?? '', role: 'cliente', functionId: functionRefs[0].id, teamId: null, joinedAt: FieldValue.serverTimestamp()
     });
     transaction.set(userRef, {
       email: user.email ?? '',

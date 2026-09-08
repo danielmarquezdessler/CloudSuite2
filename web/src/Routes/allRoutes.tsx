@@ -1,4 +1,8 @@
 import Dashboard from "../pages/Dashboard";
+import Functions from '../pages/Modules/Organization/Functions';
+import Teams from '../pages/Modules/Organization/Teams';
+import Users from '../pages/Modules/Organization/Users';
+import JoinInvitation from '../pages/JoinInvitation';
 // import AffiliateDashboard from "../pages/AffiliateDashboard";
 // import InvoiceDashboard from "../pages/InvoiceDashboard";
 // import FinaceDashboard from "../pages/FinaceDashboard";
@@ -164,6 +168,9 @@ const routes = [
     // { path: "/forms/editor-document", component: <EditorDocument /> },
 
     { path: "/dashboard", component: <Dashboard /> },
+    { path: "/organization/functions", component: <Functions /> },
+    { path: "/organization/teams", component: <Teams /> },
+    { path: "/organization/users", component: <Users /> },
     // { path: "/affiliate-dashboard", component: <AffiliateDashboard /> },
     // { path: "/invoice-dashboard", component: <InvoiceDashboard /> },
     // { path: "/finance-dashboard", component: <FinaceDashboard /> },
@@ -351,6 +358,7 @@ const nonAuthRoutes = [
 
     { path: "/", component: <LoginV2 /> },
     { path: "/register", component: <Register /> },
+    { path: "/join-invitation", component: <JoinInvitation /> },
     { path: "*", component: <LoginV2 /> },
 
     //Authentication1

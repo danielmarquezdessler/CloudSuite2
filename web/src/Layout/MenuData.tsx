@@ -392,7 +392,11 @@ const templateMenuItems = [
 
 const menuItems = [
     { label: 'CloudSuite', type: 'HEADER' },
-    { id: 'dashboard', label: 'Dashboard', icon: 'ph-duotone ph-gauge', link: '/dashboard', dataPage: 'dashboard' }
+    { id: 'dashboard', label: 'Dashboard', icon: 'ph-duotone ph-gauge', link: '/dashboard', dataPage: 'dashboard' },
+    { label: 'Organización', type: 'HEADER' },
+    { id: 'organization-functions', label: 'Funciones', icon: 'ph-duotone ph-identification-badge', link: '/organization/functions', dataPage: 'functions' },
+    { id: 'organization-teams', label: 'Equipos', icon: 'ph-duotone ph-users-three', link: '/organization/teams', dataPage: 'teams' },
+    { id: 'organization-users', label: 'Usuarios', icon: 'ph-duotone ph-user-plus', link: '/organization/users', dataPage: 'users' }
 ];
 
 export { menuItems, templateMenuItems };
