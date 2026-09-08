@@ -66,29 +66,30 @@ $googleFontsUrl: "https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;60
   box-shadow: 0 24px 60px rgba(0, 43, 128, 0.25);
 }
 
-.cloudsuite-logo-placeholder {
+.cloudsuite-logo-shell {
   display: inline-flex;
   align-items: center;
-  min-height: 42px;
-  color: #0060F0;
-  font-size: 1.45rem;
-  font-weight: 700;
-  letter-spacing: -0.04em;
+  justify-content: center;
+  background: #fff;
+  border-radius: 10px;
 }
 
-.cloudsuite-logo-placeholder::before {
-  width: 26px;
-  height: 26px;
-  margin-right: 10px;
-  border: 4px solid currentColor;
-  border-radius: 8px;
-  content: '';
+.cloudsuite-logo {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.cloudsuite-logo-shell--login {
+  width: 250px;
+  padding: 8px 12px;
+}
+
+.cloudsuite-logo-shell--sidebar {
+  width: 172px;
+  padding: 5px 8px;
 }
 
 [data-pc-theme='dark'] .cloudsuite-auth__panel {
   background: var(--bs-body-bg);
-}
-
-[data-pc-theme='dark'] .cloudsuite-logo-placeholder {
-  color: #72b5ff;
 }

@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { Card, CardBody } from "react-bootstrap";
 import { THEME_MODE } from "../../Common/layoutConfig";
 import { changeThemeMode } from "../../toolkit/thunk";
+import cloudsuiteLogo from '../../assets/images/cloudsuite.svg';
 
 const LoginV2 = () => {
     const dispatch = useDispatch<any>();
@@ -22,8 +23,9 @@ const LoginV2 = () => {
                 <CardBody className="p-4 p-md-5">
                     <div className="d-flex justify-content-between align-items-start mb-4">
                         <div>
-                            {/* Logo CloudSuite: reemplazar este placeholder cuando esté disponible el archivo final. */}
-                            <span className="cloudsuite-logo-placeholder">CloudSuite</span>
+                            <div className="cloudsuite-logo-shell cloudsuite-logo-shell--login">
+                                <img className="cloudsuite-logo" src={cloudsuiteLogo} alt="CloudSuite" />
+                            </div>
                             <p className="text-muted mb-0 mt-2">Gestión inteligente de campañas</p>
                         </div>
                         <button

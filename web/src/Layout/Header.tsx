@@ -2,6 +2,7 @@ import React from "react";
 import { Link } from "react-router-dom";
 //import images
 
+import cloudsuiteLogo from '../assets/images/cloudsuite.svg';
 import avatar1 from "../assets/images/user/avatar-1.jpg"
 import SimpleBar from "simplebar-react";
 import { menuItems } from "./MenuData";
@@ -15,8 +16,9 @@ const Header = ({ themeMode }: { themeMode: string }) => {
         <div className="navbar-wrapper">
           <div className="m-header">
             <Link to="/dashboard" className="b-brand text-primary">
-              {/* Logo CloudSuite: reemplazar este placeholder cuando esté disponible el archivo final. */}
-              <span className="cloudsuite-logo-placeholder">CloudSuite</span>
+              <span className="cloudsuite-logo-shell cloudsuite-logo-shell--sidebar">
+                <img className="cloudsuite-logo" src={cloudsuiteLogo} alt="CloudSuite" />
+              </span>
             </Link>
           </div>
 
