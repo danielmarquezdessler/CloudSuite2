@@ -1,0 +1,94 @@
+$googleFontsUrl: "https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700&display=swap";
+@import url("https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700&display=swap");
+@import "./style.scss";
+@import "./style-preset.scss";
+@import "./uikit.scss";
+@import "../fonts/tabler-icons.min.css";
+@import "../fonts/feather.css";
+@import "../fonts/fontawesome.css";
+@import "../fonts/material.css";
+
+// Define a variable for the Google Fonts URL
+
+// Import the Google Fonts using the @import directive
+
+// Now you can use the font in your styles
+// body {
+//   font-family: 'Public Sans', sans-serif;
+// }
+
+.paymenttab {
+    display: none !important;
+
+    // background-color: transparent !important;
+    // border: 0 !important;
+}
+
+.dropdown-menu .dropdown-item svg.svg-dropdown-icon {
+    fill: var(--bs-dropdown-link-color);
+    font-size: 5px;
+}
+
+#left-right-fix {
+    overflow-x: scroll !important;
+    overflow-y: scroll !important;
+    height: 500px;
+}
+
+#right-fix {
+    overflow-x: scroll !important;
+    overflow-y: scroll !important;
+    height: 500px;
+}
+
+.tableScroller {
+    max-height: 250px;
+    overflow-y: auto !important;
+}
+
+.modal-body {
+    background-color: white !important;
+}
+
+#world-map-markers::-webkit-scrollbar {
+	display: none;
+}
+
+.cloudsuite-auth {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #0090F0 0%, #0048F0 100%);
+}
+
+.cloudsuite-auth__panel {
+  width: min(100%, 440px);
+  border: 0;
+  border-radius: 20px;
+  box-shadow: 0 24px 60px rgba(0, 43, 128, 0.25);
+}
+
+.cloudsuite-logo-placeholder {
+  display: inline-flex;
+  align-items: center;
+  min-height: 42px;
+  color: #0060F0;
+  font-size: 1.45rem;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+}
+
+.cloudsuite-logo-placeholder::before {
+  width: 26px;
+  height: 26px;
+  margin-right: 10px;
+  border: 4px solid currentColor;
+  border-radius: 8px;
+  content: '';
+}
+
+[data-pc-theme='dark'] .cloudsuite-auth__panel {
+  background: var(--bs-body-bg);
+}
+
+[data-pc-theme='dark'] .cloudsuite-logo-placeholder {
+  color: #72b5ff;
+}
