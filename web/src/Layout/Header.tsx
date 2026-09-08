@@ -2,7 +2,6 @@ import React from "react";
 import { Link } from "react-router-dom";
 //import images
 
-import navCardBg from '../assets/images/layout/nav-card-bg.svg'
 import avatar1 from "../assets/images/user/avatar-1.jpg"
 import SimpleBar from "simplebar-react";
 import { menuItems } from "./MenuData";
@@ -26,21 +25,10 @@ const Header = ({ themeMode }: { themeMode: string }) => {
 
               <NestedMenu menuItems={menuItems} />
             </ul>
-            <Card className="nav-action-card bg-brand-color-4">
-              <CardBody
-                style={{ backgroundImage: `url(${navCardBg})` }}
-              >
-                <h5 className="text-dark">Help Center</h5>
-                <p className="text-dark text-opacity-75">
-                  Please contact us for more questions.
-                </p>
-                <Link
-                  to="https://phoenixcoded.support-hub.io/"
-                  className="btn btn-primary"
-                  target="_blank"
-                >
-                  Go to help Center
-                </Link>
+            <Card className="nav-action-card border-0 bg-primary-subtle">
+              <CardBody>
+                <h5 className="text-primary">CloudSuite</h5>
+                <p className="text-muted mb-0">Módulos de campaña próximamente.</p>
               </CardBody>
             </Card>
           </SimpleBar>

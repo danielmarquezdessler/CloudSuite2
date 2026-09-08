@@ -1,4 +1,4 @@
-const menuItems = [
+const templateMenuItems = [
     {
         label: "Navigation", type: "HEADER", //  HEADER , HASHMENU, ITEM(default)
     },
@@ -390,4 +390,9 @@ const menuItems = [
     { id: "samplepage", label: "Sample Page", icon: "ph-duotone ph-desktop", link: "/other/sample-page", dataPage: "sample-page" }
 ];
 
-export { menuItems };
+const menuItems = [
+    { label: 'CloudSuite', type: 'HEADER' },
+    { id: 'dashboard', label: 'Dashboard', icon: 'ph-duotone ph-gauge', link: '/dashboard', dataPage: 'dashboard' }
+];
+
+export { menuItems, templateMenuItems };
