@@ -9,7 +9,13 @@ import VotersMap from '../pages/Modules/Execution/VotersMap';
 import AuditLog from '../pages/Modules/System/AuditLog';
 import Notifications from '../pages/Modules/System/Notifications';
 import QuestionsEditor from '../pages/Modules/Planning/QuestionsEditor';
-import PlanningWorkspace from '../pages/Modules/Planning/PlanningWorkspace';
+import Calendario from '../pages/Modules/Planning/Calendario';
+import Territorio from '../pages/Modules/Planning/Territorio';
+import Metas from '../pages/Modules/Planning/Metas';
+import Rutas from '../pages/Modules/Planning/Rutas';
+import Encuestas from '../pages/Modules/Planning/Encuestas';
+import Presupuesto from '../pages/Modules/Planning/Presupuesto';
+import Asesor from '../pages/Modules/Planning/Asesor';
 import SettingsPlaceholder from '../pages/Modules/System/SettingsPlaceholder';
 // import AffiliateDashboard from "../pages/AffiliateDashboard";
 // import InvoiceDashboard from "../pages/InvoiceDashboard";
@@ -186,13 +192,13 @@ const routes = [
     { path: "/audit-log", component: <AuditLog /> },
     { path: "/notifications", component: <Notifications /> },
     { path: "/planning/questions", component: <QuestionsEditor /> },
-    { path: "/planning/calendar", component: <PlanningWorkspace area="calendar" /> },
-    { path: "/planning/territory", component: <PlanningWorkspace area="territory" /> },
-    { path: "/planning/goals", component: <PlanningWorkspace area="goals" /> },
-    { path: "/planning/routes", component: <PlanningWorkspace area="routes" /> },
-    { path: "/planning/surveys", component: <PlanningWorkspace area="surveys" /> },
-    { path: "/planning/budget", component: <PlanningWorkspace area="budget" /> },
-    { path: "/planning/advisor", component: <PlanningWorkspace area="advisor" /> },
+    { path: "/planning/calendar", component: <Calendario /> },
+    { path: "/planning/territory", component: <Territorio /> },
+    { path: "/planning/goals", component: <Metas /> },
+    { path: "/planning/routes", component: <Rutas /> },
+    { path: "/planning/surveys", component: <Encuestas /> },
+    { path: "/planning/budget", component: <Presupuesto /> },
+    { path: "/planning/advisor", component: <Asesor /> },
     { path: "/settings", component: <SettingsPlaceholder /> },
     // { path: "/affiliate-dashboard", component: <AffiliateDashboard /> },
     // { path: "/invoice-dashboard", component: <InvoiceDashboard /> },
