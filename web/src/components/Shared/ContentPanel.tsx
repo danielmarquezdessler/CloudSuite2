@@ -1,0 +1,2 @@
+import { ReactNode } from 'react';
+export default function ContentPanel({ icon, title, subtitle, headerAction, children }: { icon: string; title: string; subtitle?: string; headerAction?: ReactNode; children: ReactNode }) { return <section className="cs-content-panel"><header><span><i className={'feather icon-' + icon} /></span><div><h2>{title}</h2>{subtitle && <p>{subtitle}</p>}</div>{headerAction && <div className="ms-auto">{headerAction}</div>}</header><div className="cs-content-panel__body">{children}</div></section>; }
