@@ -35,11 +35,15 @@ const Routing = () => {
 
                 {(nonAuthRoutes || []).map((item, key) => (
                     <Route key={key} path={item.path} element={
-                        <PublicOnlyRoute>
-                            <NonLayout>
-                                {item.component}
-                            </NonLayout>
-                        </PublicOnlyRoute>
+                        item.path === '/register' ? (
+                            <NonLayout>{item.component}</NonLayout>
+                        ) : (
+                            <PublicOnlyRoute>
+                                <NonLayout>
+                                    {item.component}
+                                </NonLayout>
+                            </PublicOnlyRoute>
+                        )
                     } />
                 ))}
             </Routes>

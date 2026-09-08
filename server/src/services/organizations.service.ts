@@ -70,25 +70,37 @@ export async function bootstrapOrganization(user: DecodedIdToken, input: Bootstr
 }
 
 export async function getCurrentUserData(user: DecodedIdToken) {
-  const orgId = typeof user.orgId === 'string' ? user.orgId : undefined;
+  const profileSnapshot = await db.collection('users').doc(user.uid).get();
+  const profile = profileSnapshot.data() ?? {};
+  const claimedOrgId = typeof user.orgId === 'string' ? user.orgId : undefined;
+  const profileOrgId = Array.isArray(profile.orgIds)
+    ? profile.orgIds.find((orgId): orgId is string => typeof orgId === 'string')
+    : undefined;
+  // Firebase puede tardar unos segundos en emitir un token con claims recién asignadas.
+  // Durante esa ventana el backend sólo usa la membresía del propio usuario como respaldo.
+  const orgId = claimedOrgId ?? profileOrgId;
   if (!orgId) {
     return { hasOrg: false };
   }
 
   const orgRef = db.collection('organizations').doc(orgId);
-  const [profileSnapshot, organizationSnapshot, campaignsSnapshot] = await Promise.all([
-    db.collection('users').doc(user.uid).get(),
+  const [organizationSnapshot, memberSnapshot, campaignsSnapshot] = await Promise.all([
     orgRef.get(),
+    orgRef.collection('members').doc(user.uid).get(),
     orgRef.collection('campaigns').get()
   ]);
 
   if (!organizationSnapshot.exists) {
     throw new NotFoundError('La organización no existe.');
   }
+  if (!memberSnapshot.exists) {
+    return { hasOrg: false };
+  }
 
-  const profile = profileSnapshot.data() ?? {};
   const organization = organizationSnapshot.data()!;
+  const member = memberSnapshot.data() ?? {};
   const camps = typeof user.camps === 'object' && user.camps !== null ? user.camps as Record<string, boolean> : {};
+  const claimsArePending = !claimedOrgId;
   return {
     hasOrg: true,
     profile: {
@@ -97,8 +109,8 @@ export async function getCurrentUserData(user: DecodedIdToken) {
     },
     organization: { id: organizationSnapshot.id, nombre: organization.nombre },
     campaigns: campaignsSnapshot.docs
-      .filter((campaign) => camps[campaign.id] === true)
+      .filter((campaign) => claimsArePending || camps[campaign.id] === true)
       .map((campaign) => ({ id: campaign.id, nombre: campaign.data().nombre })),
-    role: typeof user.role === 'string' ? user.role : 'sin-rol'
+    role: typeof user.role === 'string' ? user.role : member.role ?? 'sin-rol'
   };
 }

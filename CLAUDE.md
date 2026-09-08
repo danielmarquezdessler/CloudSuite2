@@ -29,6 +29,7 @@ Antes de editar cualquier archivo existente del template, abrilo y leé su conte
 - Monorepo creado con frontend y backend separados, rebrandeado con la identidad visual de CloudSuite y su logo.
 - Firebase Authentication implementado: login, registro de cliente, contexto de sesión, logout y guardas de rutas privadas.
 - El registro ejecuta secuencialmente la creación de usuario, bootstrap de organización, refresco del token con claims y navegación al dashboard.
+- La guarda de `/register` no redirige durante el bootstrap; `GET /api/me` tolera la breve propagación de claims usando la membresía propia como respaldo.
 - El backend usa Firebase Admin SDK con ADC, valida tokens y expone el bootstrap multi-campaña y `GET /api/me`.
 - Firestore usa reglas desplegadas basadas exclusivamente en custom claims; las escrituras sensibles quedan reservadas al backend.
 - El dashboard muestra organización y campaña reales, permite recuperar un bootstrap incompleto y el header/sidebar muestran el usuario y rol autenticados, sin datos demo.

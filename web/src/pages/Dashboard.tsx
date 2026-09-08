@@ -26,9 +26,12 @@ const Dashboard = () => {
   const [campaignName, setCampaignName] = useState('');
   const [isRecovering, setIsRecovering] = useState(false);
 
-  const loadProfile = async () => {
+  const loadProfile = async (forceTokenRefresh = false) => {
     if (!user) return;
     try {
+      if (forceTokenRefresh) {
+        await user.getIdToken(true);
+      }
       const data = await authenticatedFetch(user, '/api/me') as MeResponse;
       setMe(data);
       setSelectedCampaignId(data.campaigns?.[0]?.id ?? '');
@@ -38,7 +41,7 @@ const Dashboard = () => {
     }
   };
 
-  useEffect(() => { void loadProfile(); }, [user]);
+  useEffect(() => { void loadProfile(true); }, [user]);
 
   const handleLogout = async () => {
     await logout();
