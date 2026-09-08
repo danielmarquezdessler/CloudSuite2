@@ -15,6 +15,11 @@ export function assertCampaignAdmin(user: DecodedIdToken, orgId: string, campId:
   if (user.role !== 'cliente') throw new ForbiddenError('Solo el Cliente puede administrar esta campaña.');
 }
 
+export function assertCampaignManager(user: DecodedIdToken, orgId: string, campId: string) {
+  assertCampaignAccess(user, orgId, campId);
+  if (user.role !== 'cliente' && user.role !== 'admin') throw new ForbiddenError('Solo el Cliente o un admin puede importar electores.');
+}
+
 export function campaignRef(orgId: string, campId: string) {
   return db.collection('organizations').doc(orgId).collection('campaigns').doc(campId);
 }

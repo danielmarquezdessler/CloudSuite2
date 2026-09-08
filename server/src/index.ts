@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import { organizationsRouter } from './routes/organizations.routes.js';
 import { campaignRouter } from './routes/campaign.routes.js';
+import { votersRouter } from './routes/voters.routes.js';
 
 const app = express();
 const port = Number(process.env.PORT ?? 8080);
@@ -15,6 +16,7 @@ app.get('/health', (_request, response) => {
 
 app.use('/api', organizationsRouter);
 app.use('/api', campaignRouter);
+app.use('/api', votersRouter);
 
 app.listen(port, () => {
   console.log(`CloudSuite server listening on port ${port}`);

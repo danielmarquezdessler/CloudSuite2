@@ -397,6 +397,9 @@ const menuItems = [
     { id: 'organization-functions', label: 'Funciones', icon: 'ph-duotone ph-identification-badge', link: '/organization/functions', dataPage: 'functions' },
     { id: 'organization-teams', label: 'Equipos', icon: 'ph-duotone ph-users-three', link: '/organization/teams', dataPage: 'teams' },
     { id: 'organization-users', label: 'Usuarios', icon: 'ph-duotone ph-user-plus', link: '/organization/users', dataPage: 'users' }
+    ,{ label: 'Conversión electoral', type: 'HEADER' }
+    ,{ id: 'voters', label: 'Electores', icon: 'ph-duotone ph-users', link: '/electoral-conversion/voters', dataPage: 'voters' }
+    ,{ id: 'voters-map', label: 'Mapa', icon: 'ph-duotone ph-map-trifold', link: '/electoral-conversion/map', dataPage: 'map' }
 ];
 
 export { menuItems, templateMenuItems };

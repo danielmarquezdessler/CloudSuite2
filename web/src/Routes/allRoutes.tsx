@@ -3,6 +3,9 @@ import Functions from '../pages/Modules/Organization/Functions';
 import Teams from '../pages/Modules/Organization/Teams';
 import Users from '../pages/Modules/Organization/Users';
 import JoinInvitation from '../pages/JoinInvitation';
+import VotersList from '../pages/Modules/ElectoralConversion/VotersList';
+import VisitScreen from '../pages/Modules/ElectoralConversion/VisitScreen';
+import VotersMap from '../pages/Modules/Execution/VotersMap';
 // import AffiliateDashboard from "../pages/AffiliateDashboard";
 // import InvoiceDashboard from "../pages/InvoiceDashboard";
 // import FinaceDashboard from "../pages/FinaceDashboard";
@@ -171,6 +174,9 @@ const routes = [
     { path: "/organization/functions", component: <Functions /> },
     { path: "/organization/teams", component: <Teams /> },
     { path: "/organization/users", component: <Users /> },
+    { path: "/electoral-conversion/voters", component: <VotersList /> },
+    { path: "/electoral-conversion/map", component: <VotersMap /> },
+    { path: "/visit/:voterId", component: <VisitScreen /> },
     // { path: "/affiliate-dashboard", component: <AffiliateDashboard /> },
     // { path: "/invoice-dashboard", component: <InvoiceDashboard /> },
     // { path: "/finance-dashboard", component: <FinaceDashboard /> },

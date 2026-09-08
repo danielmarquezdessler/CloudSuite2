@@ -1,0 +1,11 @@
+import { Request, Response } from 'express';
+import { ForbiddenError, NotFoundError, ValidationError } from '../services/access.service.js';
+import * as voters from '../services/voters.service.js'; import * as visits from '../services/visits.service.js';
+const ids = (r: Request) => [String(r.params.orgId), String(r.params.campId)] as const;
+const fail = (s: Response, e: unknown) => { if (e instanceof ForbiddenError) return s.status(403).json({ message: e.message }); if (e instanceof ValidationError) return s.status(400).json({ message: e.message }); if (e instanceof NotFoundError) return s.status(404).json({ message: e.message }); console.error(e); return s.status(500).json({ message: 'No pudimos completar la operación.' }); };
+export const importVoters = async (r: Request, s: Response) => { try { s.status(201).json(await voters.importVoters(r.user!, ...ids(r), r.file, r.body.allowNearDuplicates === 'true')); } catch(e) { fail(s,e); } };
+export const getVoters = async (r: Request, s: Response) => { try { s.json(await voters.listVoters(r.user!, ...ids(r))); } catch(e) { fail(s,e); } };
+export const startVisit = async (r: Request, s: Response) => { try { s.status(201).json(await visits.startVisit(r.user!, ...ids(r), String(r.params.voterId))); } catch(e) { fail(s,e); } };
+export const feedback = async (r: Request, s: Response) => { try { await visits.saveFeedback(r.user!, ...ids(r), String(r.params.voterId), String(r.params.visitId), r.body); s.status(204).end(); } catch(e) { fail(s,e); } };
+export const conversion = async (r: Request, s: Response) => { try { await visits.convertVisit(r.user!, ...ids(r), String(r.params.voterId), String(r.params.visitId), String(r.body.decision)); s.status(204).end(); } catch(e) { fail(s,e); } };
+export const history = async (r: Request, s: Response) => { try { s.json(await visits.listVisits(r.user!, ...ids(r), String(r.params.voterId))); } catch(e) { fail(s,e); } };

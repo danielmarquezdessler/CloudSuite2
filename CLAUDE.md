@@ -34,3 +34,4 @@ Antes de editar cualquier archivo existente del template, abrilo y leé su conte
 - Firestore usa reglas desplegadas basadas exclusivamente en custom claims; las escrituras sensibles quedan reservadas al backend.
 - El dashboard muestra organización y campaña reales, permite recuperar un bootstrap incompleto y el header/sidebar muestran el usuario y rol autenticados, sin datos demo.
 - Módulo Organización listo: Funciones y Equipos con CRUD, miembros de campaña, invitaciones firmadas y aceptación pública con alta segura por backend.
+- Conversión electoral incorporada: importación CSV/XLSX, deduplicación, visitas con historial y conversión, lista de electores, mapa y guardado local de visita.

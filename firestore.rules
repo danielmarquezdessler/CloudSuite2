@@ -20,6 +20,11 @@ service cloud.firestore {
       return belongsToOrganization(orgId) && request.auth.token.role == 'cliente';
     }
 
+    function isManager(orgId) {
+      return belongsToOrganization(orgId)
+        && (request.auth.token.role == 'cliente' || request.auth.token.role == 'admin');
+    }
+
     match /organizations/{orgId} {
       allow read: if belongsToOrganization(orgId);
       allow write: if false;
@@ -58,6 +63,15 @@ service cloud.firestore {
     match /organizations/{orgId}/campaigns/{campId}/members/{memberId} {
       allow read: if belongsToOrganization(orgId) && canAccessCampaign(campId);
       allow write: if false;
+    }
+
+    match /organizations/{orgId}/campaigns/{campId}/voters/{voterId} {
+      allow read: if belongsToOrganization(orgId) && canAccessCampaign(campId);
+      allow write: if isManager(orgId) && canAccessCampaign(campId);
+    }
+
+    match /organizations/{orgId}/campaigns/{campId}/visits/{visitId} {
+      allow read, write: if belongsToOrganization(orgId) && canAccessCampaign(campId);
     }
 
     match /organizations/{orgId}/invitations/{invitationId} {
