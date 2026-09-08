@@ -9,6 +9,7 @@ import VotersMap from '../pages/Modules/Execution/VotersMap';
 import AuditLog from '../pages/Modules/System/AuditLog';
 import Notifications from '../pages/Modules/System/Notifications';
 import QuestionsEditor from '../pages/Modules/Planning/QuestionsEditor';
+import SettingsPlaceholder from '../pages/Modules/System/SettingsPlaceholder';
 // import AffiliateDashboard from "../pages/AffiliateDashboard";
 // import InvoiceDashboard from "../pages/InvoiceDashboard";
 // import FinaceDashboard from "../pages/FinaceDashboard";
@@ -181,8 +182,10 @@ const routes = [
     { path: "/electoral-conversion/map", component: <VotersMap /> },
     { path: "/visit/:voterId", component: <VisitScreen /> },
     { path: "/control-de-revision", component: <AuditLog /> },
+    { path: "/audit-log", component: <AuditLog /> },
     { path: "/notifications", component: <Notifications /> },
     { path: "/planning/questions", component: <QuestionsEditor /> },
+    { path: "/settings", component: <SettingsPlaceholder /> },
     // { path: "/affiliate-dashboard", component: <AffiliateDashboard /> },
     // { path: "/invoice-dashboard", component: <InvoiceDashboard /> },
     // { path: "/finance-dashboard", component: <FinaceDashboard /> },
