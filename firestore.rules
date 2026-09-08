@@ -2,85 +2,26 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    function signedIn() {
-      return request.auth != null;
-    }
+    function signedIn() { return request.auth != null; }
+    function belongsToOrganization(orgId) { return signedIn() && request.auth.token.orgId == orgId; }
+    function canAccessCampaign(campId) { return signedIn() && request.auth.token.camps != null && request.auth.token.camps[campId] == true; }
+    function campaignMember(orgId, campId) { return belongsToOrganization(orgId) && canAccessCampaign(campId); }
+    function isCliente(orgId) { return belongsToOrganization(orgId) && request.auth.token.role == 'cliente'; }
 
-    function belongsToOrganization(orgId) {
-      return signedIn() && request.auth.token.orgId == orgId;
-    }
-
-    function canAccessCampaign(campId) {
-      return signedIn()
-        && request.auth.token.camps != null
-        && request.auth.token.camps[campId] == true;
-    }
-
-    function isCliente(orgId) {
-      return belongsToOrganization(orgId) && request.auth.token.role == 'cliente';
-    }
-
-    function isManager(orgId) {
-      return belongsToOrganization(orgId)
-        && (request.auth.token.role == 'cliente' || request.auth.token.role == 'admin');
-    }
-
-    match /organizations/{orgId} {
-      allow read: if belongsToOrganization(orgId);
-      allow write: if false;
-    }
-
-    match /organizations/{orgId}/members/{memberId} {
-      allow read: if belongsToOrganization(orgId);
-      allow write: if false;
-    }
-
-    match /organizations/{orgId}/campaigns/{campId} {
-      allow read: if belongsToOrganization(orgId) && canAccessCampaign(campId);
-      allow write: if false;
-    }
-
-    match /organizations/{orgId}/campaigns/{campId}/{document=**} {
-      allow read: if belongsToOrganization(orgId) && canAccessCampaign(campId);
-      allow write: if false;
-    }
-
-    match /organizations/{orgId}/campaigns/{campId}/functions/{functionId} {
-      allow read: if true;
-      allow write: if isCliente(orgId) && canAccessCampaign(campId);
-    }
-
-    match /organizations/{orgId}/campaigns/{campId}/teams/{teamId} {
-      allow read: if belongsToOrganization(orgId) && canAccessCampaign(campId);
-      allow write: if isCliente(orgId) && canAccessCampaign(campId);
-    }
-
-    match /organizations/{orgId}/campaigns/{campId}/teams/{teamId}/members/{memberId} {
-      allow read: if belongsToOrganization(orgId) && canAccessCampaign(campId);
-      allow write: if false;
-    }
-
-    match /organizations/{orgId}/campaigns/{campId}/members/{memberId} {
-      allow read: if belongsToOrganization(orgId) && canAccessCampaign(campId);
-      allow write: if false;
-    }
-
-    match /organizations/{orgId}/campaigns/{campId}/voters/{voterId} {
-      allow read: if belongsToOrganization(orgId) && canAccessCampaign(campId);
-      allow write: if isManager(orgId) && canAccessCampaign(campId);
-    }
-
-    match /organizations/{orgId}/campaigns/{campId}/visits/{visitId} {
-      allow read, write: if belongsToOrganization(orgId) && canAccessCampaign(campId);
-    }
-
-    match /organizations/{orgId}/invitations/{invitationId} {
-      allow read, write: if isCliente(orgId);
-    }
-
-    match /users/{uid} {
-      allow read, update: if signedIn() && request.auth.uid == uid;
-      allow create, delete: if false;
-    }
+    match /organizations/{orgId} { allow read: if belongsToOrganization(orgId); allow write: if false; }
+    match /organizations/{orgId}/members/{memberId} { allow read: if belongsToOrganization(orgId); allow write: if false; }
+    match /organizations/{orgId}/invitations/{invitationId} { allow read, write: if false; }
+    match /organizations/{orgId}/campaigns/{campId} { allow read: if campaignMember(orgId, campId); allow write: if false; }
+    match /organizations/{orgId}/campaigns/{campId}/functions/{functionId} { allow read: if campaignMember(orgId, campId); allow write: if false; }
+    match /organizations/{orgId}/campaigns/{campId}/teams/{teamId} { allow read: if campaignMember(orgId, campId); allow write: if false; }
+    match /organizations/{orgId}/campaigns/{campId}/teams/{teamId}/members/{memberId} { allow read: if campaignMember(orgId, campId); allow write: if false; }
+    match /organizations/{orgId}/campaigns/{campId}/members/{memberId} { allow read: if campaignMember(orgId, campId); allow write: if false; }
+    match /organizations/{orgId}/campaigns/{campId}/voters/{voterId} { allow read: if campaignMember(orgId, campId); allow write: if false; }
+    match /organizations/{orgId}/campaigns/{campId}/visits/{visitId} { allow read: if campaignMember(orgId, campId); allow write: if false; }
+    match /organizations/{orgId}/campaigns/{campId}/questionSets/{setId} { allow read: if campaignMember(orgId, campId); allow write: if false; }
+    match /organizations/{orgId}/campaigns/{campId}/auditLog/{logId} { allow read: if isCliente(orgId) && canAccessCampaign(campId); allow write: if false; }
+    match /organizations/{orgId}/campaigns/{campId}/{document=**} { allow read, write: if false; }
+    match /users/{uid} { allow read, update: if signedIn() && request.auth.uid == uid; allow create, delete: if false; }
+    match /users/{uid}/notifications/{notificationId} { allow read: if signedIn() && request.auth.uid == uid; allow write: if false; }
   }
 }

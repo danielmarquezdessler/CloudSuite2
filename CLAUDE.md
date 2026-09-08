@@ -35,3 +35,7 @@ Antes de editar cualquier archivo existente del template, abrilo y leé su conte
 - El dashboard muestra organización y campaña reales, permite recuperar un bootstrap incompleto y el header/sidebar muestran el usuario y rol autenticados, sin datos demo.
 - Módulo Organización listo: Funciones y Equipos con CRUD, miembros de campaña, invitaciones firmadas y aceptación pública con alta segura por backend.
 - Conversión electoral incorporada: importación CSV/XLSX, deduplicación, visitas con historial y conversión, lista de electores, mapa y guardado local de visita.
+- Dashboard de campaña cerrado: métricas agregadas con caché de cinco minutos, evolución de 30 días, gráficos ApexCharts, comparativa por equipo, ranking de militantes y exportación Excel.
+- Control de Revisión append-only implementado para las operaciones principales; los eventos se guardan desde el backend y solo Cliente/admin puede consultarlos o exportarlos.
+- Notificaciones internas persistentes incorporadas: seed de bienvenida al bootstrap, campanita con contador, inbox, marcado de lectura, archivado y toast temporal.
+- Preguntas de visita configurables listas: conjuntos activos por campaña, editor de Cliente/admin y carga dinámica en la visita con cinco preguntas fallback.

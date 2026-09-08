@@ -1,6 +1,7 @@
 import { FieldValue } from 'firebase-admin/firestore';
 import { DecodedIdToken } from 'firebase-admin/auth';
 import { adminAuth, db } from '../config/firebase.js';
+import { createNotification } from './notifications.service.js';
 
 export class ConflictError extends Error {}
 export class NotFoundError extends Error {}
@@ -79,6 +80,12 @@ export async function bootstrapOrganization(user: DecodedIdToken, input: Bootstr
     orgId: orgRef.id,
     camps: { [campaignRef.id]: true }
   });
+
+  await Promise.all([
+    createNotification(user.uid, { type: 'welcome', title: 'Bienvenido a CloudSuite', message: `Tu campaña ${campaignName} está lista para empezar.`, metadata: { orgId: orgRef.id, campId: campaignRef.id } }),
+    createNotification(user.uid, { type: 'tip', title: 'Importá tus electores', message: 'Subí un CSV o Excel para iniciar la conversión electoral.', metadata: { path: '/electoral-conversion/voters' } }),
+    createNotification(user.uid, { type: 'tip', title: 'Configurá tu visita', message: 'Personalizá las preguntas que verá tu equipo territorial.', metadata: { path: '/planning/questions' } })
+  ]);
 
   return { orgId: orgRef.id, campId: campaignRef.id };
 }

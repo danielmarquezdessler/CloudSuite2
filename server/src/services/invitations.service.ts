@@ -4,6 +4,7 @@ import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { adminAuth, db } from '../config/firebase.js';
 import { assertCampaignAdmin, campaignRef, ForbiddenError, NotFoundError, ValidationError } from './access.service.js';
 import { sendInvitationEmail } from './email.service.js';
+import { createNotification } from './notifications.service.js';
 
 type InviteInput = { email?: string; role?: string; functionId?: string | null; teamId?: string | null; message?: string };
 const secret = () => process.env.INVITATION_TOKEN_SECRET ?? process.env.PROJECT_ID ?? 'cloudsuite-local-development-secret';
@@ -39,6 +40,8 @@ export async function acceptInvitation(user: DecodedIdToken, token: string) { co
   }, { merge: true });
   if (invitation.teamId) await campaignRef(orgId, invitation.campaignId).collection('teams').doc(invitation.teamId).collection('members').doc(user.uid).set({ joinedAt: FieldValue.serverTimestamp() });
   const current = (await adminAuth.getUser(user.uid)).customClaims ?? {}; const camps = { ...((current.camps as Record<string, boolean>) ?? {}), [invitation.campaignId]: true }; await adminAuth.setCustomUserClaims(user.uid, { ...current, role: current.role ?? invitation.role, orgId, camps });
-  await invitationDoc.ref.update({ status: 'accepted', acceptedAt: FieldValue.serverTimestamp(), acceptedUid: user.uid }); return { orgId, campId: invitation.campaignId };
+  await invitationDoc.ref.update({ status: 'accepted', acceptedAt: FieldValue.serverTimestamp(), acceptedUid: user.uid });
+  await createNotification(invitation.senderUid, { type: 'member_joined', title: 'Nuevo miembro en tu campaña', message: `${user.email ?? 'Un usuario'} aceptó la invitación.`, metadata: { campId: invitation.campaignId } });
+  return { orgId, campId: invitation.campaignId };
 }
 export async function listMembers(user: DecodedIdToken, orgId: string, campId: string) { assertCampaignAdmin(user, orgId, campId); const members = await campaignRef(orgId, campId).collection('members').get(); return members.docs.map(d => ({ uid: d.id, ...d.data() })); }

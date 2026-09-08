@@ -400,6 +400,9 @@ const menuItems = [
     ,{ label: 'Conversión electoral', type: 'HEADER' }
     ,{ id: 'voters', label: 'Electores', icon: 'ph-duotone ph-users', link: '/electoral-conversion/voters', dataPage: 'voters' }
     ,{ id: 'voters-map', label: 'Mapa', icon: 'ph-duotone ph-map-trifold', link: '/electoral-conversion/map', dataPage: 'map' }
+    ,{ id: 'planning-questions', label: 'Preguntas de visita', icon: 'ph-duotone ph-question', link: '/planning/questions', dataPage: 'questions' }
+    ,{ label: 'Sistema', type: 'HEADER' }
+    ,{ id: 'audit-log', label: 'Control de Revisión', icon: 'ph-duotone ph-shield-check', link: '/control-de-revision', dataPage: 'audit-log' }
 ];
 
 export { menuItems, templateMenuItems };

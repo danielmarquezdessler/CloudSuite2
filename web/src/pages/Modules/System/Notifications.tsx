@@ -1,0 +1,7 @@
+import { useEffect, useState } from 'react';
+import { useAuth } from '../../../context/AuthContext';
+import { authenticatedFetch } from '../../../lib/api';
+
+type NotificationItem = { id: string; title: string; message: string; read: boolean; createdAt: string | null };
+export default function Notifications() { const { user } = useAuth(); const [items, setItems] = useState<NotificationItem[]>([]); useEffect(() => { if (user) void authenticatedFetch(user, `/api/users/${user.uid}/notifications`).then(data => setItems(data as NotificationItem[])); }, [user]); const archive = async (id: string) => { if (!user) return; await authenticatedFetch(user, `/api/users/${user.uid}/notifications/${id}`, { method: 'DELETE' }); setItems(current => current.filter(item => item.id !== id)); }; return <section className="card"><div className="card-body"><h1 className="h4">Notificaciones</h1><p className="text-muted">Tu historial reciente de actividad.</p><div className="list-group">{items.map(item => <div className={`list-group-item d-flex justify-content-between gap-3 ${item.read ? '' : 'bg-light-primary'}`} key={item.id}><div><strong>{item.title}</strong><p className="mb-1">{item.message}</p><small className="text-muted">{item.createdAt ? new Date(item.createdAt).toLocaleString('es-AR') : 'Recién'}</small></div><button className="btn btn-sm btn-outline-secondary align-self-center" onClick={() => void archive(item.id)}>Archivar</button></div>)}{items.length === 0 && <p className="text-muted">No hay notificaciones.</p>}</div></div></section>; }
+
