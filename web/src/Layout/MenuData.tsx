@@ -401,6 +401,14 @@ const menuItems = [
     ,{ id: 'voters', label: 'Electores', icon: 'ph-duotone ph-users', link: '/electoral-conversion/voters', dataPage: 'voters' }
     ,{ id: 'voters-map', label: 'Mapa', icon: 'ph-duotone ph-map-trifold', link: '/electoral-conversion/map', dataPage: 'map' }
     ,{ id: 'planning-questions', label: 'Preguntas de visita', icon: 'ph-duotone ph-question', link: '/planning/questions', dataPage: 'questions' }
+    ,{ label: 'Planificación', type: 'HEADER' }
+    ,{ id: 'planning-calendar', label: 'Calendario', icon: 'ph-duotone ph-calendar', link: '/planning/calendar', dataPage: 'calendar' }
+    ,{ id: 'planning-territory', label: 'Territorio', icon: 'ph-duotone ph-map-trifold', link: '/planning/territory', dataPage: 'territory' }
+    ,{ id: 'planning-goals', label: 'Metas', icon: 'ph-duotone ph-target', link: '/planning/goals', dataPage: 'goals' }
+    ,{ id: 'planning-routes', label: 'Rutas', icon: 'ph-duotone ph-route', link: '/planning/routes', dataPage: 'routes' }
+    ,{ id: 'planning-surveys', label: 'Encuestas', icon: 'ph-duotone ph-clipboard-text', link: '/planning/surveys', dataPage: 'surveys' }
+    ,{ id: 'planning-budget', label: 'Presupuesto', icon: 'ph-duotone ph-wallet', link: '/planning/budget', dataPage: 'budget' }
+    ,{ id: 'planning-advisor', label: 'Asesor IA', icon: 'ph-duotone ph-sparkle', link: '/planning/advisor', dataPage: 'advisor' }
     ,{ label: 'Sistema', type: 'HEADER' }
     ,{ id: 'audit-log', label: 'Control de Revisión', icon: 'ph-duotone ph-shield-check', link: '/control-de-revision', dataPage: 'audit-log' }
 ];

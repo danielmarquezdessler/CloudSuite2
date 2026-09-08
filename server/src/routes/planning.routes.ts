@@ -1,0 +1,13 @@
+import { Router } from 'express';
+import { requireAuth } from '../middleware/requireAuth.js';
+import * as c from '../controllers/planning.controller.js';
+export const planningRouter = Router();
+const b = '/organizations/:orgId/campaigns/:campId';
+planningRouter.get(`${b}/calendar`, requireAuth, c.getCalendar); planningRouter.post(`${b}/calendar`, requireAuth, c.postCalendar); planningRouter.put(`${b}/calendar/:eventId`, requireAuth, c.putCalendar); planningRouter.delete(`${b}/calendar/:eventId`, requireAuth, c.deleteCalendar);
+planningRouter.get(`${b}/circuitos`, requireAuth, c.getCircuitos); planningRouter.post(`${b}/circuitos`, requireAuth, c.postCircuito); planningRouter.put(`${b}/circuitos/:circuitoId`, requireAuth, c.putCircuito); planningRouter.delete(`${b}/circuitos/:circuitoId`, requireAuth, c.deleteCircuito);
+planningRouter.get(`${b}/zones`, requireAuth, c.getZones); planningRouter.post(`${b}/zones`, requireAuth, c.postZone); planningRouter.get(`${b}/zones/:zoneId/voters`, requireAuth, c.getZoneVoters); planningRouter.put(`${b}/zones/:zoneId`, requireAuth, c.putZone); planningRouter.delete(`${b}/zones/:zoneId`, requireAuth, c.deleteZone);
+planningRouter.get(`${b}/goals`, requireAuth, c.getGoals); planningRouter.post(`${b}/goals`, requireAuth, c.postGoal); planningRouter.put(`${b}/goals/:goalId`, requireAuth, c.putGoal); planningRouter.delete(`${b}/goals/:goalId`, requireAuth, c.deleteGoal);
+planningRouter.get(`${b}/routes`, requireAuth, c.getRoutes); planningRouter.post(`${b}/routes`, requireAuth, c.postRoute); planningRouter.post(`${b}/routes/auto-distribute`, requireAuth, c.postAutoDistribute); planningRouter.get(`${b}/routes/:routeId/optimized`, requireAuth, c.getOptimizedRoute); planningRouter.put(`${b}/routes/:routeId`, requireAuth, c.putRoute);
+planningRouter.get(`${b}/surveys`, requireAuth, c.getSurveys); planningRouter.post(`${b}/surveys`, requireAuth, c.postSurvey); planningRouter.put(`${b}/surveys/:surveyId`, requireAuth, c.putSurvey); planningRouter.delete(`${b}/surveys/:surveyId`, requireAuth, c.deleteSurvey);
+planningRouter.get(`${b}/budgets`, requireAuth, c.getBudgets); planningRouter.post(`${b}/budgets`, requireAuth, c.postBudget); planningRouter.put(`${b}/budgets/:budgetId`, requireAuth, c.putBudget); planningRouter.delete(`${b}/budgets/:budgetId`, requireAuth, c.deleteBudget);
+planningRouter.get(`${b}/ai-suggestions`, requireAuth, c.getSuggestions); planningRouter.post(`${b}/ai-suggestions/request`, requireAuth, c.postSuggestions); planningRouter.put(`${b}/ai-suggestions/:suggestionId/feedback`, requireAuth, c.putSuggestionFeedback);

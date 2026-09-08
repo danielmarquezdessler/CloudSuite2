@@ -47,6 +47,11 @@ export async function bootstrapOrganization(user: DecodedIdToken, input: Bootstr
     ['Apoyo Logístico', 'Apoya la logística y los recursos.', '#6C757D']
   ] as const;
   const functionRefs = defaultFunctions.map(() => campaignRef.collection('functions').doc());
+  const circuitoRef = campaignRef.collection('circuitos').doc();
+  const zoneRefs = [campaignRef.collection('zones').doc(), campaignRef.collection('zones').doc()];
+  const goalRefs = [campaignRef.collection('goals').doc(), campaignRef.collection('goals').doc()];
+  const budgetRefs = [campaignRef.collection('budgets').doc(), campaignRef.collection('budgets').doc(), campaignRef.collection('budgets').doc()];
+  const suggestionRefs = [campaignRef.collection('aiSuggestions').doc(), campaignRef.collection('aiSuggestions').doc()];
 
   await db.runTransaction(async (transaction) => {
     transaction.set(orgRef, {
@@ -62,6 +67,13 @@ export async function bootstrapOrganization(user: DecodedIdToken, input: Bootstr
       nombre: campaignName,
       createdAt: FieldValue.serverTimestamp()
     });
+    transaction.set(circuitoRef, { name: 'Circuito Central', district: 'Distrito Central', schools: [{ name: 'Escuela Central', address: 'Centro', lat: -34.6037, lng: -58.3816 }], leaderId: user.uid, createdAt: FieldValue.serverTimestamp(), createdBy: user.uid, deleted: false });
+    transaction.set(zoneRefs[0], { name: 'Zona Norte', neighborhood: 'Norte', circuitoId: circuitoRef.id, leaderId: user.uid, polygon: [{ lat: -34.59, lng: -58.40 }, { lat: -34.59, lng: -58.37 }, { lat: -34.60, lng: -58.37 }, { lat: -34.60, lng: -58.40 }], createdAt: FieldValue.serverTimestamp(), createdBy: user.uid, deleted: false });
+    transaction.set(zoneRefs[1], { name: 'Zona Sur', neighborhood: 'Sur', circuitoId: circuitoRef.id, leaderId: user.uid, polygon: [{ lat: -34.61, lng: -58.40 }, { lat: -34.61, lng: -58.37 }, { lat: -34.63, lng: -58.37 }, { lat: -34.63, lng: -58.40 }], createdAt: FieldValue.serverTimestamp(), createdBy: user.uid, deleted: false });
+    transaction.set(goalRefs[0], { type: 'coverage', target: 100, progress: 0, zoneId: zoneRefs[0].id, functionId: null, description: 'Cubrir el padrón prioritario', createdAt: FieldValue.serverTimestamp(), createdBy: user.uid, deleted: false });
+    transaction.set(goalRefs[1], { type: 'conversion', target: 30, progress: 0, zoneId: zoneRefs[1].id, functionId: null, description: 'Convertir electores indecisos', createdAt: FieldValue.serverTimestamp(), createdBy: user.uid, deleted: false });
+    [['Territorio', 100000, 0], ['Comunicación', 75000, 0], ['Logística', 50000, 0]].forEach(([category, amount, spent], index) => transaction.set(budgetRefs[index], { category, amount, spent, description: 'Línea inicial de presupuesto', createdAt: FieldValue.serverTimestamp(), createdBy: user.uid, deleted: false }));
+    [['focus_zone', 'Priorizá la Zona Norte durante la primera semana.', 'La cobertura inicial es la base para optimizar el resto de la campaña.'], ['resource_allocation', 'Reservá recursos para logística territorial.', 'El presupuesto inicial permite medir ejecución y desvíos.']].forEach(([type, content, reasoning], index) => transaction.set(suggestionRefs[index], { type, content, reasoning, potential_gain: 'Mejor cobertura y control de recursos', feedback: 'modified', source: 'demo', createdAt: FieldValue.serverTimestamp(), requestedBy: user.uid }));
     defaultFunctions.forEach(([name, description, color], index) => transaction.set(functionRefs[index], {
       name, description, color, deleted: false, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp()
     }));

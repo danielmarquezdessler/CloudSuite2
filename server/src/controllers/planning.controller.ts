@@ -1,0 +1,44 @@
+import { Request, Response } from 'express';
+import { ForbiddenError, NotFoundError, ValidationError } from '../services/access.service.js';
+import * as planning from '../services/planning.service.js';
+
+const ids = (request: Request) => [String(request.params.orgId), String(request.params.campId)] as const;
+const id = (request: Request, key: string) => String(request.params[key]);
+function fail(response: Response, error: unknown) { if (error instanceof ForbiddenError) return response.status(403).json({ message: error.message }); if (error instanceof ValidationError) return response.status(400).json({ message: error.message }); if (error instanceof NotFoundError) return response.status(404).json({ message: error.message }); console.error(error); return response.status(500).json({ message: 'No pudimos completar la operación.' }); }
+const handler = (action: (request: Request) => Promise<unknown>, status = 200) => async (request: Request, response: Response) => { try { response.status(status).json(await action(request)); } catch (error) { fail(response, error); } };
+const destroy = (action: (request: Request) => Promise<void>) => async (request: Request, response: Response) => { try { await action(request); response.status(204).end(); } catch (error) { fail(response, error); } };
+const user = (request: Request) => request.user!;
+
+export const getCalendar = handler(r => planning.listCalendar(user(r), ...ids(r)));
+export const postCalendar = handler(r => planning.createCalendar(user(r), ...ids(r), r.body), 201);
+export const putCalendar = handler(r => planning.updateCalendar(user(r), ...ids(r), id(r, 'eventId'), r.body));
+export const deleteCalendar = destroy(r => planning.deleteCalendar(user(r), ...ids(r), id(r, 'eventId')));
+export const getCircuitos = handler(r => planning.listCircuitos(user(r), ...ids(r)));
+export const postCircuito = handler(r => planning.createCircuito(user(r), ...ids(r), r.body), 201);
+export const putCircuito = handler(r => planning.updateCircuito(user(r), ...ids(r), id(r, 'circuitoId'), r.body));
+export const deleteCircuito = destroy(r => planning.deleteCircuito(user(r), ...ids(r), id(r, 'circuitoId')));
+export const getZones = handler(r => planning.listZones(user(r), ...ids(r)));
+export const postZone = handler(r => planning.createZone(user(r), ...ids(r), r.body), 201);
+export const putZone = handler(r => planning.updateZone(user(r), ...ids(r), id(r, 'zoneId'), r.body));
+export const deleteZone = destroy(r => planning.deleteZone(user(r), ...ids(r), id(r, 'zoneId')));
+export const getZoneVoters = handler(r => planning.zoneVoters(user(r), ...ids(r), id(r, 'zoneId')));
+export const getGoals = handler(r => planning.listGoals(user(r), ...ids(r)));
+export const postGoal = handler(r => planning.createGoal(user(r), ...ids(r), r.body), 201);
+export const putGoal = handler(r => planning.updateGoal(user(r), ...ids(r), id(r, 'goalId'), r.body));
+export const deleteGoal = destroy(r => planning.deleteGoal(user(r), ...ids(r), id(r, 'goalId')));
+export const getRoutes = handler(r => planning.listRoutes(user(r), ...ids(r)));
+export const postRoute = handler(r => planning.createRoute(user(r), ...ids(r), r.body), 201);
+export const putRoute = handler(r => planning.updateRoute(user(r), ...ids(r), id(r, 'routeId'), r.body));
+export const getOptimizedRoute = handler(r => planning.optimizeRoute(user(r), ...ids(r), id(r, 'routeId')));
+export const postAutoDistribute = handler(r => planning.autoDistributeRoutes(user(r), ...ids(r)), 201);
+export const getSurveys = handler(r => planning.listSurveys(user(r), ...ids(r)));
+export const postSurvey = handler(r => planning.createSurvey(user(r), ...ids(r), r.body), 201);
+export const putSurvey = handler(r => planning.updateSurvey(user(r), ...ids(r), id(r, 'surveyId'), r.body));
+export const deleteSurvey = destroy(r => planning.deleteSurvey(user(r), ...ids(r), id(r, 'surveyId')));
+export const getBudgets = handler(r => planning.listBudgets(user(r), ...ids(r)));
+export const postBudget = handler(r => planning.createBudget(user(r), ...ids(r), r.body), 201);
+export const putBudget = handler(r => planning.updateBudget(user(r), ...ids(r), id(r, 'budgetId'), r.body));
+export const deleteBudget = destroy(r => planning.deleteBudget(user(r), ...ids(r), id(r, 'budgetId')));
+export const getSuggestions = handler(r => planning.listSuggestions(user(r), ...ids(r)));
+export const postSuggestions = handler(r => planning.requestSuggestions(user(r), ...ids(r)), 201);
+export const putSuggestionFeedback = handler(r => planning.setSuggestionFeedback(user(r), ...ids(r), id(r, 'suggestionId'), String(r.body.feedback)));

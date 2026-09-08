@@ -14,6 +14,7 @@ export async function authenticatedFetch(user: User, path: string, init: Request
     throw new Error(body.message ?? 'La operación no pudo completarse.');
   }
 
+  if (response.status === 204) return undefined;
   return response.json();
 }
 

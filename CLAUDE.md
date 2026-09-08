@@ -39,3 +39,4 @@ Antes de editar cualquier archivo existente del template, abrilo y leé su conte
 - Control de Revisión append-only implementado para las operaciones principales; los eventos se guardan desde el backend y solo Cliente/admin puede consultarlos o exportarlos.
 - Notificaciones internas persistentes incorporadas: seed de bienvenida al bootstrap, campanita con contador, inbox, marcado de lectura, archivado y toast temporal.
 - Preguntas de visita configurables listas: conjuntos activos por campaña, editor de Cliente/admin y carga dinámica en la visita con cinco preguntas fallback.
+- Planificación incorporada: calendario, circuito/zona territorial, metas dinámicas, rutas, encuestas, presupuesto y asesor con sugerencias persistentes; todas sus escrituras pasan por la API Admin SDK.

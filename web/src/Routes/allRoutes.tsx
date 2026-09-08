@@ -9,6 +9,7 @@ import VotersMap from '../pages/Modules/Execution/VotersMap';
 import AuditLog from '../pages/Modules/System/AuditLog';
 import Notifications from '../pages/Modules/System/Notifications';
 import QuestionsEditor from '../pages/Modules/Planning/QuestionsEditor';
+import PlanningWorkspace from '../pages/Modules/Planning/PlanningWorkspace';
 import SettingsPlaceholder from '../pages/Modules/System/SettingsPlaceholder';
 // import AffiliateDashboard from "../pages/AffiliateDashboard";
 // import InvoiceDashboard from "../pages/InvoiceDashboard";
@@ -185,6 +186,13 @@ const routes = [
     { path: "/audit-log", component: <AuditLog /> },
     { path: "/notifications", component: <Notifications /> },
     { path: "/planning/questions", component: <QuestionsEditor /> },
+    { path: "/planning/calendar", component: <PlanningWorkspace area="calendar" /> },
+    { path: "/planning/territory", component: <PlanningWorkspace area="territory" /> },
+    { path: "/planning/goals", component: <PlanningWorkspace area="goals" /> },
+    { path: "/planning/routes", component: <PlanningWorkspace area="routes" /> },
+    { path: "/planning/surveys", component: <PlanningWorkspace area="surveys" /> },
+    { path: "/planning/budget", component: <PlanningWorkspace area="budget" /> },
+    { path: "/planning/advisor", component: <PlanningWorkspace area="advisor" /> },
     { path: "/settings", component: <SettingsPlaceholder /> },
     // { path: "/affiliate-dashboard", component: <AffiliateDashboard /> },
     // { path: "/invoice-dashboard", component: <InvoiceDashboard /> },
