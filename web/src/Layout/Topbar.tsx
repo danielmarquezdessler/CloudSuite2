@@ -1,6 +1,6 @@
 import { THEME_MODE } from "../Common/layoutConfig";
-import { Link } from "react-router-dom";
-import React from "react";
+import { Link, useNavigate } from "react-router-dom";
+import React, { useEffect, useState } from "react";
 import { Dropdown } from "react-bootstrap";
 import { useDispatch } from "react-redux";
 import SimpleBar from "simplebar-react";
@@ -11,6 +11,8 @@ import avatar2 from "../assets/images/user/avatar-2.jpg";
 import avatar3 from "../assets/images/user/avatar-3.jpg";
 import { chanageLanguage } from "../toolkit/themeLayouts/thunk";
 import i18n from "../utils/i18n";
+import { useAuth } from '../context/AuthContext';
+import { authenticatedFetch } from '../lib/api';
 
 interface HeaderProps {
     themeMode?: string; // Define the type for themeMode
@@ -23,6 +25,23 @@ interface HeaderProps {
 const TopBar = ({ handleOffcanvasToggle, changeThemeMode, toogleSidebarHide, toogleMobileSidebarHide }: HeaderProps) => {
 
     const dispatch = useDispatch<any>();
+    const { user, logout } = useAuth();
+    const navigate = useNavigate();
+    const [role, setRole] = useState('Cliente');
+
+    useEffect(() => {
+        if (!user) return;
+        authenticatedFetch(user, '/api/me')
+            .then((data: { role?: string }) => setRole(data.role ?? 'Cliente'))
+            .catch(() => setRole('Cliente'));
+    }, [user]);
+
+    const handleLogout = async () => {
+        await logout();
+        navigate('/');
+    };
+
+    const userName = user?.displayName ?? user?.email ?? 'Usuario';
 
     const handleLanguageChange = (language: string) => {
         dispatch(chanageLanguage(language));
@@ -208,9 +227,9 @@ const TopBar = ({ handleOffcanvasToggle, changeThemeMode, toogleSidebarHide, too
                                         <i className="ph-duotone ph-lock-key"></i>
                                         <span>Lock Screen</span>
                                     </Dropdown.Item>
-                                    <Dropdown.Item>
+                                    <Dropdown.Item onClick={handleLogout}>
                                         <i className="ph-duotone ph-power"></i>
-                                        <span>Logout</span>
+                                        <span>Cerrar sesión</span>
                                     </Dropdown.Item>
                                 </Dropdown.Menu>
                             </Dropdown>
@@ -391,7 +410,7 @@ const TopBar = ({ handleOffcanvasToggle, changeThemeMode, toogleSidebarHide, too
                             <Dropdown as="li" className="pc-h-item header-user-profile">
                                 <Dropdown.Toggle className="pc-head-link arrow-none me-0" data-bs-toggle="dropdown" href="#"
                                     aria-haspopup="false" data-bs-auto-close="outside" aria-expanded="false" style={{ border: "none" }}>
-                                    <img src={avatar2} alt="user-image" width={40} className="user-avtar" />
+                                    <img src={avatar2} alt={userName} width={40} className="user-avtar" />
                                 </Dropdown.Toggle>
                                 <Dropdown.Menu className="dropdown-user-profile dropdown-menu-end pc-h-dropdown">
                                     <div className="dropdown-header d-flex align-items-center justify-content-between">
@@ -403,17 +422,17 @@ const TopBar = ({ handleOffcanvasToggle, changeThemeMode, toogleSidebarHide, too
                                                 <li className="list-group-item">
                                                     <div className="d-flex align-items-center">
                                                         <div className="flex-shrink-0">
-                                                            <img src={avatar2} alt="user-image" width={50} className="wid-50 rounded-circle" />
+                                                            <img src={avatar2} alt={userName} width={50} className="wid-50 rounded-circle" />
                                                         </div>
                                                         <div className="flex-grow-1 mx-3">
-                                                            <h5 className="mb-0">Carson Darrin</h5>
-                                                            <a className="link-primary" href="mailto:carson.darrin@company.io">carson.darrin@company.io</a>
+                                                            <h5 className="mb-0">{userName}</h5>
+                                                            <span className="link-primary">{user?.email}</span>
                                                         </div>
-                                                        <span className="badge bg-primary">PRO</span>
+                                                        <span className="badge bg-primary text-capitalize">{role}</span>
                                                     </div>
                                                 </li>
-                                                <li className="list-group-item">
-                                                    <Dropdown.Item>
+                                                <li className="list-group-item d-none">
+                                                    <Dropdown.Item className="d-none">
                                                         <span className="d-flex align-items-center">
                                                             <i className="ph-duotone ph-key"></i>
                                                             <span>Change password</span>
@@ -437,7 +456,7 @@ const TopBar = ({ handleOffcanvasToggle, changeThemeMode, toogleSidebarHide, too
                                                         </span>
                                                     </Dropdown.Item>
                                                 </li>
-                                                <li className="list-group-item">
+                                                <li className="list-group-item d-none">
                                                     <Dropdown.Item>
                                                         <span className="d-flex align-items-center">
                                                             <i className="ph-duotone ph-heart"></i>
@@ -452,7 +471,7 @@ const TopBar = ({ handleOffcanvasToggle, changeThemeMode, toogleSidebarHide, too
                                                         <span className="avtar avtar-xs rounded-circle bg-danger text-white">10</span>
                                                     </Dropdown.Item>
                                                 </li>
-                                                <li className="list-group-item">
+                                                <li className="list-group-item d-none">
                                                     <div className="dropdown-item">
                                                         <span className="d-flex align-items-center">
                                                             <i className="ph-duotone ph-globe-hemisphere-west"></i>
@@ -483,14 +502,14 @@ const TopBar = ({ handleOffcanvasToggle, changeThemeMode, toogleSidebarHide, too
                                                         </div>
                                                     </div>
                                                 </li>
-                                                <li className="list-group-item">
+                                                <li className="list-group-item d-none">
                                                     <Dropdown.Item>
                                                         <span className="d-flex align-items-center">
                                                             <i className="ph-duotone ph-user-circle"></i>
                                                             <span>Edit profile</span>
                                                         </span>
                                                     </Dropdown.Item>
-                                                    <Dropdown.Item>
+                                                    <Dropdown.Item className="d-none">
                                                         <span className="d-flex align-items-center">
                                                             <i className="ph-duotone ph-star text-warning"></i>
                                                             <span>Upgrade account</span>
@@ -511,16 +530,16 @@ const TopBar = ({ handleOffcanvasToggle, changeThemeMode, toogleSidebarHide, too
                                                     </Dropdown.Item>
                                                 </li>
                                                 <li className="list-group-item">
-                                                    <Dropdown.Item>
+                                                    <Dropdown.Item className="d-none">
                                                         <span className="d-flex align-items-center">
                                                             <i className="ph-duotone ph-plus-circle"></i>
                                                             <span>Add account</span>
                                                         </span>
                                                     </Dropdown.Item>
-                                                    <Dropdown.Item>
+                                                    <Dropdown.Item onClick={handleLogout}>
                                                         <span className="d-flex align-items-center">
                                                             <i className="ph-duotone ph-power"></i>
-                                                            <span>Logout</span>
+                                                            <span>Cerrar sesión</span>
                                                         </span>
                                                     </Dropdown.Item>
                                                 </li>

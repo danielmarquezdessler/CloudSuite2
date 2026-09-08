@@ -101,6 +101,7 @@ import Loading from "../pages/Pages/Loading";
 import Resetpasswordv1 from "../pages/Pages/ResetPasswordV1";
 import CodeVerificationV1 from "../pages/Pages/CodeVerificationV1";
 import LoginV2 from '../pages/Pages/LoginV2'
+import Register from '../pages/Pages/Register'
 import RegisterV2 from "../pages/Pages/RegisterV2";
 import ForgotPassowordV2 from "../pages/Pages/ForgotPasswordV2";
 import ResetPasswordV2 from "../pages/Pages/ResetPasswordV2";
@@ -349,6 +350,7 @@ const routes = [
 const nonAuthRoutes = [
 
     { path: "/", component: <LoginV2 /> },
+    { path: "/register", component: <Register /> },
     { path: "*", component: <LoginV2 /> },
 
     //Authentication1

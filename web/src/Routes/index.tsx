@@ -1,9 +1,23 @@
-import React from 'react'
-import { Route, Routes } from 'react-router-dom'
+import React, { ReactNode } from 'react'
+import { Navigate, Route, Routes } from 'react-router-dom'
 import { nonAuthRoutes, routes } from './allRoutes'
 import Layout from '../Layout'
 import NonLayout from '../Layout/NonLayout'
+import { useAuth } from '../context/AuthContext'
 
+const LoadingScreen = () => <div className="min-vh-100 d-flex align-items-center justify-content-center">Cargando sesión…</div>
+
+const RequireAuth = ({ children }: { children: ReactNode }) => {
+    const { user, loading } = useAuth()
+    if (loading) return <LoadingScreen />
+    return user ? <>{children}</> : <Navigate to="/" replace />
+}
+
+const PublicOnlyRoute = ({ children }: { children: ReactNode }) => {
+    const { user, loading } = useAuth()
+    if (loading) return <LoadingScreen />
+    return user ? <Navigate to="/dashboard" replace /> : <>{children}</>
+}
 
 const Routing = () => {
     return (
@@ -11,17 +25,21 @@ const Routing = () => {
             <Routes>
                 {(routes || []).map((item, key) => (
                     <Route key={key} path={item.path} element={
-                        <Layout>
-                            {item.component}
-                        </Layout>
+                        <RequireAuth>
+                            <Layout>
+                                {item.component}
+                            </Layout>
+                        </RequireAuth>
                     } />
                 ))}
 
                 {(nonAuthRoutes || []).map((item, key) => (
                     <Route key={key} path={item.path} element={
-                        <NonLayout>
-                            {item.component}
-                        </NonLayout>
+                        <PublicOnlyRoute>
+                            <NonLayout>
+                                {item.component}
+                            </NonLayout>
+                        </PublicOnlyRoute>
                     } />
                 ))}
             </Routes>

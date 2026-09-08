@@ -1,5 +1,5 @@
-import React from "react";
-import { Link } from "react-router-dom";
+import React, { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 //import images
 
 import cloudsuiteLogo from '../assets/images/cloudsuite.svg';
@@ -8,8 +8,27 @@ import SimpleBar from "simplebar-react";
 import { menuItems } from "./MenuData";
 import NestedMenu from "./NestedMenu";
 import { Card, CardBody, Dropdown } from "react-bootstrap";
+import { useAuth } from '../context/AuthContext';
+import { authenticatedFetch } from '../lib/api';
 
 const Header = ({ themeMode }: { themeMode: string }) => {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  const [role, setRole] = useState('Cliente');
+
+  useEffect(() => {
+    if (!user) return;
+    authenticatedFetch(user, '/api/me')
+      .then((data: { role?: string }) => setRole(data.role ?? 'Cliente'))
+      .catch(() => setRole('Cliente'));
+  }, [user]);
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/');
+  };
+
+  const userName = user?.displayName ?? user?.email ?? 'Usuario';
   return (
     <React.Fragment>
       <nav className="pc-sidebar" id="pc-sidebar-hide" data-theme-mode={themeMode}>
@@ -49,8 +68,9 @@ const Header = ({ themeMode }: { themeMode: string }) => {
                   <Link to="#" className="arrow-none dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" data-bs-offset="0,20"></Link>
                   <div className="d-flex align-items-center">
                     <div className="flex-grow-1">
-                      <h6 className="mb-0">Jonh Smith</h6>
-                      <small>Administrator</small>
+                      <h6 className="mb-0 text-truncate">{userName}</h6>
+                      <small className="d-block text-truncate">{user?.email}</small>
+                      <small>{role}</small>
                     </div>
 
                     <Dropdown>
@@ -63,21 +83,9 @@ const Header = ({ themeMode }: { themeMode: string }) => {
                       </Dropdown.Toggle>
                       <Dropdown.Menu>
                         <ul>
-                          <li><Dropdown.Item className="pc-user-links">
-                            <i className="ph-duotone ph-user"></i>
-                            <span>My Account</span>
-                          </Dropdown.Item></li>
-                          <li><Dropdown.Item className="pc-user-links">
-                            <i className="ph-duotone ph-gear"></i>
-                            <span>Settings</span>
-                          </Dropdown.Item></li>
-                          <li><Dropdown.Item className="pc-user-links">
-                            <i className="ph-duotone ph-lock-key"></i>
-                            <span>Lock Screen</span>
-                          </Dropdown.Item></li>
-                          <li><Dropdown.Item className="pc-user-links">
+                          <li><Dropdown.Item className="pc-user-links" onClick={handleLogout}>
                             <i className="ph-duotone ph-power"></i>
-                            <span>Logout</span>
+                            <span>Cerrar sesión</span>
                           </Dropdown.Item></li>
                         </ul>
                       </Dropdown.Menu>

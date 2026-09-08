@@ -46,6 +46,7 @@
     "clipboard": "^2.0.11",
     "feather-icons": "^4.29.1",
     "feather-icons-react": "^0.7.0",
+    "firebase": "^12.18.0",
     "formik": "^2.4.5",
     "google-maps-react": "^2.0.6",
     "html2canvas": "^1.4.1",

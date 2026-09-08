@@ -1,20 +1,33 @@
-import { FormEvent } from "react";
+import { FormEvent, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Card, CardBody } from "react-bootstrap";
 import { THEME_MODE } from "../../Common/layoutConfig";
 import { changeThemeMode } from "../../toolkit/thunk";
 import cloudsuiteLogo from '../../assets/images/cloudsuite.svg';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '../../lib/firebase';
 
 const LoginV2 = () => {
     const dispatch = useDispatch<any>();
     const navigate = useNavigate();
     const themeMode = useSelector((state: any) => state.Theme.themeMode);
+    const [error, setError] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
-    const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
-        // TODO: auth Firebase (Brief 2)
-        navigate('/dashboard');
+        const form = new FormData(event.currentTarget);
+        setError('');
+        setIsSubmitting(true);
+        try {
+            await signInWithEmailAndPassword(auth, String(form.get('email')), String(form.get('password')));
+            navigate('/dashboard');
+        } catch (caughtError) {
+            setError(caughtError instanceof Error ? caughtError.message : 'No pudimos iniciar sesión.');
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     return (
@@ -39,19 +52,21 @@ const LoginV2 = () => {
                     </div>
                     <h1 className="h4 mb-2">Iniciá sesión</h1>
                     <p className="text-muted mb-4">Ingresá con tu cuenta de CloudSuite.</p>
+                    {error && <div className="alert alert-danger" role="alert">{error}</div>}
                     <form onSubmit={handleSubmit}>
                         <div className="mb-3">
                             <label className="form-label" htmlFor="email">Email</label>
-                            <input type="email" className="form-control" id="email" placeholder="nombre@organizacion.com" required />
+                            <input type="email" className="form-control" id="email" name="email" placeholder="nombre@organizacion.com" required />
                         </div>
                         <div className="mb-4">
                             <label className="form-label" htmlFor="password">Contraseña</label>
-                            <input type="password" className="form-control" id="password" placeholder="••••••••" required />
+                            <input type="password" className="form-control" id="password" name="password" placeholder="••••••••" required />
                         </div>
                         <div className="d-grid">
-                            <button type="submit" className="btn btn-primary">Ingresar</button>
+                            <button type="submit" className="btn btn-primary" disabled={isSubmitting}>{isSubmitting ? 'Ingresando…' : 'Ingresar'}</button>
                         </div>
                     </form>
+                    <p className="text-muted text-center mb-0 mt-4">¿Primera vez? <Link to="/register">Creá tu organización</Link></p>
                 </CardBody>
             </Card>
         </div>
