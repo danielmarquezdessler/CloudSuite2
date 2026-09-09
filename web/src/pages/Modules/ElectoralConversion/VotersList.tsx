@@ -9,6 +9,7 @@ import HeroBanner from '../../../components/Shared/HeroBanner';
 import SearchInput from '../../../components/Shared/SearchInput';
 import SelectControl from '../../../components/Shared/SelectControl';
 import StatCard from '../../../components/Shared/StatCard';
+import PageContainer from '../../../components/Shared/PageContainer';
 
 type Voter = { id: string; name: string; phone?: string; address?: string; section?: string; state: string; teamName?: string; lastVisitAt?: string };
 const labels: Record<string, string> = { unvisited: 'Listo para visitar', converted_yes: 'Favorable', converted_no: 'No favorable', undecided: 'Indeciso' };
@@ -27,7 +28,7 @@ export default function VotersList() {
   const percent = (value: string) => voters.length ? Math.round(count(value) / voters.length * 100) : 0;
   const loadError = campaignError || error?.message;
 
-  return <section className="cd-page cs-page">
+  return <PageContainer>
     <HeroBanner icon="users" title="Electores" subtitle="Importa y prepara tu lista de electores para planificar y realizar visitas de campaña." subtitleDetail="Convierte datos en oportunidades. Organiza, segmenta y asigna electores a tu equipo." tags={[{ icon:'file', label:'Importa desde Excel o CSV' }, { icon:'users', label:'Segmenta y organiza' }, { icon:'user-check', label:'Asigna a tus equipos' }]} ctaLabel="Importar electores" ctaIcon="upload-cloud" onCtaClick={() => setImportOpen(true)} />
     <ImportVoters open={importOpen} onOpenChange={setImportOpen} showTrigger={false} onImported={() => void reloadVoters()} />
 
@@ -50,5 +51,5 @@ export default function VotersList() {
       {loadError ? <EmptyState icon="users" title="No pudimos cargar los electores" description={loadError} ctaLabel="Reintentar" onCtaClick={() => void (campaignError ? reloadCampaign() : reloadVoters())} /> : loading ? <EmptyState icon="users" title="Cargando electores" description="Estamos preparando la lista de tu campaña." /> : visible.length ? <div className="cd-table-scroll"><table className="cd-data-table"><thead><tr><th>NOMBRE</th><th>TELÉFONO</th><th>DIRECCIÓN</th><th>SECCIÓN</th><th>ESTADO</th><th>EQUIPO</th><th>ÚLTIMA VISITA</th><th>ACCIONES</th></tr></thead><tbody>{visible.map(voter => <tr key={voter.id}><td>{voter.name}</td><td>{voter.phone || '—'}</td><td>{voter.address || '—'}</td><td>{voter.section || '—'}</td><td><span className="cd-state-pill">{labels[voter.state] ?? voter.state}</span></td><td>{voter.teamName || '—'}</td><td>{voter.lastVisitAt ? new Date(voter.lastVisitAt).toLocaleDateString('es-AR') : '—'}</td><td><button className="btn btn-sm btn-primary" onClick={() => navigate(`/visit/${voter.id}`)}>Visitar</button></td></tr>)}</tbody></table></div> : <EmptyState icon="users" title="Aún no hay electores para mostrar" description="Importa tu lista de electores desde un archivo Excel o CSV para comenzar a organizar y planificar tus visitas de campaña." ctaLabel="Importar electores" onCtaClick={() => setImportOpen(true)} />}
       <footer className="cd-table-footer"><span>Mostrando {visible.length} de {voters.length} electores</span><span>Filas por página&nbsp;&nbsp; 10</span></footer>
     </ContentPanel>
-  </section>;
+  </PageContainer>;
 }

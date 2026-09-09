@@ -8,6 +8,7 @@ import KpiCard from '../../../components/Shared/KpiCard';
 import Card from '../../../components/Shared/Card';
 import EmptyState from '../../../components/Shared/EmptyState';
 import SelectControl from '../../../components/Shared/SelectControl';
+import PageContainer from '../../../components/Shared/PageContainer';
 
 type Summary = { totalVoters:number; visitedCount:number; convertedYes:number; convertedNo:number; undecidedCount:number; conversionRate:number; coverageRate:number; teamStats:Array<{teamName:string;conversionsCount:number}>; topMilitants:Array<{uid:string;name:string;visitsCount:number;conversionsCount:number;conversionRate:number}> };
 const empty: Summary = { totalVoters:0, visitedCount:0, convertedYes:0, convertedNo:0, undecidedCount:0, conversionRate:0, coverageRate:0, teamStats:[], topMilitants:[] };
@@ -49,7 +50,7 @@ export default function CampaignDashboard() {
   const updatedAt = new Intl.DateTimeFormat('es-AR', { hour:'2-digit', minute:'2-digit' }).format(new Date());
   const distribution = [{ label:'SI', value:summary.convertedYes, percent:summary.totalVoters ? Math.round((summary.convertedYes / summary.totalVoters) * 100) : 0, color:'#22c55e' }, { label:'NO', value:summary.convertedNo, percent:noPercent, color:'#ef4444' }, { label:'Indeciso', value:summary.undecidedCount, percent:undecidedPercent, color:'#f59e0b' }];
 
-  return <main className="cd-dashboard">
+  return <PageContainer className="cd-dashboard">
     <HeroBanner icon="bar-chart-2" title="Dashboard de campaña" subtitle="Indicadores actualizados cada cinco minutos." subtitleDetail="Visualizá el desempeño de tu campaña y tomá decisiones basadas en datos." tags={[{ icon:'clock', label:'Datos en tiempo real' }, { icon:'bars', label:`Última actualización: ${updatedAt}` }, { icon:'target', label:campaign ? 'Campaña activa' : 'Campaña' }]} extraFilters={<div className="cd-hero__filters"><label className="cd-hero__date">Desde<input type="date" value={from} onChange={(event) => setFrom(event.target.value)} /></label><label className="cd-hero__date">Hasta<input type="date" value={to} onChange={(event) => setTo(event.target.value)} /></label></div>} ctaLabel="Exportar reporte" ctaIcon="download" onCtaClick={exportReport} />
     {error && <div className="cd-dashboard__data-error"><div><strong>No pudimos preparar tu campaña.</strong><p>{error}</p></div></div>}
     {analyticsError ? <div className="cd-dashboard__data-error"><div><strong>No pudimos cargar los datos</strong><p>{analyticsError}</p></div><button type="button" className="cd-primary-button" onClick={loadAnalytics}>Reintentar</button></div> : <>
@@ -69,5 +70,5 @@ export default function CampaignDashboard() {
     </div>
     </>}
     {notice && <Toast message={notice} onClose={() => setNotice('')} />}
-  </main>;
+  </PageContainer>;
 }
