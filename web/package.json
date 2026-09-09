@@ -9,7 +9,8 @@
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
     "visual:dashboard": "node scripts/capture-dashboard.mjs",
-    "visual:voters": "node scripts/capture-voters.mjs"
+    "visual:voters": "node scripts/capture-voters.mjs",
+    "visual:map": "node scripts/capture-map.mjs"
   },
   "dependencies": {
     "@ckeditor/ckeditor5-build-balloon": "^41.3.1",
