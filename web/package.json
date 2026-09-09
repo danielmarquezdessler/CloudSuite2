@@ -13,7 +13,9 @@
     "visual:map": "node scripts/capture-map.mjs",
     "visual:functions": "node scripts/capture-functions.mjs",
     "visual:teams": "node scripts/capture-teams.mjs",
-    "visual:users": "node scripts/capture-users.mjs"
+    "visual:users": "node scripts/capture-users.mjs",
+    "visual:planning": "node scripts/capture-planning.mjs",
+    "visual:network-error": "node scripts/capture-network-error.mjs"
   },
   "dependencies": {
     "@ckeditor/ckeditor5-build-balloon": "^41.3.1",
