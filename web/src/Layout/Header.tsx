@@ -9,7 +9,7 @@ import { menuItems } from "./MenuData";
 import NestedMenu from "./NestedMenu";
 import { Card, CardBody, Dropdown } from "react-bootstrap";
 import { useAuth } from '../context/AuthContext';
-import { authenticatedFetch } from '../lib/api';
+import { authenticatedRequest } from '../lib/api';
 
 const Header = ({ themeMode }: { themeMode: string }) => {
   const { user, logout } = useAuth();
@@ -18,9 +18,7 @@ const Header = ({ themeMode }: { themeMode: string }) => {
 
   useEffect(() => {
     if (!user) return;
-    authenticatedFetch(user, '/api/me')
-      .then((data: { role?: string }) => setRole(data.role ?? 'Cliente'))
-      .catch(() => setRole('Cliente'));
+    void authenticatedRequest<{ role?: string }>(user, '/api/me').then(result => setRole(result.data?.role ?? 'Cliente'));
   }, [user]);
 
   const handleLogout = async () => {

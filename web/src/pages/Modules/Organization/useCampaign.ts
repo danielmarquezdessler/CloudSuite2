@@ -1,10 +1,31 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '../../../context/AuthContext';
-import { authenticatedFetch } from '../../../lib/api';
+import { authenticatedRequest } from '../../../lib/api';
 
 export type CampaignContext = { orgId: string; campId: string; role: string };
+type Me = { organization?: { id: string }; campaigns?: { id: string }[]; role?: string };
+
 export function useCampaign() {
-  const { user } = useAuth(); const [campaign, setCampaign] = useState<CampaignContext | null>(null); const [error, setError] = useState('');
-  useEffect(() => { if (!user) return; void (async () => { try { const me = await authenticatedFetch(user, '/api/me') as { organization?: { id: string }; campaigns?: { id: string }[]; role?: string }; const campId = me.campaigns?.[0]?.id; if (!me.organization || !campId) throw new Error('No hay una campaña disponible.'); setCampaign({ orgId: me.organization.id, campId, role: me.role ?? '' }); } catch (e) { setError(e instanceof Error ? e.message : 'No pudimos cargar la campaña.'); } })(); }, [user]);
-  return { user, campaign, error };
+  const { user } = useAuth();
+  const [campaign, setCampaign] = useState<CampaignContext | null>(null);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(Boolean(user));
+
+  const reload = useCallback(async () => {
+    if (!user) { setCampaign(null); setError(''); setLoading(false); return; }
+    setLoading(true);
+    const result = await authenticatedRequest<Me>(user, '/api/me');
+    if (result.error || !result.data?.organization || !result.data.campaigns?.[0]?.id) {
+      setCampaign(null);
+      setError(result.error?.message ?? 'No hay una campaña disponible.');
+      setLoading(false);
+      return;
+    }
+    setCampaign({ orgId: result.data.organization.id, campId: result.data.campaigns[0].id, role: result.data.role ?? '' });
+    setError('');
+    setLoading(false);
+  }, [user]);
+
+  useEffect(() => { void reload(); }, [reload]);
+  return { user, campaign, error, loading, reload };
 }

@@ -4,14 +4,14 @@ import { Dropdown } from 'react-bootstrap';
 import { useDispatch } from 'react-redux';
 import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { authenticatedFetch } from '../lib/api';
+import { authenticatedRequest } from '../lib/api';
 import AppLauncher from '../components/AppLauncher';
 import NotificationInbox from '../components/NotificationInbox';
 
 interface HeaderProps { themeMode?: string; changeThemeMode?: any; toogleSidebarHide?: () => void; toogleMobileSidebarHide?: () => void; handleOffcanvasToggle?: () => void; }
 export default function TopBar({ changeThemeMode, toogleSidebarHide, toogleMobileSidebarHide }: HeaderProps) {
   const dispatch = useDispatch<any>(); const { user, logout } = useAuth(); const navigate = useNavigate(); const [role, setRole] = useState('Cliente'); const [search, setSearch] = useState('');
-  useEffect(() => { if (user) void authenticatedFetch(user, '/api/me').then((data: { role?: string }) => setRole(data.role ?? 'Cliente')).catch(() => setRole('Cliente')); }, [user]);
+  useEffect(() => { if (user) void authenticatedRequest<{ role?: string }>(user, '/api/me').then(result => setRole(result.data?.role ?? 'Cliente')); }, [user]);
   const handleLogout = async () => { await logout(); navigate('/'); };
   const userName = user?.displayName ?? user?.email ?? 'Usuario';
   const submitSearch = (event: React.FormEvent) => { event.preventDefault(); if (search.trim()) navigate(`/electoral-conversion/voters?search=${encodeURIComponent(search.trim())}`); };

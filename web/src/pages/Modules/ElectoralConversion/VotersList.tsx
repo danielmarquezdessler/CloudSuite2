@@ -1,3 +1,54 @@
-import { useEffect,useState } from 'react';import { useNavigate } from 'react-router-dom';import { authenticatedFetch } from '../../../lib/api';import { useCampaign } from '../Organization/useCampaign';import ImportVoters from '../Organization/Voters/ImportVoters';import HeroBanner from '../../../components/Shared/HeroBanner';import StatCard from '../../../components/Shared/StatCard';import ContentPanel from '../../../components/Shared/ContentPanel';import EmptyState from '../../../components/Shared/EmptyState';
-type V={id:string;name:string;address:string;phone?:string;state:string};const labels:any={unvisited:'Sin visitar',visited:'Visitado',converted_yes:'SI',converted_no:'NO',undecided:'Indeciso'};
-export default function VotersList(){const{user,campaign,error}=useCampaign();const[list,setList]=useState<V[]>([]);const[search,setSearch]=useState('');const[state,setState]=useState('');const nav=useNavigate();useEffect(()=>{if(user&&campaign)void authenticatedFetch(user,'/api/organizations/'+campaign.orgId+'/campaigns/'+campaign.campId+'/voters').then(setList)},[user,campaign]);const show=list.filter(v=>(v.name+' '+(v.phone||'')).toLowerCase().includes(search.toLowerCase())&&(!state||v.state===state));const count=(s:string)=>list.filter(v=>v.state===s).length;return <section className="cs-page"><HeroBanner icon="users" title="Electores" subtitle="Importa y prepara tu lista de electores para planificar y realizar visitas de campaña." tags={[{icon:'file',label:'Importa desde Excel o CSV'},{icon:'users',label:'Segmenta y organiza'},{icon:'user-check',label:'Asigna a tus equipos'}]} ctaLabel="Importar electores" ctaIcon="upload-cloud" onCtaClick={()=>document.querySelector<HTMLButtonElement>('[data-import-voters]')?.click()}/><span className="d-none" data-import-voters=""><ImportVoters onImported={()=>location.reload()}/></span>{error&&<div className="alert alert-danger">{error}</div>}<div className="row g-3 mb-3"><div className="col-md-6 col-xl-3"><StatCard icon="users" value={list.length} label="Total de electores" caption={list.length?'Registros cargados':'Sin registros aún'} /></div><div className="col-md-6 col-xl-3"><StatCard icon="check-circle" iconColor="green" value={count('unvisited')} label="Listos para visitar" caption={(list.length?count('unvisited')/list.length*100:0).toFixed(0)+'% del total'} progress={list.length?count('unvisited')/list.length*100:0}/></div><div className="col-md-6 col-xl-3"><StatCard icon="help-circle" iconColor="orange" value={count('undecided')} label="Indecisos" caption={(list.length?count('undecided')/list.length*100:0).toFixed(0)+'% del total'}/></div><div className="col-md-6 col-xl-3"><StatCard icon="user-x" iconColor="red" value={count('converted_no')} label="No favorables" caption={(list.length?count('converted_no')/list.length*100:0).toFixed(0)+'% del total'}/></div></div><ContentPanel icon="users" title="Lista de electores" subtitle="Gestiona tu base de electores, asigna segmentos y prepara tus visitas." headerAction={<span className="small text-muted">{list.length} electores</span>}><div className="row g-2 mb-3"><div className="col-lg-5"><input className="form-control" placeholder="Buscar elector por nombre, teléfono, dirección o sección..." value={search} onChange={e=>setSearch(e.target.value)}/></div><div className="col"><select className="form-select" value={state} onChange={e=>setState(e.target.value)}><option value="">Todos los estados</option>{Object.keys(labels).map(k=><option key={k} value={k}>{labels[k]}</option>)}</select></div><div className="col"><button className="btn btn-light w-100">Todos los equipos⌄</button></div><div className="col"><button className="btn btn-light w-100">Todas las secciones⌄</button></div></div>{show.length?<div className="table-responsive"><table className="table planning-table"><thead><tr><th>NOMBRE</th><th>TELÉFONO</th><th>DIRECCIÓN</th><th>SECCIÓN</th><th>ESTADO</th><th>EQUIPO</th><th>ÚLTIMA VISITA</th><th>ACCIONES</th></tr></thead><tbody>{show.map(v=><tr key={v.id}><td>{v.name}</td><td>{v.phone||'—'}</td><td>{v.address}</td><td>—</td><td><span className="badge text-bg-light">{labels[v.state]}</span></td><td>—</td><td>—</td><td><button className="btn btn-sm btn-primary" onClick={()=>nav('/visit/'+v.id)}>Visitar</button></td></tr>)}</tbody></table></div>:<EmptyState icon="users" title="Aún no hay electores para mostrar" description="Importa tu lista de electores desde un archivo Excel o CSV para comenzar a organizar y planificar tus visitas de campaña." ctaLabel="Importar electores" onCtaClick={()=>document.querySelector<HTMLButtonElement>('[data-import-voters]')?.click()}/>}<div className="d-flex justify-content-between mt-3 small text-muted"><span>Mostrando {show.length} de {list.length} electores</span><span>Filas por página　10⌄　‹　›</span></div></ContentPanel></section>;}
+import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuthenticatedQuery } from '../../../lib/api';
+import { useCampaign } from '../Organization/useCampaign';
+import ImportVoters from '../Organization/Voters/ImportVoters';
+import ContentPanel from '../../../components/Shared/ContentPanel';
+import EmptyState from '../../../components/Shared/EmptyState';
+import HeroBanner from '../../../components/Shared/HeroBanner';
+import SearchInput from '../../../components/Shared/SearchInput';
+import SelectControl from '../../../components/Shared/SelectControl';
+import StatCard from '../../../components/Shared/StatCard';
+
+type Voter = { id: string; name: string; phone?: string; address?: string; section?: string; state: string; teamName?: string; lastVisitAt?: string };
+const labels: Record<string, string> = { unvisited: 'Listo para visitar', converted_yes: 'Favorable', converted_no: 'No favorable', undecided: 'Indeciso' };
+
+export default function VotersList() {
+  const { user, campaign, error: campaignError, reload: reloadCampaign } = useCampaign();
+  const navigate = useNavigate();
+  const [search, setSearch] = useState('');
+  const [state, setState] = useState('');
+  const [importOpen, setImportOpen] = useState(false);
+  const path = campaign ? `/api/organizations/${campaign.orgId}/campaigns/${campaign.campId}/voters` : null;
+  const { data, error, loading, reload: reloadVoters } = useAuthenticatedQuery<Voter[]>(user, path, [campaign?.orgId, campaign?.campId]);
+  const voters = data ?? [];
+  const visible = useMemo(() => voters.filter(voter => `${voter.name} ${voter.phone ?? ''} ${voter.address ?? ''}`.toLowerCase().includes(search.toLowerCase()) && (!state || voter.state === state)), [voters, search, state]);
+  const count = (value: string) => voters.filter(voter => voter.state === value).length;
+  const percent = (value: string) => voters.length ? Math.round(count(value) / voters.length * 100) : 0;
+  const loadError = campaignError || error?.message;
+
+  return <section className="cd-page cs-page">
+    <HeroBanner icon="users" title="Electores" subtitle="Importa y prepara tu lista de electores para planificar y realizar visitas de campaña." subtitleDetail="Convierte datos en oportunidades. Organiza, segmenta y asigna electores a tu equipo." tags={[{ icon:'file', label:'Importa desde Excel o CSV' }, { icon:'users', label:'Segmenta y organiza' }, { icon:'user-check', label:'Asigna a tus equipos' }]} ctaLabel="Importar electores" ctaIcon="upload-cloud" onCtaClick={() => setImportOpen(true)} />
+    <ImportVoters open={importOpen} onOpenChange={setImportOpen} showTrigger={false} onImported={() => void reloadVoters()} />
+
+    <div className="cd-dashboard__kpis">
+      <StatCard icon="users" value={voters.length} label="Total de electores" caption={voters.length ? `${voters.length} registros cargados` : 'Sin registros aún'} />
+      <StatCard icon="check-circle" iconColor="green" value={count('unvisited')} label="Listos para visitar" caption={`${percent('unvisited')}% del total`} progress={percent('unvisited')} />
+      <StatCard icon="help-circle" iconColor="orange" value={count('undecided')} label="Indecisos" caption={`${percent('undecided')}% del total`} progress={percent('undecided')} />
+      <StatCard icon="user-x" iconColor="red" value={count('converted_no')} label="No favorables" caption={`${percent('converted_no')}% del total`} progress={percent('converted_no')} />
+    </div>
+
+    <div className="cd-page-controls" aria-label="Filtros de electores">
+      <SearchInput value={search} onChange={event => setSearch(event.target.value)} placeholder="Buscar elector por nombre, teléfono, dirección o sección…" aria-label="Buscar elector" />
+      <label className="cd-native-select"><span>Estado</span><select value={state} onChange={event => setState(event.target.value)}><option value="">Todos los estados</option>{Object.entries(labels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+      <SelectControl icon="people" label="Todos los equipos" />
+      <SelectControl icon="map" label="Todas las secciones" />
+      <button className="cd-filter-more" type="button">Más filtros</button>
+    </div>
+
+    <ContentPanel icon="users" title="Lista de electores" subtitle="Gestiona tu base de electores, asigna segmentos y prepara tus visitas." headerAction={<span className="cd-panel-count">{voters.length} electores</span>}>
+      {loadError ? <EmptyState icon="users" title="No pudimos cargar los electores" description={loadError} ctaLabel="Reintentar" onCtaClick={() => void (campaignError ? reloadCampaign() : reloadVoters())} /> : loading ? <EmptyState icon="users" title="Cargando electores" description="Estamos preparando la lista de tu campaña." /> : visible.length ? <div className="cd-table-scroll"><table className="cd-data-table"><thead><tr><th>NOMBRE</th><th>TELÉFONO</th><th>DIRECCIÓN</th><th>SECCIÓN</th><th>ESTADO</th><th>EQUIPO</th><th>ÚLTIMA VISITA</th><th>ACCIONES</th></tr></thead><tbody>{visible.map(voter => <tr key={voter.id}><td>{voter.name}</td><td>{voter.phone || '—'}</td><td>{voter.address || '—'}</td><td>{voter.section || '—'}</td><td><span className="cd-state-pill">{labels[voter.state] ?? voter.state}</span></td><td>{voter.teamName || '—'}</td><td>{voter.lastVisitAt ? new Date(voter.lastVisitAt).toLocaleDateString('es-AR') : '—'}</td><td><button className="btn btn-sm btn-primary" onClick={() => navigate(`/visit/${voter.id}`)}>Visitar</button></td></tr>)}</tbody></table></div> : <EmptyState icon="users" title="Aún no hay electores para mostrar" description="Importa tu lista de electores desde un archivo Excel o CSV para comenzar a organizar y planificar tus visitas de campaña." ctaLabel="Importar electores" onCtaClick={() => setImportOpen(true)} />}
+      <footer className="cd-table-footer"><span>Mostrando {visible.length} de {voters.length} electores</span><span>Filas por página&nbsp;&nbsp; 10</span></footer>
+    </ContentPanel>
+  </section>;
+}
