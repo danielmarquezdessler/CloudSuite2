@@ -87,6 +87,25 @@ try {
     console.log(`[${name}] cards=${audit.cards.length}, paddingFailures=${audit.cards.filter((card) => card.failed).length}, headers=${audit.headers.length}, headerGapFailures=${audit.headers.filter((header) => header.failed).length}, ghostWarnings=${audit.ghosts.length}`);
   }
 
+  // The active-campaign selector is rendered by the shared navbar, so open it
+  // explicitly and include its canonical Card in the same padding gate.
+  await page.goto(`${appUrl}/organization/campaigns`, { waitUntil: 'domcontentloaded' });
+  const selector = page.getByRole('button', { name: /Cambiar campaña activa:/ });
+  await selector.waitFor({ state: 'visible' });
+  await selector.click();
+  const modal = page.getByRole('dialog', { name: 'Campaña activa' });
+  await modal.waitFor({ state: 'visible' });
+  const modalAudit = await modal.locator('[data-card="true"]').evaluateAll((elements, minPadding) => elements.map((element) => {
+    const style = getComputedStyle(element);
+    const padding = { top: Number.parseFloat(style.paddingTop), right: Number.parseFloat(style.paddingRight), bottom: Number.parseFloat(style.paddingBottom), left: Number.parseFloat(style.paddingLeft) };
+    return { padding, failed: Object.values(padding).some((value) => value < minPadding) };
+  }), minimumPadding);
+  cardsAudited += modalAudit.length;
+  for (const [index, card] of modalAudit.entries()) {
+    if (card.failed) failures.push(`Selector de campaña (modal) — card ${index + 1} — ${formatBox(card.padding)}`);
+  }
+  console.log(`[Selector de campaña modal] cards=${modalAudit.length}, paddingFailures=${modalAudit.filter((card) => card.failed).length}`);
+
   console.log(`\nPADDING AUDIT SUMMARY\nCards audited: ${cardsAudited}\nPadding failures: ${failures.length}\nCardHeaders audited: ${headersAudited}\nHeader-gap failures: ${headerFailures.length}\nGhost-card warnings: ${ghosts.length}`);
   if (failures.length) console.error(`\nPADDING FAILURES\n${failures.join('\n')}`);
   if (headerFailures.length) console.error(`\nHEADER-GAP FAILURES\n${headerFailures.join('\n')}`);

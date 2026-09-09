@@ -7,6 +7,7 @@ import { Provider } from "react-redux";
 import { configureStore } from '@reduxjs/toolkit';
 import { rootReducer } from './toolkit/index.ts';
 import { AuthProvider } from './context/AuthContext.tsx';
+import { CampaignProvider } from './context/CampaignContext.tsx';
 
 
 const store = configureStore({ reducer: rootReducer, devTools: true });
@@ -16,7 +17,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <BrowserRouter>
       <Provider store={store}>
         <AuthProvider>
-          <App />
+          <CampaignProvider><App /></CampaignProvider>
         </AuthProvider>
       </Provider>
     </BrowserRouter>

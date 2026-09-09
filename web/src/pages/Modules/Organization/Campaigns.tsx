@@ -44,7 +44,7 @@ export default function Campaigns() {
     try {
       const item = await authenticatedFetch<Campaign>(user, editing ? `${path}/${editing.id}` : path, { method: editing ? 'PUT' : 'POST', body: JSON.stringify({ nombre: name }) });
       if (!editing) await user.getIdToken(true);
-      await campaignsQuery.reload();
+      await Promise.all([campaignsQuery.reload(), reloadCampaign()]);
       setShowEditor(false);
       setNotice({ message: editing ? `La campaña “${item.nombre}” fue renombrada.` : `La campaña “${item.nombre}” fue creada.`, variant: 'success' });
     } catch (caught) {
