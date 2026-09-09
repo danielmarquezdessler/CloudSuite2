@@ -15,6 +15,7 @@ import {
 } from "@tanstack/react-table";
 
 import { rankItem } from "@tanstack/match-sorter-utils";
+import SelectControl from "../components/Shared/SelectControl";
 
 // Column Filter
 const Filter = ({
@@ -154,29 +155,14 @@ const TableContainer = ({
     Number(customPageSize) && setPageSize(Number(customPageSize));
   }, [customPageSize, setPageSize]);
 
-  const onChangeInSelect = (event: any) => {
-    setPageSize(Number(event.target.value));
-  };
-
   return (
     <Fragment>
       {isGlobalFilter && (
         <React.Fragment>
           <div className="datatable-top">
-            <div className="datatable-dropdown">
-              <label>
-                <select
-                  onChange={onChangeInSelect}
-                  className="datatable-selector"
-                >
-                  {[5, 10, 15, 20, 25].map((pageSize) => (
-                    <option key={pageSize} value={pageSize}>
-                      {pageSize}
-                    </option>
-                  ))}
-                </select>{" "}
-                entries per page
-              </label>
+            <div className="datatable-dropdown d-flex align-items-center gap-2">
+              <SelectControl ariaLabel="Filas por página" label={String(getState().pagination.pageSize)} options={[5, 10, 15, 20, 25].map((pageSize) => ({ value:String(pageSize), label:String(pageSize) }))} value={String(getState().pagination.pageSize)} onChange={(value) => setPageSize(Number(value))} />
+              <span>entries per page</span>
             </div>
             <div className="datatable-search">
               <DebouncedInput

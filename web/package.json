@@ -19,7 +19,8 @@
     "visual:spacing": "node scripts/capture-page-spacing.mjs",
     "test:organization-crud": "node scripts/test-organization-crud.mjs",
     "test:e2e": "node scripts/test-e2e-real.mjs",
-    "test:e2e:user": "node scripts/test-create-user-e2e.mjs"
+    "test:e2e:user": "node scripts/test-create-user-e2e.mjs",
+    "test:e2e:selects": "node scripts/test-select-controls-e2e.mjs"
   },
   "dependencies": {
     "@ckeditor/ckeditor5-build-balloon": "^41.3.1",

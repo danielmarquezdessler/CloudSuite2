@@ -4,6 +4,7 @@ import React from "react";
 import { Dropdown } from "react-bootstrap";
 import { useDispatch } from "react-redux";
 import SimpleBar from "simplebar-react";
+import SelectControl from "../../components/Shared/SelectControl";
 
 //import images
 import avatar1 from "../../assets/images/user/avatar-1.jpg";
@@ -413,11 +414,7 @@ const TopBar = ({ handleOffcanvasToggle, changeThemeMode, toogleSidebarHide, too
                                                             <span>Languages</span>
                                                         </span>
                                                         <span className="flex-shrink-0">
-                                                            <select className="form-select bg-transparent form-select-sm border-0 shadow-none">
-                                                                <option value="1">English</option>
-                                                                <option value="2">Spain</option>
-                                                                <option value="3">Arbic</option>
-                                                            </select>
+                                                            <SelectControl ariaLabel="Language" label="English" options={[{ value:'1', label:'English' }, { value:'2', label:'Spain' }, { value:'3', label:'Arbic' }]} defaultValue="1" />
                                                         </span>
                                                     </div>
                                                     <Dropdown.Item>

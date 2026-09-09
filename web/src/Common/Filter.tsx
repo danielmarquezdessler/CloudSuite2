@@ -1,4 +1,5 @@
 import React, { Fragment } from 'react';
+import SelectControl from '../components/Shared/SelectControl';
 
 export const Filter = ({ column }: any) => {
   return (
@@ -56,21 +57,5 @@ export const SelectColumnFilter = ({
     return [...options.values()];
   }, [id, preFilteredRows]);
 
-  return (
-    <select
-      id='custom-select'
-      className="form-select"
-      value={filterValue}
-      onChange={(e) => {
-        setFilter(e.target.value || undefined);
-      }}
-    >
-      <option value=''>All</option>
-      {options.map((option: any) => (
-        <option key={option} value={option}>
-          {option}
-        </option>
-      ))}
-    </select>
-  );
+  return <SelectControl id='custom-select' ariaLabel="Filtrar columna" label={filterValue || 'All'} options={[{ value:'', label:'All' }, ...options.map((option: any) => ({ value:String(option), label:String(option) }))]} value={filterValue || ''} onChange={(value) => setFilter(value || undefined)} />;
 };

@@ -41,7 +41,7 @@ export default function VotersList() {
 
     <div className="cd-page-controls" aria-label="Filtros de electores">
       <SearchInput value={search} onChange={event => setSearch(event.target.value)} placeholder="Buscar elector por nombre, teléfono, dirección o sección…" aria-label="Buscar elector" />
-      <label className="cd-native-select"><span>Estado</span><select value={state} onChange={event => setState(event.target.value)}><option value="">Todos los estados</option>{Object.entries(labels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+      <SelectControl ariaLabel="Estado" label={labels[state] ?? 'Todos los estados'} options={[{ value:'', label:'Todos los estados' }, ...Object.entries(labels).map(([value, label]) => ({ value, label }))]} value={state} onChange={setState} />
       <SelectControl icon="people" label="Todos los equipos" />
       <SelectControl icon="map" label="Todas las secciones" />
       <button className="cd-filter-more" type="button">Más filtros</button>
