@@ -7,16 +7,18 @@ type Item = { id: string; name: string };
 type EditableUser = { uid: string; firstName?: string; lastName?: string; displayName?: string; phone?: string; email: string };
 type Props = { show: boolean; functions: Item[]; teams: Item[]; campaigns: Item[]; onHide: () => void; onSubmit: (data: FormData) => Promise<void>; mode?: 'create' | 'edit'; initialUser?: EditableUser | null };
 const MAX_AVATAR_BYTES = 8 * 1024 * 1024;
+const AVATAR_DISPLAY_SIZE = 512;
 
 async function cropImage(source: string, area: Area) {
   const image = new Image();
   image.src = source;
   await new Promise<void>((resolveLoad, reject) => { image.onload = () => resolveLoad(); image.onerror = () => reject(new Error('No pudimos leer la imagen.')); });
   const canvas = document.createElement('canvas');
-  canvas.width = area.width;
-  canvas.height = area.height;
-  canvas.getContext('2d')!.drawImage(image, area.x, area.y, area.width, area.height, 0, 0, area.width, area.height);
-  return new Promise<Blob>((resolveBlob, reject) => canvas.toBlob((blob) => blob ? resolveBlob(blob) : reject(new Error('No pudimos recortar la imagen.')), 'image/jpeg', .9));
+  const scale = Math.min(1, AVATAR_DISPLAY_SIZE / Math.max(area.width, area.height));
+  canvas.width = Math.max(1, Math.round(area.width * scale));
+  canvas.height = Math.max(1, Math.round(area.height * scale));
+  canvas.getContext('2d')!.drawImage(image, area.x, area.y, area.width, area.height, 0, 0, canvas.width, canvas.height);
+  return new Promise<Blob>((resolveBlob, reject) => canvas.toBlob((blob) => blob ? resolveBlob(blob) : reject(new Error('No pudimos recortar la imagen.')), 'image/jpeg', .82));
 }
 
 export default function CreateUserModal({ show, functions, teams, campaigns, onHide, onSubmit, mode = 'create', initialUser = null }: Props) {

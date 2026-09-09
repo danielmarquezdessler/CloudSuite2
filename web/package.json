@@ -23,7 +23,8 @@
     "test:e2e:selects": "node scripts/test-select-controls-e2e.mjs",
     "test:e2e:user-actions": "node scripts/test-user-actions-e2e.mjs",
     "visual:spacing-real": "node scripts/capture-spacing-real.mjs",
-    "test:padding-audit": "node scripts/padding-audit.mjs"
+    "test:padding-audit": "node scripts/padding-audit.mjs",
+    "test:e2e:avatars": "node scripts/test-user-avatars-real.mjs"
   },
   "dependencies": {
     "@ckeditor/ckeditor5-build-balloon": "^41.3.1",

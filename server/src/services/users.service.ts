@@ -45,10 +45,9 @@ async function uploadAvatar(uid: string, avatar?: Express.Multer.File): Promise<
 async function avatarReadUrl(photoURL: unknown, existingToken: unknown) {
   if (typeof photoURL !== 'string' || !photoURL) return null;
   if (/^https?:\/\//.test(photoURL)) return { url: photoURL, downloadToken: null };
-  const bucket = storage.bucket();
-  const prefix = `gs://${bucket.name}/`;
-  if (!photoURL.startsWith(prefix)) return null;
-  const path = photoURL.slice(prefix.length); const file = bucket.file(path);
+  const storageReference = /^gs:\/\/([^/]+)\/(.+)$/.exec(photoURL);
+  if (!storageReference) return null;
+  const [, bucketName, path] = storageReference; const bucket = storage.bucket(bucketName); const file = bucket.file(path);
   try {
     let downloadToken = typeof existingToken === 'string' && existingToken ? existingToken : '';
     if (!downloadToken) {
