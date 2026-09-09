@@ -12,7 +12,8 @@
     "visual:voters": "node scripts/capture-voters.mjs",
     "visual:map": "node scripts/capture-map.mjs",
     "visual:functions": "node scripts/capture-functions.mjs",
-    "visual:teams": "node scripts/capture-teams.mjs"
+    "visual:teams": "node scripts/capture-teams.mjs",
+    "visual:users": "node scripts/capture-users.mjs"
   },
   "dependencies": {
     "@ckeditor/ckeditor5-build-balloon": "^41.3.1",
