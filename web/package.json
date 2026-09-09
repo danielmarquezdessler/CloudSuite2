@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "visual:dashboard": "node scripts/capture-dashboard.mjs",
     "visual:voters": "node scripts/capture-voters.mjs",
-    "visual:map": "node scripts/capture-map.mjs"
+    "visual:map": "node scripts/capture-map.mjs",
+    "visual:functions": "node scripts/capture-functions.mjs"
   },
   "dependencies": {
     "@ckeditor/ckeditor5-build-balloon": "^41.3.1",
