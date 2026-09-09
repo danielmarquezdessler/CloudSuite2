@@ -2,6 +2,7 @@ import Dashboard from "../pages/Dashboard";
 import Functions from '../pages/Modules/Organization/Functions';
 import Teams from '../pages/Modules/Organization/Teams';
 import Users from '../pages/Modules/Organization/Users';
+import Campaigns from '../pages/Modules/Organization/Campaigns';
 import JoinInvitation from '../pages/JoinInvitation';
 import VotersList from '../pages/Modules/ElectoralConversion/VotersList';
 import VisitScreen from '../pages/Modules/ElectoralConversion/VisitScreen';
@@ -185,6 +186,7 @@ const routes = [
     { path: "/organization/functions", component: <Functions /> },
     { path: "/organization/teams", component: <Teams /> },
     { path: "/organization/users", component: <Users /> },
+    { path: "/organization/campaigns", component: <Campaigns /> },
     { path: "/electoral-conversion/voters", component: <VotersList /> },
     { path: "/electoral-conversion/map", component: <VotersMap /> },
     { path: "/visit/:voterId", component: <VisitScreen /> },

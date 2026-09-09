@@ -6,6 +6,7 @@ import * as invitations from '../services/invitations.service.js';
 import { appendAudit } from '../services/audit.service.js';
 import { invalidateAnalytics } from '../services/analytics.service.js';
 import * as users from '../services/users.service.js';
+import * as campaigns from '../services/campaigns.service.js';
 
 const params = (request: Request) => ({ orgId: request.params.orgId, campId: request.params.campId });
 const ids = (request: Request) => [String(request.params.orgId), String(request.params.campId)] as const;
@@ -25,6 +26,10 @@ export const getOrganizationUsers = async (r: Request, s: Response) => { try { s
 export const postOrganizationUser = async (r: Request, s: Response) => { try { const result = await users.createOrganizationUser(r.user!, String(r.params.orgId), r.body, r.file); s.status(201).json(result); } catch (e) { fail(s, e); } };
 export const putOrganizationUser = async (r: Request, s: Response) => { try { s.json(await users.updateOrganizationUser(r.user!, String(r.params.orgId), String(r.params.userId), r.body, r.file)); } catch (e) { fail(s, e); } };
 export const removeOrganizationUser = async (r: Request, s: Response) => { try { await users.deleteOrganizationUser(r.user!, String(r.params.orgId), String(r.params.userId), String(r.body.confirmEmail ?? '')); s.status(204).end(); } catch (e) { fail(s, e); } };
+export const getOrganizationCampaigns = async (r: Request, s: Response) => { try { s.json(await campaigns.listCampaigns(r.user!, String(r.params.orgId))); } catch (e) { fail(s, e); } };
+export const postOrganizationCampaign = async (r: Request, s: Response) => { try { s.status(201).json(await campaigns.createCampaign(r.user!, String(r.params.orgId), r.body)); } catch (e) { fail(s, e); } };
+export const putOrganizationCampaign = async (r: Request, s: Response) => { try { s.json(await campaigns.renameCampaign(r.user!, String(r.params.orgId), String(r.params.campId), r.body)); } catch (e) { fail(s, e); } };
+export const removeOrganizationCampaign = async (r: Request, s: Response) => { try { s.json(await campaigns.deleteCampaign(r.user!, String(r.params.orgId), String(r.params.campId))); } catch (e) { fail(s, e); } };
 export const getInvitations = async (r: Request, s: Response) => { try { s.json(await invitations.listInvitations(r.user!, ...ids(r))); } catch (e) { fail(s, e); } };
 export const postInvitation = async (r: Request, s: Response) => { try { const [orgId, campId] = ids(r); const result = await invitations.createInvitation(r.user!, orgId, campId, r.body); void appendAudit(orgId, campId, r.user!, { action: 'INVITE_USER', resource: 'invitation', resourceId: result.invId, changes: { after: { email: result.email, role: r.body.role ?? 'usuario', functionId: r.body.functionId ?? null } }, ...auditMeta(r) }).catch(console.error); s.status(201).json(result); } catch (e) { fail(s, e); } };
 export const removeInvitation = async (r: Request, s: Response) => { try { await invitations.revokeInvitation(r.user!, ...ids(r), String(r.params.invId)); s.status(204).end(); } catch (e) { fail(s, e); } };

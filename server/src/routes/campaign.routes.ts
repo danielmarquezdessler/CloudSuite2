@@ -13,6 +13,10 @@ campaignRouter.get('/organizations/:orgId/users', requireAuth, controller.getOrg
 campaignRouter.post('/organizations/:orgId/users', requireAuth, avatarUpload, controller.postOrganizationUser);
 campaignRouter.put('/organizations/:orgId/users/:userId', requireAuth, avatarUpload, controller.putOrganizationUser);
 campaignRouter.delete('/organizations/:orgId/users/:userId', requireAuth, controller.removeOrganizationUser);
+campaignRouter.get('/organizations/:orgId/campaigns', requireAuth, controller.getOrganizationCampaigns);
+campaignRouter.post('/organizations/:orgId/campaigns', requireAuth, controller.postOrganizationCampaign);
+campaignRouter.put('/organizations/:orgId/campaigns/:campId', requireAuth, controller.putOrganizationCampaign);
+campaignRouter.delete('/organizations/:orgId/campaigns/:campId', requireAuth, controller.removeOrganizationCampaign);
 campaignRouter.get(`${base}/functions`, requireAuth, controller.getFunctions);
 campaignRouter.post(`${base}/functions`, requireAuth, controller.postFunction);
 campaignRouter.put(`${base}/functions/:funcId`, requireAuth, controller.putFunction);
