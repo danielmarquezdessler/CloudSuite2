@@ -1,6 +1,6 @@
 import { DecodedIdToken } from 'firebase-admin/auth';
 import { FieldValue } from 'firebase-admin/firestore';
-import { assertCampaignAdmin, campaignRef, NotFoundError, ValidationError } from './access.service.js';
+import { assertCampaignAccess, assertCampaignAdmin, campaignRef, NotFoundError, ValidationError } from './access.service.js';
 
 type FunctionInput = { name?: string; description?: string; color?: string };
 const clean = (input: FunctionInput) => {
@@ -10,7 +10,8 @@ const clean = (input: FunctionInput) => {
 };
 const serialize = (doc: FirebaseFirestore.QueryDocumentSnapshot | FirebaseFirestore.DocumentSnapshot) => ({ id: doc.id, ...doc.data() });
 
-export async function listFunctions(orgId: string, campId: string) {
+export async function listFunctions(user: DecodedIdToken, orgId: string, campId: string) {
+  assertCampaignAccess(user, orgId, campId);
   const snapshot = await campaignRef(orgId, campId).collection('functions').where('deleted', '!=', true).get();
   return snapshot.docs.map(serialize);
 }
