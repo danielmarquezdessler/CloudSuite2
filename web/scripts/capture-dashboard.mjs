@@ -39,8 +39,15 @@ try {
   if (await page.getByText('Failed to fetch', { exact:false }).count()) throw new Error('La pantalla todavía muestra “Failed to fetch”.');
   const card = page.locator('.cd-dashboard__main .cd-card').first(); const cardBox = await card.boundingBox(); const headerBox = await card.locator('.cd-card__header').boundingBox();
   const headerOffset = cardBox && headerBox ? headerBox.y - cardBox.y : Number.NaN;
+  const cardPadding = await card.evaluate((element) => getComputedStyle(element).padding);
+  if (cardPadding !== '20px 22px') throw new Error(`Padding de Card inesperado: ${cardPadding}`);
+  const heroAlignment = await page.evaluate(() => {
+    const read = (selector) => { const element = document.querySelector(selector); if (!element) return null; const style = getComputedStyle(element); const rect = element.getBoundingClientRect(); return { alignItems:style.alignItems, y:rect.y, height:rect.height, center:rect.y + rect.height / 2 }; };
+    return { aside:read('.cd-hero__aside'), actions:read('.cd-hero__actions'), tagline:read('.cd-hero__tagline') };
+  });
+  if (!heroAlignment.aside || !heroAlignment.actions || !heroAlignment.tagline || heroAlignment.aside.alignItems !== 'center' || heroAlignment.actions.alignItems !== 'center' || Math.abs(heroAlignment.actions.center - heroAlignment.tagline.center) > 1) throw new Error(`Alineación vertical del hero inesperada: ${JSON.stringify(heroAlignment)}`);
   const layoutMetrics = await page.evaluate(() => {
-    const read = (selector) => { const element = document.querySelector(selector); if (!element) return null; const style = getComputedStyle(element); const rect = element.getBoundingClientRect(); return { selector, x:rect.x, y:rect.y, width:rect.width, marginTop:style.marginTop, paddingTop:style.paddingTop, position:style.position, display:style.display, transform:style.transform }; };
+    const read = (selector) => { const element = document.querySelector(selector); if (!element) return null; const style = getComputedStyle(element); const rect = element.getBoundingClientRect(); return { selector, x:rect.x, y:rect.y, width:rect.width, marginTop:style.marginTop, padding:style.padding, position:style.position, display:style.display, transform:style.transform }; };
     return [read('.pc-container'), read('.pc-content'), read('.cd-dashboard'), read('.cd-hero'), read('.cd-hero__tile'), read('.cd-hero h1'), read('.cd-kpi-card'), read('.cd-card'), read('.cd-card__header')];
   });
   await page.screenshot({ path:screenshotPath, fullPage:false }); await page.locator('.cd-dashboard').screenshot({ path:dashboardScreenshotPath });
@@ -55,5 +62,5 @@ try {
   if (!await errorPage.getByRole('button', { name:'Reintentar' }).count()) throw new Error('El estado de error no ofrece Reintentar.');
   if (await errorPage.getByText('Failed to fetch', { exact:false }).count()) throw new Error('El estado de error expone el texto técnico “Failed to fetch”.');
   await errorPage.close(); await browser.close();
-  console.log(`Screenshots guardados en ${screenshotPath} y ${dashboardScreenshotPath}`); console.log(`Color H1 verificado: ${titleColor}; header offset: ${headerOffset}px; errores de consola: ${consoleErrors.length}`); console.log(JSON.stringify(layoutMetrics));
+  console.log(`Screenshots guardados en ${screenshotPath} y ${dashboardScreenshotPath}`); console.log(`Color H1 verificado: ${titleColor}; Card padding: ${cardPadding}; header offset: ${headerOffset}px; hero: ${JSON.stringify(heroAlignment)}; errores de consola: ${consoleErrors.length}`); console.log(JSON.stringify(layoutMetrics));
 } finally { vite.kill(); }
