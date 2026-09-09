@@ -71,7 +71,6 @@ try {
 
   console.log('3/7 Creando una segunda campaña desde el selector…');
   const creationModal = await openSelector();
-  await creationModal.getByText('Nueva campaña', { exact: true }).click();
   const creationResponse = page.waitForResponse((response) => response.request().method() === 'POST' && /\/api\/organizations\/[^/]+\/campaigns$/.test(new URL(response.url()).pathname) && response.status() === 201);
   await creationModal.locator('#navbar-campaign-name').fill(secondCampaignName);
   await creationModal.getByRole('button', { name: 'Crear campaña', exact: true }).click();

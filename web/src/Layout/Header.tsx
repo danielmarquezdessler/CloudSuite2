@@ -3,23 +3,28 @@ import { Link, useNavigate } from "react-router-dom";
 //import images
 
 import cloudsuiteLogo from '../assets/images/cloudsuite.svg';
-import avatar1 from "../assets/images/user/avatar-1.jpg"
 import SimpleBar from "simplebar-react";
 import { menuItems } from "./MenuData";
 import NestedMenu from "./NestedMenu";
 import { Card, CardBody, Dropdown } from "react-bootstrap";
 import { useAuth } from '../context/AuthContext';
 import { authenticatedRequest } from '../lib/api';
+import { useActiveCampaign } from '../context/CampaignContext';
 
 const Header = ({ themeMode }: { themeMode: string }) => {
   const { user, logout } = useAuth();
+  const { organizationId, role: campaignRole } = useActiveCampaign();
   const navigate = useNavigate();
-  const [role, setRole] = useState('Cliente');
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [avatarFailed, setAvatarFailed] = useState(false);
 
   useEffect(() => {
-    if (!user) return;
-    void authenticatedRequest<{ role?: string }>(user, '/api/me').then(result => setRole(result.data?.role ?? 'Cliente'));
-  }, [user]);
+    if (!user || !organizationId) { setAvatarUrl(user?.photoURL ?? null); return; }
+    void authenticatedRequest<Array<{ uid: string; photoURL?: string | null }>>(user, `/api/organizations/${organizationId}/users`)
+      .then((result) => setAvatarUrl(result.data?.find((person) => person.uid === user.uid)?.photoURL ?? user.photoURL ?? null));
+  }, [organizationId, user]);
+
+  useEffect(() => { setAvatarFailed(false); }, [avatarUrl]);
 
   const handleLogout = async () => {
     await logout();
@@ -55,12 +60,9 @@ const Header = ({ themeMode }: { themeMode: string }) => {
             <CardBody>
               <div className="d-flex align-items-center">
                 <div className="flex-shrink-0">
-                  <img
-                    src={avatar1}
-                    alt="user-image"
-                    className="user-avtar wid-45 rounded-circle"
-                    width={45}
-                  />
+                  {avatarUrl && !avatarFailed
+                    ? <img src={avatarUrl} alt={`Foto de ${userName}`} className="user-avtar wid-45 rounded-circle cloudsuite-sidebar-avatar" width={45} onError={() => setAvatarFailed(true)} />
+                    : <span className="user-avtar wid-45 rounded-circle cloudsuite-sidebar-avatar cloudsuite-sidebar-avatar--fallback" aria-label={`Avatar de ${userName}`}>{userName.slice(0, 2).toUpperCase()}</span>}
                 </div>
                 <div className="flex-grow-1 ms-3">
                   <Link to="#" className="arrow-none dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" data-bs-offset="0,20"></Link>
@@ -68,7 +70,7 @@ const Header = ({ themeMode }: { themeMode: string }) => {
                     <div className="flex-grow-1">
                       <h6 className="mb-0 text-truncate">{userName}</h6>
                       <small className="d-block text-truncate">{user?.email}</small>
-                      <small>{role}</small>
+                      <small>{campaignRole || 'Cliente'}</small>
                     </div>
 
                     <Dropdown>
