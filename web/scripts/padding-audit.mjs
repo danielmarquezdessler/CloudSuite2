@@ -17,6 +17,7 @@ const pages = [
   ['Encuestas', '/planning/surveys'], ['Presupuesto', '/planning/budget'], ['Asesor', '/planning/advisor']
 ];
 const minimumPadding = 12;
+const minimumHeaderGap = 16;
 
 function formatBox(box) {
   return `top:${box.top}px right:${box.right}px bottom:${box.bottom}px left:${box.left}px`;
@@ -26,8 +27,10 @@ const browser = await chromium.launch({ headless: true, executablePath: chromium
 const page = await browser.newPage({ viewport: { width: 1440, height: 980 } });
 page.setDefaultTimeout(30_000);
 const failures = [];
+const headerFailures = [];
 const ghosts = [];
 let cardsAudited = 0;
+let headersAudited = 0;
 
 try {
   await page.goto(`${appUrl}/`);
@@ -39,7 +42,7 @@ try {
   for (const [name, route] of pages) {
     await page.goto(`${appUrl}${route}`, { waitUntil: 'domcontentloaded' });
     await page.waitForTimeout(500);
-    const audit = await page.evaluate((minPadding) => {
+    const audit = await page.evaluate(({ minPadding, minHeaderGap }) => {
       const visible = (element) => {
         const box = element.getBoundingClientRect();
         const style = getComputedStyle(element);
@@ -55,6 +58,11 @@ try {
         const padding = { top: Number.parseFloat(style.paddingTop), right: Number.parseFloat(style.paddingRight), bottom: Number.parseFloat(style.paddingBottom), left: Number.parseFloat(style.paddingLeft) };
         return { selector: selectorFor(element), padding, failed: Object.values(padding).some((value) => value < minPadding) };
       });
+      const headers = [...document.querySelectorAll('[data-card-header="true"]')].filter(visible).map((element) => {
+        const next = element.nextElementSibling;
+        const gap = next && visible(next) ? next.getBoundingClientRect().top - element.getBoundingClientRect().bottom : -1;
+        return { selector: selectorFor(element), gap, failed: gap < minHeaderGap };
+      });
       const ignoredGhosts = ['cd-hero', 'cd-page-controls', 'cd-search-input', 'cd-native-select', 'cd-select-control', 'cd-table-scroll', 'cd-map-stage', 'cd-map-notice', 'cd-state-pill', 'cd-user-identity'];
       const ghostCandidates = [...document.querySelectorAll('article, section, div')].filter((element) => {
         if (!visible(element) || element.matches('[data-card="true"], [data-card="true"] *')) return false;
@@ -64,21 +72,26 @@ try {
         const hasBorder = Number.parseFloat(style.borderTopWidth) > 0 || Number.parseFloat(style.borderRightWidth) > 0 || Number.parseFloat(style.borderBottomWidth) > 0 || Number.parseFloat(style.borderLeftWidth) > 0;
         return hasBorder && radius >= 8 && box.width >= 180 && box.height >= 88;
       }).map((element) => selectorFor(element));
-      return { cards, ghosts: [...new Set(ghostCandidates)] };
-    }, minimumPadding);
+      return { cards, headers, ghosts: [...new Set(ghostCandidates)] };
+    }, { minPadding: minimumPadding, minHeaderGap: minimumHeaderGap });
 
     cardsAudited += audit.cards.length;
+    headersAudited += audit.headers.length;
     for (const card of audit.cards) {
       if (card.failed) failures.push(`${name} (${route}) — ${card.selector} — ${formatBox(card.padding)}`);
     }
     for (const selector of audit.ghosts) ghosts.push(`${name} (${route}) — ${selector}`);
-    console.log(`[${name}] cards=${audit.cards.length}, paddingFailures=${audit.cards.filter((card) => card.failed).length}, ghostWarnings=${audit.ghosts.length}`);
+    for (const header of audit.headers) {
+      if (header.failed) headerFailures.push(`${name} (${route}) — ${header.selector} — gap:${header.gap.toFixed(1)}px`);
+    }
+    console.log(`[${name}] cards=${audit.cards.length}, paddingFailures=${audit.cards.filter((card) => card.failed).length}, headers=${audit.headers.length}, headerGapFailures=${audit.headers.filter((header) => header.failed).length}, ghostWarnings=${audit.ghosts.length}`);
   }
 
-  console.log(`\nPADDING AUDIT SUMMARY\nCards audited: ${cardsAudited}\nPadding failures: ${failures.length}\nGhost-card warnings: ${ghosts.length}`);
+  console.log(`\nPADDING AUDIT SUMMARY\nCards audited: ${cardsAudited}\nPadding failures: ${failures.length}\nCardHeaders audited: ${headersAudited}\nHeader-gap failures: ${headerFailures.length}\nGhost-card warnings: ${ghosts.length}`);
   if (failures.length) console.error(`\nPADDING FAILURES\n${failures.join('\n')}`);
+  if (headerFailures.length) console.error(`\nHEADER-GAP FAILURES\n${headerFailures.join('\n')}`);
   if (ghosts.length) console.warn(`\nGHOST-CARD WARNINGS\n${ghosts.join('\n')}`);
-  if (failures.length) process.exitCode = 1;
+  if (failures.length || headerFailures.length) process.exitCode = 1;
 } finally {
   await browser.close();
 }
