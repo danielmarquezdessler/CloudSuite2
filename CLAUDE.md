@@ -24,6 +24,10 @@ CloudSuite 2 es un SaaS de gestión de campañas políticas. La aplicación no t
 
 Antes de editar cualquier archivo existente del template, abrilo y leé su contenido real. Si el cambio es grande, reemplazá el archivo completo en base a ese contenido; nunca apliques un patch contra contenido asumido.
 
+## Regla obligatoria de espaciado
+
+Ningún componente puede renderizar dos o más elementos hermanos (bloques de texto o botones/acciones) sin envolverlos en `Stack` (vertical) o `Inline` (horizontal). Está prohibido usar `margin` o `gap` hardcodeado a mano para separar elementos hermanos dentro de una card. Si necesitás separar algo, usá estos componentes; si no alcanzan para el caso, avisá antes de improvisar un valor nuevo.
+
 ## Testing E2E real local
 
 - El usuario persistente de pruebas es `e2e-test@cloudsuite.local`. Sus credenciales y los IDs de su organización/campaña viven exclusivamente en `web/.env.test`, un archivo ignorado por Git; nunca se copian al código ni a la documentación versionada.
@@ -47,3 +51,4 @@ Antes de editar cualquier archivo existente del template, abrilo y leé su conte
 - Preguntas de visita configurables listas: conjuntos activos por campaña, editor de Cliente/admin y carga dinámica en la visita con cinco preguntas fallback.
 - Planificación incorporada: calendario, circuito/zona territorial, metas dinámicas, rutas, encuestas, presupuesto y asesor con sugerencias persistentes; todas sus escrituras pasan por la API Admin SDK.
 - E2E real de Organización incorporado: login Firebase persistente y comprobaciones sin mocks de creación y recarga de Funciones, Equipos e Invitaciones contra Firestore.
+- Sistema de espaciado estructural incorporado: `Stack` e `Inline` centralizan la separación interna de cards, textos y acciones.

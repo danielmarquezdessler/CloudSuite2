@@ -3,6 +3,12 @@
 // =======================================
 :root {
   --bs-neutral: #{$neutral};
+  // CloudSuite spacing scale: consumed exclusively by Shared/Stack and Shared/Inline.
+  --cs-space-xs: 4px;
+  --cs-space-sm: 8px;
+  --cs-space-md: 12px;
+  --cs-space-lg: 16px;
+  --cs-space-xl: 24px;
   // body
   --#{$variable-prefix}body-bg: #{$body-bg};
   --bs-body-bg-rgb: #{to-rgb($body-bg)};
