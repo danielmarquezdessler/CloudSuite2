@@ -110,7 +110,14 @@ try {
   const invitedEmail = `e2e-invite-${suffix}@cloudsuite.local`;
   console.log('Usuarios e invitaciones sin mocks…');
   await page.goto(`${webUrl}/organization/users`, { waitUntil: 'domcontentloaded', timeout: 25000 });
-  await page.getByRole('button', { name: 'Invitar colaborador', exact: true }).first().click(); await page.getByLabel('Email').fill(invitedEmail); await page.locator('#invite-function').selectOption({ label: functionName }); await page.locator('#invite-team').selectOption({ label: teamName });
+  await page.getByRole('button', { name: 'Invitar colaborador', exact: true }).first().click(); await page.getByLabel('Email').fill(invitedEmail);
+  const functionTrigger = page.getByLabel('Función');
+  await functionTrigger.click();
+  const functionMenu = page.locator('.cd-select-dropdown__menu.show');
+  const [triggerBox, menuBox] = await Promise.all([functionTrigger.boundingBox(), functionMenu.boundingBox()]);
+  if (!triggerBox || !menuBox || menuBox.y < triggerBox.y + triggerBox.height - 1) throw new Error('El selector de Función no se abrió hacia abajo dentro del modal.');
+  await page.screenshot({ path: resolve(screenshots, 'function-select-downward.png'), fullPage: false });
+  await page.getByText(functionName, { exact: true }).click(); await page.locator('#invite-team').selectOption({ label: teamName });
   const postInvite = page.waitForResponse((response) => response.request().method() === 'POST' && new URL(response.url()).pathname.endsWith('/invitations') && response.status() === 201);
   await page.getByRole('button', { name: 'Enviar invitación', exact: true }).click(); await postInvite; await page.getByRole('tab', { name: 'Invitaciones pendientes' }).click(); await page.getByText(invitedEmail, { exact: true }).waitFor();
   await page.reload({ waitUntil: 'domcontentloaded' }); await page.getByRole('tab', { name: 'Invitaciones pendientes' }).click(); await page.getByText(invitedEmail, { exact: true }).waitFor();
