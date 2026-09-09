@@ -8,7 +8,7 @@ export type CreateOrganizationUserInput = {
   firstName?: string; lastName?: string; phone?: string; email?: string; password?: string;
   functionId?: string | null; teamId?: string | null; campaignId?: string | null;
 };
-export type UpdateOrganizationUserInput = Pick<CreateOrganizationUserInput, 'firstName' | 'lastName' | 'phone'>;
+export type UpdateOrganizationUserInput = CreateOrganizationUserInput;
 const MAX_AVATAR_BYTES = 8 * 1024 * 1024;
 
 function assertOrganizationAdmin(user: DecodedIdToken, orgId: string) {
@@ -117,8 +117,22 @@ export async function listOrganizationUsers(user: DecodedIdToken, orgId: string)
 function normalizeProfile(input: UpdateOrganizationUserInput) {
   const firstName = input.firstName?.trim();
   const lastName = input.lastName?.trim();
+  const email = input.email?.trim().toLowerCase();
+  const password = input.password ?? '';
   if (!firstName || !lastName) throw new ValidationError('El nombre y apellido son obligatorios.');
-  return { firstName, lastName, displayName: `${firstName} ${lastName}`, phone: input.phone?.trim() ?? '' };
+  if (!email || !/^\S+@\S+\.\S+$/.test(email)) throw new ValidationError('Ingresá un email válido.');
+  if (password && password.length < 6) throw new ValidationError('La contraseña debe tener al menos 6 caracteres.');
+  return {
+    firstName,
+    lastName,
+    displayName: `${firstName} ${lastName}`,
+    phone: input.phone?.trim() ?? '',
+    email,
+    password: password || null,
+    campaignId: input.campaignId?.trim() || null,
+    functionId: input.functionId?.trim() || null,
+    teamId: input.teamId?.trim() || null
+  };
 }
 
 export async function updateOrganizationUser(user: DecodedIdToken, orgId: string, targetUid: string, input: UpdateOrganizationUserInput, avatar?: Express.Multer.File) {
@@ -131,19 +145,47 @@ export async function updateOrganizationUser(user: DecodedIdToken, orgId: string
   const avatarReference = avatar ? await uploadAvatar(targetUid, avatar) : null;
   const photoURL = avatarReference?.storagePath ?? profile.data()?.photoURL ?? null;
   const avatarDownloadToken = avatarReference?.downloadToken ?? profile.data()?.avatarDownloadToken ?? null;
-  // El avatar se conserva como referencia gs:// en Firestore; Firebase Auth recibe solo el nombre.
-  await adminAuth.updateUser(targetUid, { displayName: data.displayName });
-
   const campaigns = await db.collection('organizations').doc(orgId).collection('campaigns').get();
+  let selectedCampaign = null as FirebaseFirestore.DocumentSnapshot | null;
+  if (data.campaignId) {
+    selectedCampaign = await campaignRef(orgId, data.campaignId).get();
+    if (!selectedCampaign.exists) throw new ValidationError('La campaña seleccionada no existe.');
+    if (data.functionId) {
+      const fn = await selectedCampaign.ref.collection('functions').doc(data.functionId).get();
+      if (!fn.exists || fn.data()?.deleted) throw new ValidationError('La función seleccionada no existe en la campaña.');
+    }
+    if (data.teamId) {
+      const team = await selectedCampaign.ref.collection('teams').doc(data.teamId).get();
+      if (!team.exists || team.data()?.deleted) throw new ValidationError('El equipo seleccionado no existe en la campaña.');
+  }
+  } else if (data.functionId || data.teamId) throw new ValidationError('Elegí una campaña para asignar una función o equipo.');
+
+  // El avatar se conserva como referencia gs:// en Firestore; Firebase Auth recibe el resto de las credenciales editables.
+  await adminAuth.updateUser(targetUid, { displayName: data.displayName, email: data.email, ...(data.password ? { password: data.password } : {}) });
+
   const batch = db.batch();
-  batch.update(profileRef, { ...data, photoURL, avatarDownloadToken, updatedAt: FieldValue.serverTimestamp() });
+  batch.update(profileRef, { firstName: data.firstName, lastName: data.lastName, displayName: data.displayName, email: data.email, phone: data.phone, photoURL, avatarDownloadToken, updatedAt: FieldValue.serverTimestamp() });
   for (const campaign of campaigns.docs) {
     const memberRef = campaign.ref.collection('members').doc(targetUid);
     const member = await memberRef.get();
-    if (member.exists) batch.update(memberRef, { displayName: data.displayName, updatedAt: FieldValue.serverTimestamp() });
+    if (member.exists) batch.update(memberRef, { email: data.email, displayName: data.displayName, updatedAt: FieldValue.serverTimestamp() });
+  }
+  if (selectedCampaign) {
+    const memberRef = selectedCampaign.ref.collection('members').doc(targetUid);
+    const existingMember = await memberRef.get();
+    const previousTeamId = typeof existingMember.data()?.teamId === 'string' ? existingMember.data()!.teamId : null;
+    if (previousTeamId && previousTeamId !== data.teamId) batch.delete(selectedCampaign.ref.collection('teams').doc(previousTeamId).collection('members').doc(targetUid));
+    batch.set(memberRef, { email: data.email, displayName: data.displayName, role: existingMember.data()?.role ?? 'usuario', functionId: data.functionId, teamId: data.teamId, ...(existingMember.exists ? { updatedAt: FieldValue.serverTimestamp() } : { joinedAt: FieldValue.serverTimestamp() }) }, { merge: true });
+    if (data.teamId) batch.set(selectedCampaign.ref.collection('teams').doc(data.teamId).collection('members').doc(targetUid), { joinedAt: FieldValue.serverTimestamp() }, { merge: true });
   }
   await batch.commit();
-  return { uid: targetUid, ...profile.data(), ...data, photoURL: avatarReference ? avatarDownloadUrl(storage.bucket().name, `avatars/${targetUid}.jpg`, avatarReference.downloadToken) : null };
+  if (selectedCampaign) {
+    const authUser = await adminAuth.getUser(targetUid);
+    const camps = typeof authUser.customClaims?.camps === 'object' && authUser.customClaims?.camps ? authUser.customClaims.camps : {};
+    await adminAuth.setCustomUserClaims(targetUid, { ...authUser.customClaims, camps: { ...camps, [data.campaignId!]: true } });
+  }
+  const readableAvatar = await avatarReadUrl(photoURL, avatarDownloadToken);
+  return { uid: targetUid, ...profile.data(), firstName: data.firstName, lastName: data.lastName, displayName: data.displayName, email: data.email, phone: data.phone, photoURL: readableAvatar?.url ?? null };
 }
 
 export async function deleteOrganizationUser(user: DecodedIdToken, orgId: string, targetUid: string, confirmEmail: string) {

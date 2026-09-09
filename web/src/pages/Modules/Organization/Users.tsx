@@ -13,7 +13,7 @@ import { useCampaign } from './useCampaign';
 
 type Member = { uid: string; displayName?: string; email: string; role: string; functionId?: string; teamId?: string };
 type Item = { id: string; name: string };
-type OrgUser = { uid: string; firstName?: string; lastName?: string; displayName?: string; email: string; phone?: string; photoURL?: string; role: string };
+type OrgUser = { uid: string; firstName?: string; lastName?: string; displayName?: string; email: string; phone?: string; photoURL?: string; role: string; campaignId?: string; functionId?: string; teamId?: string };
 
 function initials(name?: string, email?: string) {
   const source = (name || email || '?').trim();
@@ -122,11 +122,14 @@ export default function Users() {
         })}</tbody></table></div> : <EmptyState icon="users" title="Aún no hay miembros" description="Creá un usuario para esta campaña." ctaLabel="Crear usuario" onCtaClick={() => setShowCreate(true)} />}
       </ContentPanel>
       <ContentPanel icon="users" title="Usuarios de la organización" subtitle="Incluye usuarios sin campaña asignada.">
-        {orgUsers.length ? <div className="cd-table-scroll"><table className="cd-data-table cd-users-table"><thead><tr><th>USUARIO</th><th>CORREO</th><th>TELÉFONO</th><th>ACCIONES</th></tr></thead><tbody>{orgUsers.map(person => <tr key={person.uid}><td><UserIdentity name={person.displayName} email={person.email} photoURL={person.photoURL} secondary={person.role} /></td><td>{person.email}</td><td>{person.phone ?? '—'}</td><td><Inline gap="sm" wrap><button type="button" className="btn btn-sm btn-outline-primary" onClick={() => setEditingUser(person)}>Editar</button><button type="button" className="btn btn-sm btn-outline-danger" aria-label={`Eliminar la cuenta de ${person.email}`} onClick={() => { setDeletingUser(person); setConfirmEmail(''); }}>Eliminar</button></Inline></td></tr>)}</tbody></table></div> : <EmptyState icon="users" title="Aún no hay usuarios" description="Creá el primer usuario." />}
+        {orgUsers.length ? <div className="cd-table-scroll"><table className="cd-data-table cd-users-table"><thead><tr><th>USUARIO</th><th>CORREO</th><th>TELÉFONO</th><th>ACCIONES</th></tr></thead><tbody>{orgUsers.map(person => {
+          const membership = members.find(member => member.uid === person.uid);
+          return <tr key={person.uid}><td><UserIdentity name={person.displayName} email={person.email} photoURL={person.photoURL} secondary={person.role} /></td><td>{person.email}</td><td>{person.phone ?? '—'}</td><td><Inline gap="sm" wrap><button type="button" className="btn btn-sm btn-outline-primary" onClick={() => setEditingUser({ ...person, campaignId: membership ? campaign?.campId : '', functionId: membership?.functionId ?? '', teamId: membership?.teamId ?? '' })}>Editar</button><button type="button" className="btn btn-sm btn-outline-danger" aria-label={`Eliminar la cuenta de ${person.email}`} onClick={() => { setDeletingUser(person); setConfirmEmail(''); }}>Eliminar</button></Inline></td></tr>;
+        })}</tbody></table></div> : <EmptyState icon="users" title="Aún no hay usuarios" description="Creá el primer usuario." />}
       </ContentPanel>
     </div>
     <CreateUserModal show={showCreate} functions={functions} teams={teams} campaigns={campaign ? [{ id: campaign.campId, name: 'Campaña actual' }] : []} onHide={() => setShowCreate(false)} onSubmit={create} />
-    <CreateUserModal show={Boolean(editingUser)} mode="edit" initialUser={editingUser} functions={functions} teams={teams} campaigns={[]} onHide={() => setEditingUser(null)} onSubmit={updateProfile} />
+    <CreateUserModal show={Boolean(editingUser)} mode="edit" initialUser={editingUser} functions={functions} teams={teams} campaigns={campaign ? [{ id: campaign.campId, name: 'Campaña actual' }] : []} onHide={() => setEditingUser(null)} onSubmit={updateProfile} />
     <MemberAssignmentModal member={editingMember} functions={functions} teams={teams} onHide={() => setEditingMember(null)} onSave={updateMember} />
     <Modal show={Boolean(deletingUser)} onHide={() => !deleting && setDeletingUser(null)}>
       <Modal.Header closeButton><Modal.Title>Eliminar cuenta de usuario</Modal.Title></Modal.Header>

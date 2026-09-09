@@ -53,6 +53,8 @@ try {
   const suffix = Date.now().toString(36);
   const email = `e2e-user-${suffix}@cloudsuite.local`;
   const password = 'CloudSuite-E2E-User-2026!';
+  const updatedEmail = `e2e-user-updated-${suffix}@cloudsuite.local`;
+  const updatedPassword = 'CloudSuite-E2E-Updated-2026!';
   const functionName = `Función E2E ${suffix}`;
   const teamName = `Equipo E2E ${suffix}`;
   await page.goto('http://127.0.0.1:5173/');
@@ -92,22 +94,39 @@ try {
   await page.getByRole('button', { name: 'Crear usuario', exact: true }).last().click();
   const created = await (await response).json();
   const { db, storage } = await import('../../server/dist/config/firebase.js');
-  const [avatarExists] = await storage.bucket().file(created.photoURL.replace(/^gs:\/\/[^/]+\//, '')).exists();
+  const [avatarExists] = await storage.bucket().file(`avatars/${created.uid}.jpg`).exists();
   if (!avatarExists) throw new Error('Avatar no existe en Storage.');
   const campaignMember = await db.collection('organizations').doc(created.orgId).collection('campaigns').doc(created.campaignId).collection('members').doc(created.uid).get();
   if (campaignMember.data()?.functionId !== created.functionId || campaignMember.data()?.teamId !== created.teamId) throw new Error(`Asignación de Firestore inválida: ${JSON.stringify(campaignMember.data())}`);
   if (!campaignMember.exists) throw new Error('No se encontró el miembro creado en Firestore.');
 
-  await page.getByLabel('Perfil').click();
+  const createdRow = page.locator('tr', { hasText: email }).last();
+  await createdRow.getByRole('button', { name: 'Editar', exact: true }).click();
+  await page.getByLabel('Email').fill(updatedEmail);
+  await page.getByLabel('Nueva contraseña').fill(updatedPassword);
+  await page.locator('#avatar').setInputFiles(avatarPath);
+  await page.getByRole('button', { name: 'Confirmar recorte', exact: true }).click();
+  await page.getByText('Foto lista para subir', { exact: true }).waitFor();
+  await page.screenshot({ path: join(screenshotsDir, 'edit-user-complete.png') });
+  const updateResponse = page.waitForResponse((request) => request.request().method() === 'PUT' && /\/organizations\/[^/]+\/users\/[^/]+$/.test(new URL(request.url()).pathname) && request.status() === 200);
+  await page.getByRole('button', { name: 'Guardar cambios', exact: true }).click();
+  const updated = await (await updateResponse).json();
+  if (!updated.photoURL?.startsWith('https://firebasestorage.googleapis.com/')) throw new Error(`La actualización no devolvió una URL de avatar utilizable: ${updated.photoURL}`);
+  await page.getByText(updatedEmail, { exact: true }).last().waitFor();
+  await page.getByRole('dialog').waitFor({ state: 'hidden' });
+  const [avatarStillExists] = await storage.bucket().file(`avatars/${created.uid}.jpg`).exists();
+  if (!avatarStillExists) throw new Error('El avatar dejó de existir en Storage tras editar el usuario.');
+
+  await page.getByRole('link', { name: 'Perfil', exact: true }).click();
   const menu = page.locator('.dropdown-menu.show').last();
   await menu.waitFor({ state: 'visible' });
   await menu.locator('a.dropdown-item').filter({ hasText: 'Cerrar sesión' }).click();
   await page.waitForURL('http://127.0.0.1:5173/');
-  await page.getByLabel('Email').fill(email);
-  await page.getByLabel('Contraseña').fill(password);
+  await page.getByLabel('Email').fill(updatedEmail);
+  await page.getByLabel('Contraseña').fill(updatedPassword);
   await page.getByRole('button', { name: 'Ingresar', exact: true }).click();
   await page.waitForURL(/dashboard/);
-  console.log(`E2E usuario real OK: ${email}; avatar de ${avatarBytes} bytes, Storage, Firestore (functionId y teamId), logout y login verificados.`);
+  console.log(`E2E usuario real OK: ${updatedEmail}; avatar de ${avatarBytes} bytes, Storage, Firestore (functionId y teamId), edición completa, logout y login con credenciales nuevas verificados.`);
 } finally {
   await browser.close();
 }
