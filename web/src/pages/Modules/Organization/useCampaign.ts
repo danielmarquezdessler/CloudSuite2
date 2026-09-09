@@ -1,11 +1,15 @@
 import { useAuth } from '../../../context/AuthContext';
 import { useActiveCampaign } from '../../../context/CampaignContext';
+import { useMemo } from 'react';
 
 export type CampaignContext = { orgId: string; campId: string; role: string };
 
 export function useCampaign() {
   const { user } = useAuth();
   const { organizationId, activeCampaign, role, error, loading, reload } = useActiveCampaign();
-  const campaign = organizationId && activeCampaign ? { orgId: organizationId, campId: activeCampaign.id, role } : null;
+  const campaign = useMemo(
+    () => organizationId && activeCampaign ? { orgId: organizationId, campId: activeCampaign.id, role } : null,
+    [activeCampaign?.id, organizationId, role]
+  );
   return { user, campaign, error, loading, reload };
 }
