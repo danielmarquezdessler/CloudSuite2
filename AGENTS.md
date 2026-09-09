@@ -24,6 +24,12 @@ CloudSuite 2 es un SaaS de gestión de campañas políticas. La aplicación no t
 
 Antes de editar cualquier archivo existente del template, abrilo y leé su contenido real. Si el cambio es grande, reemplazá el archivo completo en base a ese contenido; nunca apliques un patch contra contenido asumido.
 
+## Testing E2E real local
+
+- El usuario persistente de pruebas es `e2e-test@cloudsuite.local`. Sus credenciales y los IDs de su organización/campaña viven exclusivamente en `web/.env.test`, un archivo ignorado por Git; nunca se copian al código ni a la documentación versionada.
+- `npm run test:e2e` desde `web/` ejecuta `scripts/test-e2e-real.mjs`: usa Firebase Auth, la API Node y Firestore reales, inicia Vite en el puerto 5188 y levanta la API en 8080 únicamente si no hay una API sana. No intercepta ni simula HTTP.
+- Para regenerar el entorno, eliminá solo el usuario E2E en Firebase Authentication y su organización de prueba indicada por `web/.env.test` en Firestore; luego eliminá o vaciá ese archivo local y ejecutá `npm run test:e2e`. Se requiere ADC local vigente con `gcloud auth application-default login`.
+
 ## Estado actual
 
 - Monorepo creado con frontend y backend separados, rebrandeado con la identidad visual de CloudSuite y su logo.
@@ -40,3 +46,4 @@ Antes de editar cualquier archivo existente del template, abrilo y leé su conte
 - Notificaciones internas persistentes incorporadas: seed de bienvenida al bootstrap, campanita con contador, inbox, marcado de lectura, archivado y toast temporal.
 - Preguntas de visita configurables listas: conjuntos activos por campaña, editor de Cliente/admin y carga dinámica en la visita con cinco preguntas fallback.
 - Planificación incorporada: calendario, circuito/zona territorial, metas dinámicas, rutas, encuestas, presupuesto y asesor con sugerencias persistentes; todas sus escrituras pasan por la API Admin SDK.
+- E2E real de Organización incorporado: login Firebase persistente y comprobaciones sin mocks de creación y recarga de Funciones, Equipos e Invitaciones contra Firestore.

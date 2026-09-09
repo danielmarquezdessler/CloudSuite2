@@ -17,7 +17,8 @@
     "visual:planning": "node scripts/capture-planning.mjs",
     "visual:network-error": "node scripts/capture-network-error.mjs",
     "visual:spacing": "node scripts/capture-page-spacing.mjs",
-    "test:organization-crud": "node scripts/test-organization-crud.mjs"
+    "test:organization-crud": "node scripts/test-organization-crud.mjs",
+    "test:e2e": "node scripts/test-e2e-real.mjs"
   },
   "dependencies": {
     "@ckeditor/ckeditor5-build-balloon": "^41.3.1",
