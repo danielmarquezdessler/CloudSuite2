@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Chart from 'react-apexcharts';
 import { useCampaign } from '../Organization/useCampaign';
 import { authenticatedFetch } from '../../../lib/api';
@@ -17,17 +17,21 @@ export default function CampaignDashboard() {
   const [summary, setSummary] = useState<Summary>(empty);
   const [timeline, setTimeline] = useState<{ daily:Array<{date:string; accumulated_yes:number}> }>({ daily:[] });
   const [notice, setNotice] = useState('');
+  const [analyticsError, setAnalyticsError] = useState('');
   const [from, setFrom] = useState(new Date(Date.now() - 29 * 86400000).toISOString().slice(0, 10));
   const [to, setTo] = useState(new Date().toISOString().slice(0, 10));
 
-  useEffect(() => {
+  const loadAnalytics = useCallback(() => {
     if (!user || !campaign) return;
     const base = `/api/organizations/${campaign.orgId}/campaigns/${campaign.campId}/analytics`;
     const range = `?start=${from}&end=${to}`;
+    setAnalyticsError('');
     void Promise.all([authenticatedFetch(user, base + '/summary' + range), authenticatedFetch(user, base + '/timeline' + range)])
       .then(([nextSummary, nextTimeline]) => { setSummary(nextSummary as Summary); setTimeline(nextTimeline as typeof timeline); })
-      .catch((requestError: Error) => setNotice(requestError.message));
+      .catch(() => setAnalyticsError('No pudimos cargar los indicadores de esta campaña. Verificá la conexión e intentá nuevamente.'));
   }, [user, campaign, from, to]);
+
+  useEffect(() => { loadAnalytics(); }, [loadAnalytics]);
 
   const exportReport = () => {
     const rows = [['Métrica', 'Valor'], ['Total de electores', String(summary.totalVoters)], ['Conversiones SI', String(summary.convertedYes)], ['Conversiones NO', String(summary.convertedNo)], ['Indecisos', String(summary.undecidedCount)]];
@@ -45,9 +49,10 @@ export default function CampaignDashboard() {
   const updatedAt = new Intl.DateTimeFormat('es-AR', { hour:'2-digit', minute:'2-digit' }).format(new Date());
   const distribution = [{ label:'SI', value:summary.convertedYes, percent:summary.totalVoters ? Math.round((summary.convertedYes / summary.totalVoters) * 100) : 0, color:'#22c55e' }, { label:'NO', value:summary.convertedNo, percent:noPercent, color:'#ef4444' }, { label:'Indeciso', value:summary.undecidedCount, percent:undecidedPercent, color:'#f59e0b' }];
 
-  return <section className="cd-dashboard">
+  return <main className="cd-dashboard">
     <HeroBanner icon="bar-chart-2" title="Dashboard de campaña" subtitle="Indicadores actualizados cada cinco minutos." subtitleDetail="Visualizá el desempeño de tu campaña y tomá decisiones basadas en datos." tags={[{ icon:'clock', label:'Datos en tiempo real' }, { icon:'bars', label:`Última actualización: ${updatedAt}` }, { icon:'target', label:campaign ? 'Campaña activa' : 'Campaña' }]} extraFilters={<div className="cd-hero__filters"><label className="cd-hero__date">Desde<input type="date" value={from} onChange={(event) => setFrom(event.target.value)} /></label><label className="cd-hero__date">Hasta<input type="date" value={to} onChange={(event) => setTo(event.target.value)} /></label></div>} ctaLabel="Exportar reporte" ctaIcon="download" onCtaClick={exportReport} />
-    {error && <div className="alert alert-danger">{error}</div>}
+    {error && <div className="cd-dashboard__data-error"><div><strong>No pudimos preparar tu campaña.</strong><p>{error}</p></div></div>}
+    {analyticsError ? <div className="cd-dashboard__data-error"><div><strong>No pudimos cargar los datos</strong><p>{analyticsError}</p></div><button type="button" className="cd-primary-button" onClick={loadAnalytics}>Reintentar</button></div> : <>
     <div className="cd-dashboard__kpis">
       <KpiCard icon="people" value={summary.totalVoters} label="Total de electores" caption={`${summary.coverageRate}% visitados`} progress={summary.coverageRate} linkText="Comienza a registrar visitas" />
       <KpiCard icon="check" iconColor="green" value={summary.convertedYes} label="Conversiones SI" caption={`${summary.conversionRate}% de conversión`} progress={summary.conversionRate} linkText="Suma más voluntades" />
@@ -62,6 +67,7 @@ export default function CampaignDashboard() {
       <Card icon="people" title="Conversiones por Equipo" subtitle="Compara el desempeño de tus equipos de campaña.">{summary.teamStats.length ? <Chart type="bar" height={240} options={{ xaxis:{ categories:summary.teamStats.map((team) => team.teamName) }, colors:['#2f6fe4'], dataLabels:{ enabled:false }, grid:{ borderColor:'#eef2f8' } }} series={[{ name:'SI', data:summary.teamStats.map((team) => team.conversionsCount) }]} /> : <EmptyState icon="users" title="Aún no hay equipos registrados" description="Asigna miembros a equipos para ver sus conversiones." ctaLabel="Crear primer equipo" />}</Card>
       <Card icon="award" title="Top 10 militantes por visitas" subtitle="Conoce quiénes están impulsando la campaña." flushBody>{summary.topMilitants.length ? <table className="cd-dashboard__table"><thead><tr><th>MILITANTE</th><th>VISITAS</th><th>SI</th><th>TASA</th></tr></thead><tbody>{summary.topMilitants.map((militant) => <tr key={militant.uid}><td>{militant.name}</td><td>{militant.visitsCount}</td><td>{militant.conversionsCount}</td><td>{militant.conversionRate}%</td></tr>)}</tbody></table> : <EmptyState icon="award" title="Todavía no hay visitas registradas" description="Los militantes aparecerán aquí cuando comiences a registrar visitas." />}</Card>
     </div>
+    </>}
     {notice && <Toast message={notice} onClose={() => setNotice('')} />}
-  </section>;
+  </main>;
 }

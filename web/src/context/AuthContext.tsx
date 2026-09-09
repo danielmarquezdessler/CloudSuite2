@@ -15,6 +15,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Exclusivo para la captura visual automatizada de desarrollo; nunca se incluye en producción.
+    if (import.meta.env.DEV && new URLSearchParams(window.location.search).has('e2eDashboard')) {
+      setUser({ uid: 'visual-test-user', email: 'visual-test@cloudsuite.local', getIdToken: async () => 'visual-test-token' } as User);
+      setLoading(false);
+      return undefined;
+    }
+
     const unsubscribe = onAuthStateChanged(auth, (nextUser) => {
       setUser(nextUser);
       setLoading(false);

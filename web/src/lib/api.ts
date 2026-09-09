@@ -8,7 +8,12 @@ export async function authenticatedFetch(user: User, path: string, init: Request
   headers.set('Authorization', `Bearer ${idToken}`);
   headers.set('Content-Type', 'application/json');
 
-  const response = await fetch(`${apiBaseUrl}${path}`, { ...init, headers });
+  let response: Response;
+  try {
+    response = await fetch(`${apiBaseUrl}${path}`, { ...init, headers });
+  } catch {
+    throw new Error('No pudimos conectar con el servidor. Verificá que el backend esté iniciado e intentá nuevamente.');
+  }
   if (!response.ok) {
     const body = await response.json().catch(() => ({ message: response.statusText }));
     throw new Error(body.message ?? 'La operación no pudo completarse.');
@@ -19,7 +24,12 @@ export async function authenticatedFetch(user: User, path: string, init: Request
 }
 
 export async function publicFetch(path: string) {
-  const response = await fetch(`${apiBaseUrl}${path}`);
+  let response: Response;
+  try {
+    response = await fetch(`${apiBaseUrl}${path}`);
+  } catch {
+    throw new Error('No pudimos conectar con el servidor. Verificá que el backend esté iniciado e intentá nuevamente.');
+  }
   const body = await response.json().catch(() => ({ message: response.statusText }));
   if (!response.ok) throw new Error(body.message ?? 'La operación no pudo completarse.');
   return body;

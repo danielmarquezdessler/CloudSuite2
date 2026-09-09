@@ -9,7 +9,12 @@ import { planningRouter } from './routes/planning.routes.js';
 const app = express();
 const port = Number(process.env.PORT ?? 8080);
 
-app.use(cors({ origin: ['http://localhost:5173', 'http://127.0.0.1:5173'] }));
+const localDevOrigin = /^http:\/\/(localhost|127\.0\.0\.1):\d+$/;
+const configuredOrigins = (process.env.WEB_ORIGINS ?? '').split(',').map((origin) => origin.trim()).filter(Boolean);
+app.use(cors({ origin(origin, callback) {
+  if (!origin || localDevOrigin.test(origin) || configuredOrigins.includes(origin)) return callback(null, true);
+  return callback(new Error('Origin no permitido por CORS.'));
+} }));
 app.use(express.json());
 
 app.get('/health', (_request, response) => {
