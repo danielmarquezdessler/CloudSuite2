@@ -1,18 +1,21 @@
 import { applicationDefault, getApps, initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
+import { getStorage } from 'firebase-admin/storage';
 
 const projectId = process.env.PROJECT_ID ?? process.env.GOOGLE_CLOUD_PROJECT ?? 'politicfy-cloudsuite';
 
 if (getApps().length === 0) {
   initializeApp({
     credential: applicationDefault(),
-    projectId
+    projectId,
+    storageBucket: process.env.FIREBASE_STORAGE_BUCKET ?? `${projectId}.firebasestorage.app`
   });
 }
 
 export const adminAuth = getAuth();
 export const db = getFirestore();
+export const storage = getStorage();
 
 /**
  * Hace una lectura sin efectos colaterales para validar ADC y conectividad con

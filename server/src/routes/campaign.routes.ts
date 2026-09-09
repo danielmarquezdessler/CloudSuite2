@@ -1,8 +1,12 @@
 import { Router } from 'express';
 import { requireAuth } from '../middleware/requireAuth.js';
 import * as controller from '../controllers/campaign.controller.js';
+import multer from 'multer';
 export const campaignRouter = Router();
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 const base = '/organizations/:orgId/campaigns/:campId';
+campaignRouter.get('/organizations/:orgId/users', requireAuth, controller.getOrganizationUsers);
+campaignRouter.post('/organizations/:orgId/users', requireAuth, upload.single('avatar'), controller.postOrganizationUser);
 campaignRouter.get(`${base}/functions`, requireAuth, controller.getFunctions);
 campaignRouter.post(`${base}/functions`, requireAuth, controller.postFunction);
 campaignRouter.put(`${base}/functions/:funcId`, requireAuth, controller.putFunction);

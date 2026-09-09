@@ -18,7 +18,8 @@
     "visual:network-error": "node scripts/capture-network-error.mjs",
     "visual:spacing": "node scripts/capture-page-spacing.mjs",
     "test:organization-crud": "node scripts/test-organization-crud.mjs",
-    "test:e2e": "node scripts/test-e2e-real.mjs"
+    "test:e2e": "node scripts/test-e2e-real.mjs",
+    "test:e2e:user": "node scripts/test-create-user-e2e.mjs"
   },
   "dependencies": {
     "@ckeditor/ckeditor5-build-balloon": "^41.3.1",
@@ -80,6 +81,7 @@
     "react-dom": "^18.2.0",
     "react-donut-chart": "^1.3.3",
     "react-dropzone": "^14.2.3",
+    "react-easy-crop": "^6.2.3",
     "react-google-recaptcha": "^3.1.0",
     "react-helmet": "^6.1.0",
     "react-helmet-async": "^2.0.4",

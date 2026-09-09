@@ -5,6 +5,7 @@ import * as teams from '../services/teams.service.js';
 import * as invitations from '../services/invitations.service.js';
 import { appendAudit } from '../services/audit.service.js';
 import { invalidateAnalytics } from '../services/analytics.service.js';
+import * as users from '../services/users.service.js';
 
 const params = (request: Request) => ({ orgId: request.params.orgId, campId: request.params.campId });
 const ids = (request: Request) => [String(request.params.orgId), String(request.params.campId)] as const;
@@ -20,6 +21,8 @@ export const putTeam = async (r: Request, s: Response) => { try { s.json(await t
 export const removeTeam = async (r: Request, s: Response) => { try { await teams.deleteTeam(r.user!, ...ids(r), String(r.params.teamId)); s.status(204).end(); } catch (e) { fail(s, e); } };
 export const getTeamMembers = async (r: Request, s: Response) => { try { s.json(await teams.listTeamMembers(r.user!, ...ids(r), String(r.params.teamId))); } catch (e) { fail(s, e); } };
 export const getMembers = async (r: Request, s: Response) => { try { s.json(await invitations.listMembers(r.user!, ...ids(r))); } catch (e) { fail(s, e); } };
+export const getOrganizationUsers = async (r: Request, s: Response) => { try { s.json(await users.listOrganizationUsers(r.user!, String(r.params.orgId))); } catch (e) { fail(s, e); } };
+export const postOrganizationUser = async (r: Request, s: Response) => { try { const result = await users.createOrganizationUser(r.user!, String(r.params.orgId), r.body, r.file); s.status(201).json(result); } catch (e) { fail(s, e); } };
 export const getInvitations = async (r: Request, s: Response) => { try { s.json(await invitations.listInvitations(r.user!, ...ids(r))); } catch (e) { fail(s, e); } };
 export const postInvitation = async (r: Request, s: Response) => { try { const [orgId, campId] = ids(r); const result = await invitations.createInvitation(r.user!, orgId, campId, r.body); void appendAudit(orgId, campId, r.user!, { action: 'INVITE_USER', resource: 'invitation', resourceId: result.invId, changes: { after: { email: result.email, role: r.body.role ?? 'usuario', functionId: r.body.functionId ?? null } }, ...auditMeta(r) }).catch(console.error); s.status(201).json(result); } catch (e) { fail(s, e); } };
 export const removeInvitation = async (r: Request, s: Response) => { try { await invitations.revokeInvitation(r.user!, ...ids(r), String(r.params.invId)); s.status(204).end(); } catch (e) { fail(s, e); } };
