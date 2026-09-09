@@ -11,6 +11,8 @@ const avatarUpload = (request: Request, response: Response, next: NextFunction) 
 const base = '/organizations/:orgId/campaigns/:campId';
 campaignRouter.get('/organizations/:orgId/users', requireAuth, controller.getOrganizationUsers);
 campaignRouter.post('/organizations/:orgId/users', requireAuth, avatarUpload, controller.postOrganizationUser);
+campaignRouter.put('/organizations/:orgId/users/:userId', requireAuth, avatarUpload, controller.putOrganizationUser);
+campaignRouter.delete('/organizations/:orgId/users/:userId', requireAuth, controller.removeOrganizationUser);
 campaignRouter.get(`${base}/functions`, requireAuth, controller.getFunctions);
 campaignRouter.post(`${base}/functions`, requireAuth, controller.postFunction);
 campaignRouter.put(`${base}/functions/:funcId`, requireAuth, controller.putFunction);

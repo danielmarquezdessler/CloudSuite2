@@ -7,10 +7,11 @@ export type CreateOrganizationUserInput = {
   firstName?: string; lastName?: string; phone?: string; email?: string; password?: string;
   functionId?: string | null; teamId?: string | null; campaignId?: string | null;
 };
+export type UpdateOrganizationUserInput = Pick<CreateOrganizationUserInput, 'firstName' | 'lastName' | 'phone'>;
 const MAX_AVATAR_BYTES = 8 * 1024 * 1024;
 
 function assertOrganizationAdmin(user: DecodedIdToken, orgId: string) {
-  if (user.orgId !== orgId || (user.role !== 'cliente' && user.role !== 'admin')) throw new ForbiddenError('Solo el Cliente o un administrador puede crear usuarios.');
+  if (user.orgId !== orgId || (user.role !== 'cliente' && user.role !== 'admin')) throw new ForbiddenError('Solo el Cliente o un administrador puede gestionar usuarios.');
 }
 
 function normalize(input: CreateOrganizationUserInput) {
@@ -71,4 +72,64 @@ export async function listOrganizationUsers(user: DecodedIdToken, orgId: string)
   const [members, users] = await Promise.all([db.collection('organizations').doc(orgId).collection('members').get(), db.collection('users').where('orgIds', 'array-contains', orgId).get()]);
   const roles = new Map(members.docs.map((member) => [member.id, member.data().role]));
   return users.docs.map((doc) => ({ uid: doc.id, ...doc.data(), role: roles.get(doc.id) ?? 'usuario' }));
+}
+
+function normalizeProfile(input: UpdateOrganizationUserInput) {
+  const firstName = input.firstName?.trim();
+  const lastName = input.lastName?.trim();
+  if (!firstName || !lastName) throw new ValidationError('El nombre y apellido son obligatorios.');
+  return { firstName, lastName, displayName: `${firstName} ${lastName}`, phone: input.phone?.trim() ?? '' };
+}
+
+export async function updateOrganizationUser(user: DecodedIdToken, orgId: string, targetUid: string, input: UpdateOrganizationUserInput, avatar?: Express.Multer.File) {
+  assertOrganizationAdmin(user, orgId);
+  const profileRef = db.collection('users').doc(targetUid);
+  const profile = await profileRef.get();
+  if (!profile.exists || !(profile.data()?.orgIds ?? []).includes(orgId)) throw new ValidationError('El usuario no pertenece a esta organización.');
+
+  const data = normalizeProfile(input);
+  const photoURL = avatar ? await uploadAvatar(targetUid, avatar) : profile.data()?.photoURL ?? null;
+  // El avatar se conserva como referencia gs:// en Firestore; Firebase Auth recibe solo el nombre.
+  await adminAuth.updateUser(targetUid, { displayName: data.displayName });
+
+  const campaigns = await db.collection('organizations').doc(orgId).collection('campaigns').get();
+  const batch = db.batch();
+  batch.update(profileRef, { ...data, photoURL, updatedAt: FieldValue.serverTimestamp() });
+  for (const campaign of campaigns.docs) {
+    const memberRef = campaign.ref.collection('members').doc(targetUid);
+    const member = await memberRef.get();
+    if (member.exists) batch.update(memberRef, { displayName: data.displayName, updatedAt: FieldValue.serverTimestamp() });
+  }
+  await batch.commit();
+  return { uid: targetUid, ...profile.data(), ...data, photoURL };
+}
+
+export async function deleteOrganizationUser(user: DecodedIdToken, orgId: string, targetUid: string, confirmEmail: string) {
+  assertOrganizationAdmin(user, orgId);
+  if (targetUid === user.uid) throw new ValidationError('No podés eliminar tu propia cuenta desde esta pantalla.');
+  const profileRef = db.collection('users').doc(targetUid);
+  const profile = await profileRef.get();
+  const profileData = profile.data();
+  if (!profile.exists || !(profileData?.orgIds ?? []).includes(orgId)) throw new ValidationError('El usuario no pertenece a esta organización.');
+  if (profileData?.email?.toLowerCase() !== confirmEmail.trim().toLowerCase()) throw new ValidationError('El email de confirmación no coincide.');
+
+  const orgIds = (profileData?.orgIds ?? []).filter((id: unknown): id is string => typeof id === 'string');
+  const batch = db.batch();
+  for (const relatedOrgId of orgIds) {
+    const organization = db.collection('organizations').doc(relatedOrgId);
+    const campaigns = await organization.collection('campaigns').get();
+    for (const campaign of campaigns.docs) {
+      const memberRef = campaign.ref.collection('members').doc(targetUid);
+      const member = await memberRef.get();
+      if (!member.exists) continue;
+      const teamId = typeof member.data()?.teamId === 'string' ? member.data()!.teamId : null;
+      batch.delete(memberRef);
+      if (teamId) batch.delete(campaign.ref.collection('teams').doc(teamId).collection('members').doc(targetUid));
+    }
+    batch.delete(organization.collection('members').doc(targetUid));
+  }
+  batch.delete(profileRef);
+  await batch.commit();
+  await storage.bucket().file(`avatars/${targetUid}.jpg`).delete({ ignoreNotFound: true }).catch(() => undefined);
+  await adminAuth.deleteUser(targetUid);
 }

@@ -1,10 +1,11 @@
-import { ChangeEvent, useState } from 'react';
+import { ChangeEvent, useEffect, useState } from 'react';
 import Cropper, { Area } from 'react-easy-crop';
 import { Button, Modal } from 'react-bootstrap';
 import SelectControl from '../Shared/SelectControl';
 
 type Item = { id: string; name: string };
-type Props = { show: boolean; functions: Item[]; teams: Item[]; campaigns: Item[]; onHide: () => void; onSubmit: (data: FormData) => Promise<void> };
+type EditableUser = { uid: string; firstName?: string; lastName?: string; displayName?: string; phone?: string; email: string };
+type Props = { show: boolean; functions: Item[]; teams: Item[]; campaigns: Item[]; onHide: () => void; onSubmit: (data: FormData) => Promise<void>; mode?: 'create' | 'edit'; initialUser?: EditableUser | null };
 const MAX_AVATAR_BYTES = 8 * 1024 * 1024;
 
 async function cropImage(source: string, area: Area) {
@@ -18,7 +19,7 @@ async function cropImage(source: string, area: Area) {
   return new Promise<Blob>((resolveBlob, reject) => canvas.toBlob((blob) => blob ? resolveBlob(blob) : reject(new Error('No pudimos recortar la imagen.')), 'image/jpeg', .9));
 }
 
-export default function CreateUserModal({ show, functions, teams, campaigns, onHide, onSubmit }: Props) {
+export default function CreateUserModal({ show, functions, teams, campaigns, onHide, onSubmit, mode = 'create', initialUser = null }: Props) {
   const [values, setValues] = useState({ firstName:'', lastName:'', phone:'', email:'', password:'', functionId:'', teamId:'', campaignId:'' });
   const [source, setSource] = useState('');
   const [crop, setCrop] = useState({ x:0, y:0 });
@@ -27,6 +28,19 @@ export default function CreateUserModal({ show, functions, teams, campaigns, onH
   const [avatar, setAvatar] = useState<Blob | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const isEditing = mode === 'edit';
+  useEffect(() => {
+    if (!show) return;
+    const nameParts = initialUser?.displayName?.trim().split(/\s+/) ?? [];
+    setValues({
+      firstName: initialUser?.firstName ?? nameParts[0] ?? '',
+      lastName: initialUser?.lastName ?? nameParts.slice(1).join(' ') ?? '',
+      phone: initialUser?.phone ?? '',
+      email: initialUser?.email ?? '',
+      password: '', functionId: '', teamId: '', campaignId: ''
+    });
+    setSource(''); setAvatar(null); setError('');
+  }, [show, initialUser, mode]);
   const update = (key: keyof typeof values) => (event: ChangeEvent<HTMLInputElement>) => setValues({ ...values, [key]:event.target.value });
   const choose = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -48,21 +62,23 @@ export default function CreateUserModal({ show, functions, teams, campaigns, onH
   const selectCampaign = (campaignId: string) => setValues({ ...values, campaignId, functionId:'', teamId:'' });
   const submit = async () => {
     setError('');
-    if (!values.firstName || !values.lastName || !values.email || !values.password) { setError('Completá nombre, apellido, email y contraseña.'); return; }
+    if (!values.firstName || !values.lastName || (!isEditing && (!values.email || !values.password))) { setError(isEditing ? 'Completá nombre y apellido.' : 'Completá nombre, apellido, email y contraseña.'); return; }
     if (avatar && avatar.size > MAX_AVATAR_BYTES) { setError('La imagen no puede superar los 8 MB.'); return; }
     setSaving(true);
     try {
       const data = new FormData();
-      Object.entries(values).forEach(([key, value]) => data.append(key, value));
+      Object.entries(values).forEach(([key, value]) => {
+        if (!isEditing || ['firstName', 'lastName', 'phone'].includes(key)) data.append(key, value);
+      });
       if (avatar) data.append('avatar', avatar, 'avatar.jpg');
       await onSubmit(data);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'No pudimos crear el usuario.');
+      setError(caught instanceof Error ? caught.message : `No pudimos ${isEditing ? 'actualizar' : 'crear'} el usuario.`);
     } finally { setSaving(false); }
   };
 
   return <Modal size="lg" show={show} onHide={() => !saving && onHide()}>
-    <Modal.Header closeButton><Modal.Title>Crear usuario</Modal.Title></Modal.Header>
+    <Modal.Header closeButton><Modal.Title>{isEditing ? 'Editar usuario' : 'Crear usuario'}</Modal.Title></Modal.Header>
     <Modal.Body><div className="row g-3">
       <div className="col-12">
         <label className="form-label" htmlFor="avatar">Foto de perfil</label>
@@ -73,14 +89,14 @@ export default function CreateUserModal({ show, functions, teams, campaigns, onH
       <div className="col-md-6"><label className="form-label" htmlFor="firstName">Nombre</label><input id="firstName" className="form-control" value={values.firstName} onChange={update('firstName')} /></div>
       <div className="col-md-6"><label className="form-label" htmlFor="lastName">Apellido</label><input id="lastName" className="form-control" value={values.lastName} onChange={update('lastName')} /></div>
       <div className="col-md-6"><label className="form-label" htmlFor="phone">Teléfono</label><input id="phone" className="form-control" value={values.phone} onChange={update('phone')} /></div>
-      <div className="col-12"><div className="border-top pt-3 mt-1"><h3 className="h6 mb-1">Credenciales de acceso</h3><p className="small text-muted mb-0">Estos datos permitirán al usuario iniciar sesión en CloudSuite.</p></div></div>
+      {!isEditing && <><div className="col-12"><div className="border-top pt-3 mt-1"><h3 className="h6 mb-1">Credenciales de acceso</h3><p className="small text-muted mb-0">Estos datos permitirán al usuario iniciar sesión en CloudSuite.</p></div></div>
       <div className="col-md-6"><label className="form-label" htmlFor="email">Email</label><input id="email" type="email" className="form-control" value={values.email} onChange={update('email')} /></div>
       <div className="col-md-6"><label className="form-label" htmlFor="password">Contraseña</label><input id="password" type="password" className="form-control" value={values.password} onChange={update('password')} /></div>
       <div className="col-12"><div className="border-top pt-3 mt-1"><h3 className="h6 mb-1">Asignación en campaña</h3><p className="small text-muted mb-0">Definí dónde trabajará la persona y qué responsabilidad tendrá.</p></div></div>
       <div className="col-md-4"><label className="form-label" htmlFor="campaign">Campaña</label><SelectControl id="campaign" ariaLabel="Campaña" label={campaigns.find(item => item.id === values.campaignId)?.name ?? 'Sin campaña por ahora'} options={[{ value:'', label:'Sin campaña por ahora' }, ...campaigns.map(item => ({ value:item.id, label:item.name }))]} value={values.campaignId} onChange={selectCampaign} /></div>
       <div className="col-md-4"><label className="form-label" htmlFor="create-function">Función</label><SelectControl id="create-function" ariaLabel="Función" disabled={!values.campaignId} label={functions.find(item => item.id === values.functionId)?.name ?? 'Sin asignar'} options={[{ value:'', label:'Sin asignar' }, ...functions.map(item => ({ value:item.id, label:item.name }))]} value={values.functionId} onChange={functionId => setValues({ ...values, functionId })} /></div>
-      <div className="col-md-4"><label className="form-label" htmlFor="team">Equipo</label><SelectControl id="team" ariaLabel="Equipo" disabled={!values.campaignId} label={!values.campaignId ? 'Elegí una campaña primero' : teams.find(item => item.id === values.teamId)?.name ?? 'Sin asignar'} options={[{ value:'', label:'Sin asignar' }, ...teams.map(item => ({ value:item.id, label:item.name }))]} value={values.teamId} onChange={teamId => setValues({ ...values, teamId })} /></div>
+      <div className="col-md-4"><label className="form-label" htmlFor="team">Equipo</label><SelectControl id="team" ariaLabel="Equipo" disabled={!values.campaignId} label={!values.campaignId ? 'Elegí una campaña primero' : teams.find(item => item.id === values.teamId)?.name ?? 'Sin asignar'} options={[{ value:'', label:'Sin asignar' }, ...teams.map(item => ({ value:item.id, label:item.name }))]} value={values.teamId} onChange={teamId => setValues({ ...values, teamId })} /></div></>}
     </div>{error && <p role="alert" className="text-danger small mt-3 mb-0">{error}</p>}</Modal.Body>
-    <Modal.Footer><Button variant="secondary" onClick={onHide} disabled={saving}>Cancelar</Button><Button onClick={() => void submit()} disabled={saving}>{saving ? 'Creando…' : 'Crear usuario'}</Button></Modal.Footer>
+    <Modal.Footer><Button variant="secondary" onClick={onHide} disabled={saving}>Cancelar</Button><Button onClick={() => void submit()} disabled={saving}>{saving ? (isEditing ? 'Guardando…' : 'Creando…') : (isEditing ? 'Guardar cambios' : 'Crear usuario')}</Button></Modal.Footer>
   </Modal>;
 }
