@@ -1,5 +1,6 @@
 import { DecodedIdToken } from 'firebase-admin/auth';
 import { FieldValue } from 'firebase-admin/firestore';
+import { randomUUID } from 'node:crypto';
 import { adminAuth, db, storage } from '../config/firebase.js';
 import { ForbiddenError, ValidationError, campaignRef } from './access.service.js';
 
@@ -22,13 +23,47 @@ function normalize(input: CreateOrganizationUserInput) {
   return { firstName, lastName, displayName: `${firstName} ${lastName}`, phone: input.phone?.trim() ?? '', email, password, campaignId: input.campaignId?.trim() || null, functionId: input.functionId?.trim() || null, teamId: input.teamId?.trim() || null };
 }
 
-async function uploadAvatar(uid: string, avatar?: Express.Multer.File) {
+type AvatarReference = { storagePath: string; downloadToken: string };
+
+function avatarDownloadUrl(bucketName: string, path: string, token: string) {
+  return `https://firebasestorage.googleapis.com/v0/b/${bucketName}/o/${encodeURIComponent(path)}?alt=media&token=${token}`;
+}
+
+async function uploadAvatar(uid: string, avatar?: Express.Multer.File): Promise<AvatarReference | null> {
   if (!avatar) return null;
   if (!avatar.mimetype.startsWith('image/')) throw new ValidationError('La foto de perfil debe ser una imagen.');
   if (avatar.size > MAX_AVATAR_BYTES) throw new ValidationError('La imagen no puede superar los 8 MB.');
-  const path = `avatars/${uid}.jpg`; const file = storage.bucket().file(path);
-  await file.save(avatar.buffer, { resumable: false, contentType: 'image/jpeg', metadata: { cacheControl: 'public,max-age=3600' } });
-  return `gs://${storage.bucket().name}/${path}`;
+  const path = `avatars/${uid}.jpg`; const file = storage.bucket().file(path); const downloadToken = randomUUID();
+  await file.save(avatar.buffer, { resumable: false, contentType: 'image/jpeg', metadata: { cacheControl: 'private,max-age=3600', metadata: { firebaseStorageDownloadTokens: downloadToken } } });
+  return { storagePath: `gs://${storage.bucket().name}/${path}`, downloadToken };
+}
+
+/**
+ * Firebase download tokens work with a private bucket and do not require a service-account
+ * signing key, unlike V4 signed URLs when the local backend uses user ADC.
+ */
+async function avatarReadUrl(photoURL: unknown, existingToken: unknown) {
+  if (typeof photoURL !== 'string' || !photoURL) return null;
+  if (/^https?:\/\//.test(photoURL)) return { url: photoURL, downloadToken: null };
+  const bucket = storage.bucket();
+  const prefix = `gs://${bucket.name}/`;
+  if (!photoURL.startsWith(prefix)) return null;
+  const path = photoURL.slice(prefix.length); const file = bucket.file(path);
+  try {
+    let downloadToken = typeof existingToken === 'string' && existingToken ? existingToken : '';
+    if (!downloadToken) {
+      const [metadata] = await file.getMetadata();
+      downloadToken = String(metadata.metadata?.firebaseStorageDownloadTokens ?? '').split(',')[0];
+      if (!downloadToken) {
+        downloadToken = randomUUID();
+        await file.setMetadata({ metadata: { firebaseStorageDownloadTokens: downloadToken } });
+      }
+    }
+    return { url: avatarDownloadUrl(bucket.name, path, downloadToken), downloadToken };
+  } catch (error) {
+    console.warn(`No se pudo preparar la URL de descarga del avatar: ${photoURL}`, error);
+    return null;
+  }
 }
 
 export async function createOrganizationUser(user: DecodedIdToken, orgId: string, input: CreateOrganizationUserInput, avatar?: Express.Multer.File) {
@@ -49,9 +84,11 @@ export async function createOrganizationUser(user: DecodedIdToken, orgId: string
 
   const created = await adminAuth.createUser({ email: data.email, password: data.password, displayName: data.displayName });
   try {
-    const photoURL = await uploadAvatar(created.uid, avatar);
+    const avatarReference = await uploadAvatar(created.uid, avatar);
+    const photoURL = avatarReference?.storagePath ?? null;
+    const avatarDownloadToken = avatarReference?.downloadToken ?? null;
     const batch = db.batch(); const userRef = db.collection('users').doc(created.uid); const orgMemberRef = db.collection('organizations').doc(orgId).collection('members').doc(created.uid);
-    batch.set(userRef, { email: data.email, displayName: data.displayName, firstName: data.firstName, lastName: data.lastName, phone: data.phone, photoURL, orgIds: [orgId], createdAt: FieldValue.serverTimestamp() });
+    batch.set(userRef, { email: data.email, displayName: data.displayName, firstName: data.firstName, lastName: data.lastName, phone: data.phone, photoURL, avatarDownloadToken, orgIds: [orgId], createdAt: FieldValue.serverTimestamp() });
     batch.set(orgMemberRef, { role: 'usuario', createdAt: FieldValue.serverTimestamp() });
     if (data.campaignId) {
       const memberRef = campaignRef(orgId, data.campaignId).collection('members').doc(created.uid);
@@ -60,7 +97,7 @@ export async function createOrganizationUser(user: DecodedIdToken, orgId: string
     }
     await batch.commit();
     await adminAuth.setCustomUserClaims(created.uid, { role: 'usuario', orgId, camps: data.campaignId ? { [data.campaignId]: true } : {} });
-    return { uid: created.uid, orgId, email: data.email, displayName: data.displayName, firstName: data.firstName, lastName: data.lastName, phone: data.phone, photoURL, role: 'usuario', campaignId: data.campaignId, functionId: data.functionId, teamId: data.teamId };
+    return { uid: created.uid, orgId, email: data.email, displayName: data.displayName, firstName: data.firstName, lastName: data.lastName, phone: data.phone, photoURL: avatarReference ? avatarDownloadUrl(storage.bucket().name, `avatars/${created.uid}.jpg`, avatarReference.downloadToken) : null, role: 'usuario', campaignId: data.campaignId, functionId: data.functionId, teamId: data.teamId };
   } catch (error) {
     await adminAuth.deleteUser(created.uid).catch(() => undefined);
     throw error;
@@ -71,7 +108,11 @@ export async function listOrganizationUsers(user: DecodedIdToken, orgId: string)
   assertOrganizationAdmin(user, orgId);
   const [members, users] = await Promise.all([db.collection('organizations').doc(orgId).collection('members').get(), db.collection('users').where('orgIds', 'array-contains', orgId).get()]);
   const roles = new Map(members.docs.map((member) => [member.id, member.data().role]));
-  return users.docs.map((doc) => ({ uid: doc.id, ...doc.data(), role: roles.get(doc.id) ?? 'usuario' }));
+  return Promise.all(users.docs.map(async (doc) => {
+    const profile = doc.data(); const avatar = await avatarReadUrl(profile.photoURL, profile.avatarDownloadToken);
+    if (avatar?.downloadToken && avatar.downloadToken !== profile.avatarDownloadToken) await doc.ref.update({ avatarDownloadToken: avatar.downloadToken });
+    return { uid: doc.id, ...profile, photoURL: avatar?.url ?? null, role: roles.get(doc.id) ?? 'usuario' };
+  }));
 }
 
 function normalizeProfile(input: UpdateOrganizationUserInput) {
@@ -88,20 +129,22 @@ export async function updateOrganizationUser(user: DecodedIdToken, orgId: string
   if (!profile.exists || !(profile.data()?.orgIds ?? []).includes(orgId)) throw new ValidationError('El usuario no pertenece a esta organización.');
 
   const data = normalizeProfile(input);
-  const photoURL = avatar ? await uploadAvatar(targetUid, avatar) : profile.data()?.photoURL ?? null;
+  const avatarReference = avatar ? await uploadAvatar(targetUid, avatar) : null;
+  const photoURL = avatarReference?.storagePath ?? profile.data()?.photoURL ?? null;
+  const avatarDownloadToken = avatarReference?.downloadToken ?? profile.data()?.avatarDownloadToken ?? null;
   // El avatar se conserva como referencia gs:// en Firestore; Firebase Auth recibe solo el nombre.
   await adminAuth.updateUser(targetUid, { displayName: data.displayName });
 
   const campaigns = await db.collection('organizations').doc(orgId).collection('campaigns').get();
   const batch = db.batch();
-  batch.update(profileRef, { ...data, photoURL, updatedAt: FieldValue.serverTimestamp() });
+  batch.update(profileRef, { ...data, photoURL, avatarDownloadToken, updatedAt: FieldValue.serverTimestamp() });
   for (const campaign of campaigns.docs) {
     const memberRef = campaign.ref.collection('members').doc(targetUid);
     const member = await memberRef.get();
     if (member.exists) batch.update(memberRef, { displayName: data.displayName, updatedAt: FieldValue.serverTimestamp() });
   }
   await batch.commit();
-  return { uid: targetUid, ...profile.data(), ...data, photoURL };
+  return { uid: targetUid, ...profile.data(), ...data, photoURL: avatarReference ? avatarDownloadUrl(storage.bucket().name, `avatars/${targetUid}.jpg`, avatarReference.downloadToken) : null };
 }
 
 export async function deleteOrganizationUser(user: DecodedIdToken, orgId: string, targetUid: string, confirmEmail: string) {

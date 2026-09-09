@@ -15,6 +15,23 @@ type Member = { uid: string; displayName?: string; email: string; role: string; 
 type Item = { id: string; name: string };
 type OrgUser = { uid: string; firstName?: string; lastName?: string; displayName?: string; email: string; phone?: string; photoURL?: string; role: string };
 
+function initials(name?: string, email?: string) {
+  const source = (name || email || '?').trim();
+  const words = source.split(/\s+/).filter(Boolean);
+  return words.length > 1 ? `${words[0][0]}${words[1][0]}`.toUpperCase() : source.slice(0, 2).toUpperCase();
+}
+
+function UserIdentity({ name, email, photoURL, secondary }: { name?: string; email: string; photoURL?: string; secondary?: string }) {
+  const [photoUnavailable, setPhotoUnavailable] = useState(false);
+  const label = name || email;
+  return <div className="cd-user-identity">
+    {!photoUnavailable && photoURL
+      ? <img className="cd-user-identity__avatar" src={photoURL} alt={`Foto de ${label}`} onError={() => setPhotoUnavailable(true)} />
+      : <span className="cd-user-identity__fallback" aria-hidden="true">{initials(label, email)}</span>}
+    <div className="cd-user-identity__copy"><strong>{label}</strong><small>{secondary ?? email}</small></div>
+  </div>;
+}
+
 function MemberAssignmentModal({ member, functions, teams, onHide, onSave }: { member: Member | null; functions: Item[]; teams: Item[]; onHide: () => void; onSave: (values: { functionId: string; teamId: string }) => Promise<void> }) {
   const [functionId, setFunctionId] = useState('');
   const [teamId, setTeamId] = useState('');
@@ -98,8 +115,15 @@ export default function Users() {
   return <PageContainer>
     <HeroBanner icon="users" title="Usuarios" subtitle="Gestioná a los colaboradores de tu campaña." subtitleDetail="Creá usuarios, asigná funciones y organizá el trabajo en equipo." tags={[]} ctaLabel="Crear usuario" onCtaClick={() => setShowCreate(true)} />
     <div className="cd-users__panels">
-      <ContentPanel icon="users" title="Miembros de la campaña" subtitle="Personas vinculadas a la campaña activa.">{members.length ? <div className="cd-table-scroll"><table className="cd-data-table"><thead><tr><th>NOMBRE</th><th>CORREO</th><th>FUNCIÓN</th><th>EQUIPO</th><th>ACCIONES</th></tr></thead><tbody>{members.map(member => <tr key={member.uid}><td>{member.displayName}</td><td>{member.email}</td><td>{functions.find(item => item.id === member.functionId)?.name ?? 'Sin función'}</td><td>{teams.find(item => item.id === member.teamId)?.name ?? 'Sin equipo'}</td><td><Inline gap="sm" wrap><button type="button" className="btn btn-sm btn-outline-primary" onClick={() => setEditingMember(member)}>Editar</button><button type="button" className="btn btn-sm btn-outline-danger" aria-label={`Desvincular ${member.displayName ?? member.email} de la campaña`} onClick={() => void unlinkMember(member)}>Eliminar</button></Inline></td></tr>)}</tbody></table></div> : <EmptyState icon="users" title="Aún no hay miembros" description="Creá un usuario para esta campaña." ctaLabel="Crear usuario" onCtaClick={() => setShowCreate(true)} />}</ContentPanel>
-      <ContentPanel icon="users" title="Usuarios de la organización" subtitle="Incluye usuarios sin campaña asignada.">{orgUsers.length ? <div className="cd-table-scroll"><table className="cd-data-table"><thead><tr><th>NOMBRE</th><th>CORREO</th><th>TELÉFONO</th><th>ACCIONES</th></tr></thead><tbody>{orgUsers.map(person => <tr key={person.uid}><td>{person.displayName}</td><td>{person.email}</td><td>{person.phone ?? '—'}</td><td><Inline gap="sm" wrap><button type="button" className="btn btn-sm btn-outline-primary" onClick={() => setEditingUser(person)}>Editar</button><button type="button" className="btn btn-sm btn-outline-danger" aria-label={`Eliminar la cuenta de ${person.email}`} onClick={() => { setDeletingUser(person); setConfirmEmail(''); }}>Eliminar</button></Inline></td></tr>)}</tbody></table></div> : <EmptyState icon="users" title="Aún no hay usuarios" description="Creá el primer usuario." />}</ContentPanel>
+      <ContentPanel icon="users" title="Miembros de la campaña" subtitle="Personas vinculadas a la campaña activa.">
+        {members.length ? <div className="cd-table-scroll"><table className="cd-data-table cd-users-table"><thead><tr><th>USUARIO</th><th>CORREO</th><th>FUNCIÓN</th><th>EQUIPO</th><th>ACCIONES</th></tr></thead><tbody>{members.map(member => {
+          const profile = orgUsers.find(person => person.uid === member.uid);
+          return <tr key={member.uid}><td><UserIdentity name={member.displayName || profile?.displayName} email={member.email} photoURL={profile?.photoURL} /></td><td>{member.email}</td><td>{functions.find(item => item.id === member.functionId)?.name ?? 'Sin función'}</td><td>{teams.find(item => item.id === member.teamId)?.name ?? 'Sin equipo'}</td><td><Inline gap="sm" wrap><button type="button" className="btn btn-sm btn-outline-primary" onClick={() => setEditingMember(member)}>Editar</button><button type="button" className="btn btn-sm btn-outline-danger" aria-label={`Desvincular ${member.displayName ?? member.email} de la campaña`} onClick={() => void unlinkMember(member)}>Eliminar</button></Inline></td></tr>;
+        })}</tbody></table></div> : <EmptyState icon="users" title="Aún no hay miembros" description="Creá un usuario para esta campaña." ctaLabel="Crear usuario" onCtaClick={() => setShowCreate(true)} />}
+      </ContentPanel>
+      <ContentPanel icon="users" title="Usuarios de la organización" subtitle="Incluye usuarios sin campaña asignada.">
+        {orgUsers.length ? <div className="cd-table-scroll"><table className="cd-data-table cd-users-table"><thead><tr><th>USUARIO</th><th>CORREO</th><th>TELÉFONO</th><th>ACCIONES</th></tr></thead><tbody>{orgUsers.map(person => <tr key={person.uid}><td><UserIdentity name={person.displayName} email={person.email} photoURL={person.photoURL} secondary={person.role} /></td><td>{person.email}</td><td>{person.phone ?? '—'}</td><td><Inline gap="sm" wrap><button type="button" className="btn btn-sm btn-outline-primary" onClick={() => setEditingUser(person)}>Editar</button><button type="button" className="btn btn-sm btn-outline-danger" aria-label={`Eliminar la cuenta de ${person.email}`} onClick={() => { setDeletingUser(person); setConfirmEmail(''); }}>Eliminar</button></Inline></td></tr>)}</tbody></table></div> : <EmptyState icon="users" title="Aún no hay usuarios" description="Creá el primer usuario." />}
+      </ContentPanel>
     </div>
     <CreateUserModal show={showCreate} functions={functions} teams={teams} campaigns={campaign ? [{ id: campaign.campId, name: 'Campaña actual' }] : []} onHide={() => setShowCreate(false)} onSubmit={create} />
     <CreateUserModal show={Boolean(editingUser)} mode="edit" initialUser={editingUser} functions={functions} teams={teams} campaigns={[]} onHide={() => setEditingUser(null)} onSubmit={updateProfile} />
