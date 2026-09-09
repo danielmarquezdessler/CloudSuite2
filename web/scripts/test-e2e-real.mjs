@@ -52,7 +52,7 @@ let browserProcess = null;
 let browser = null;
 try {
   const env = parseEnv(await readFile(envPath, 'utf8'));
-  if (!env.E2E_EMAIL || !env.E2E_PASSWORD || !env.E2E_ORGANIZATION || !env.E2E_CAMPAIGN) throw new Error('Faltan E2E_EMAIL, E2E_PASSWORD, E2E_ORGANIZATION o E2E_CAMPAIGN en web/.env.test.');
+  if (!env.E2E_EMAIL || !env.E2E_PASSWORD || !env.E2E_ORGANIZATION) throw new Error('Faltan E2E_EMAIL, E2E_PASSWORD o E2E_ORGANIZATION en web/.env.test.');
   if (!(await health())) {
     apiProcess = spawn(process.execPath, [resolve(serverDir, 'node_modules', 'tsx', 'dist', 'cli.mjs'), 'src/index.ts'], { cwd: serverDir, env: { ...process.env, PROJECT_ID: 'politicfy-cloudsuite' }, stdio: ['ignore', 'pipe', 'pipe'] });
     await waitForOutput(apiProcess, 'CloudSuite server listening', 'La API real');
@@ -76,7 +76,7 @@ try {
   } catch (loginError) {
     console.log('Usuario E2E no autenticable; intentando registro real…');
     await page.goto(`${webUrl}/register`, { waitUntil: 'domcontentloaded', timeout: 25000 });
-    await page.getByLabel('Nombre de la organización').fill(env.E2E_ORGANIZATION); await page.getByLabel('Nombre de la primera campaña').fill(env.E2E_CAMPAIGN); await page.getByLabel('Email').fill(env.E2E_EMAIL); await page.getByLabel('Contraseña').fill(env.E2E_PASSWORD); await page.getByRole('button', { name: 'Crear cuenta', exact: true }).click();
+    await page.getByLabel('Nombre de la organización').fill(env.E2E_ORGANIZATION); await page.getByLabel('Email').fill(env.E2E_EMAIL); await page.getByLabel('Contraseña').fill(env.E2E_PASSWORD); await page.getByRole('button', { name: 'Crear cuenta', exact: true }).click();
     try { await submitToDashboard(page); } catch (registerError) { throw new Error(`Login inicial: ${loginError instanceof Error ? loginError.message : String(loginError)}\nRegistro real: ${registerError instanceof Error ? registerError.message : String(registerError)}`); }
   }
   // El dashboard puede haber terminado su primer GET /api/me antes de llegar aquí.

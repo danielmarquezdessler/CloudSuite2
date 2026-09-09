@@ -25,7 +25,8 @@
     "visual:spacing-real": "node scripts/capture-spacing-real.mjs",
     "test:padding-audit": "node scripts/padding-audit.mjs",
     "test:e2e:avatars": "node scripts/test-user-avatars-real.mjs",
-    "test:e2e:campaigns": "node scripts/test-campaigns-e2e-real.mjs"
+    "test:e2e:campaigns": "node scripts/test-campaigns-e2e-real.mjs",
+    "test:e2e:auto-campaign": "node scripts/test-auto-campaign-e2e-real.mjs"
   },
   "dependencies": {
     "@ckeditor/ckeditor5-build-balloon": "^41.3.1",

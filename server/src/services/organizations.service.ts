@@ -8,14 +8,13 @@ export class NotFoundError extends Error {}
 
 interface BootstrapInput {
   organizationName: string;
-  campaignName: string;
 }
 
 export async function bootstrapOrganization(user: DecodedIdToken, input: BootstrapInput) {
   const organizationName = input.organizationName.trim();
-  const campaignName = input.campaignName.trim();
-  if (!organizationName || !campaignName) {
-    throw new Error('El nombre de la organización y de la campaña son obligatorios.');
+  const campaignName = 'Campaña Electoral';
+  if (!organizationName) {
+    throw new Error('El nombre de la organización es obligatorio.');
   }
 
   const userRef = db.collection('users').doc(user.uid);

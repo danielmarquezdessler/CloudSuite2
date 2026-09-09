@@ -7,7 +7,6 @@ const suffix = Date.now().toString(36);
 const email = `e2e-campaign-owner-${suffix}@cloudsuite.local`;
 const password = 'CloudSuite-Campaign-E2E-2026!';
 const organizationName = `Organización E2E ${suffix}`;
-const initialCampaignName = `Campaña base ${suffix}`;
 const createdName = `Campaña temporal ${suffix}`;
 const renamedName = `Campaña renombrada ${suffix}`;
 const appUrl = process.env.E2E_WEB_URL ?? 'http://127.0.0.1:5173';
@@ -20,7 +19,6 @@ page.setDefaultTimeout(30_000);
 try {
   await page.goto(`${appUrl}/register`);
   await page.getByLabel('Nombre de la organización').fill(organizationName);
-  await page.getByLabel('Nombre de la primera campaña').fill(initialCampaignName);
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Contraseña').fill(password);
   await page.getByRole('button', { name: 'Crear cuenta', exact: true }).click();
