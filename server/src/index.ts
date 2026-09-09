@@ -5,6 +5,7 @@ import { campaignRouter } from './routes/campaign.routes.js';
 import { votersRouter } from './routes/voters.routes.js';
 import { systemRouter } from './routes/system.routes.js';
 import { planningRouter } from './routes/planning.routes.js';
+import { executionRouter } from './routes/execution.routes.js';
 import { getFirestoreStartupDiagnostic, verifyFirestoreReachability } from './config/firebase.js';
 
 const app = express();
@@ -28,6 +29,7 @@ app.use('/api', campaignRouter);
 app.use('/api', votersRouter);
 app.use('/api', systemRouter);
 app.use('/api', planningRouter);
+app.use('/api', executionRouter);
 
 async function startServer() {
   try {

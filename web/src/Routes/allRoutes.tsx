@@ -18,6 +18,9 @@ import Encuestas from '../pages/Modules/Planning/Encuestas';
 import Presupuesto from '../pages/Modules/Planning/Presupuesto';
 import Asesor from '../pages/Modules/Planning/Asesor';
 import SettingsPlaceholder from '../pages/Modules/System/SettingsPlaceholder';
+import LiveVisits from '../pages/Modules/Execution/LiveVisits';
+import Heatmap from '../pages/Modules/Execution/Heatmap';
+import Undecided from '../pages/Modules/Execution/Undecided';
 // import AffiliateDashboard from "../pages/AffiliateDashboard";
 // import InvoiceDashboard from "../pages/InvoiceDashboard";
 // import FinaceDashboard from "../pages/FinaceDashboard";
@@ -202,6 +205,9 @@ const routes = [
     { path: "/planning/budget", component: <Presupuesto /> },
     { path: "/planning/advisor", component: <Asesor /> },
     { path: "/settings", component: <SettingsPlaceholder /> },
+    { path: "/execution/live", component: <LiveVisits /> },
+    { path: "/execution/heatmap", component: <Heatmap /> },
+    { path: "/execution/undecided", component: <Undecided /> },
     // { path: "/affiliate-dashboard", component: <AffiliateDashboard /> },
     // { path: "/invoice-dashboard", component: <InvoiceDashboard /> },
     // { path: "/finance-dashboard", component: <FinaceDashboard /> },

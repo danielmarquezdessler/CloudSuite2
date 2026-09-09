@@ -14,7 +14,8 @@ const pages = [
   ['Usuarios', '/organization/users'], ['Campañas', '/organization/campaigns'], ['Electores', '/electoral-conversion/voters'], ['Mapa', '/electoral-conversion/map'],
   ['Preguntas de visita', '/planning/questions'], ['Control de Revisión', '/control-de-revision'], ['Calendario', '/planning/calendar'],
   ['Territorio', '/planning/territory'], ['Metas', '/planning/goals'], ['Rutas', '/planning/routes'],
-  ['Encuestas', '/planning/surveys'], ['Presupuesto', '/planning/budget'], ['Asesor', '/planning/advisor']
+  ['Encuestas', '/planning/surveys'], ['Presupuesto', '/planning/budget'], ['Asesor', '/planning/advisor'],
+  ['Visitas en vivo', '/execution/live'], ['Mapa de calor', '/execution/heatmap'], ['Indecisos', '/execution/undecided']
 ];
 const minimumPadding = 12;
 const minimumHeaderGap = 16;

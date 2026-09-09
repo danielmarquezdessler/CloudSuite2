@@ -410,6 +410,10 @@ const menuItems = [
     ,{ id: 'planning-surveys', label: 'Encuestas', icon: 'ph-duotone ph-clipboard-text', link: '/planning/surveys', dataPage: 'surveys' }
     ,{ id: 'planning-budget', label: 'Presupuesto', icon: 'ph-duotone ph-wallet', link: '/planning/budget', dataPage: 'budget' }
     ,{ id: 'planning-advisor', label: 'Asesor IA', icon: 'ph-duotone ph-sparkle', link: '/planning/advisor', dataPage: 'advisor' }
+    ,{ label: 'Ejecución', type: 'HEADER' }
+    ,{ id: 'execution-live', label: 'Visitas en vivo', icon: 'ph-duotone ph-broadcast', link: '/execution/live', dataPage: 'execution-live' }
+    ,{ id: 'execution-heatmap', label: 'Mapa de calor', icon: 'ph-duotone ph-fire', link: '/execution/heatmap', dataPage: 'execution-heatmap' }
+    ,{ id: 'execution-undecided', label: 'Indecisos', icon: 'ph-duotone ph-question', link: '/execution/undecided', dataPage: 'execution-undecided' }
     ,{ label: 'Sistema', type: 'HEADER' }
     ,{ id: 'audit-log', label: 'Control de Revisión', icon: 'ph-duotone ph-shield-check', link: '/control-de-revision', dataPage: 'audit-log' }
 ];
