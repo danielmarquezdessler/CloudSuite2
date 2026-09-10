@@ -2,6 +2,7 @@ import { Router } from 'express'; import multer from 'multer'; import { requireA
 export const votersRouter = Router(); const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } }); const base = '/organizations/:orgId/campaigns/:campId';
 votersRouter.post(`${base}/voters/import`, requireAuth, upload.single('file'), controller.importVoters);
 votersRouter.get(`${base}/voters`, requireAuth, controller.getVoters);
+votersRouter.post(`${base}/voters`, requireAuth, controller.createVoter);
 votersRouter.post(`${base}/voters/:voterId/visits`, requireAuth, controller.startVisit);
 votersRouter.post(`${base}/voters/:voterId/visits/:visitId/feedback`, requireAuth, controller.feedback);
 votersRouter.post(`${base}/voters/:voterId/visits/:visitId/conversion`, requireAuth, controller.conversion);

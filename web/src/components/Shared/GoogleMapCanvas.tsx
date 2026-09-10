@@ -46,7 +46,7 @@ function loadGoogleMaps(apiKey: string) {
     script.id = 'cloudsuite-google-maps';
     script.async = true;
     script.defer = true;
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&callback=${callbackName}`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&libraries=places&callback=${callbackName}`;
     script.onerror = () => {
       window.clearTimeout(timeout);
       reject(new Error('No se pudo descargar Google Maps. Revisá la red o la configuración de la API.'));
@@ -55,6 +55,13 @@ function loadGoogleMaps(apiKey: string) {
   });
 
   return mapsPromise;
+}
+
+/** Loads the same Maps JavaScript API used by the map widgets, including Places. */
+export function loadGoogleMapsApi() {
+  const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined;
+  if (!apiKey) return Promise.reject(new Error('Configurá VITE_GOOGLE_MAPS_API_KEY para usar Google Places.'));
+  return loadGoogleMaps(apiKey);
 }
 
 function markerColor(state?: string) {

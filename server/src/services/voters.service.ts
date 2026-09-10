@@ -1,11 +1,12 @@
 import { DecodedIdToken } from 'firebase-admin/auth';
 import { FieldValue } from 'firebase-admin/firestore';
 import * as XLSX from 'xlsx';
-import { assertCampaignAccess, assertCampaignManager, campaignRef, ValidationError } from './access.service.js';
+import { assertCampaignAccess, assertCampaignManager, campaignRef, ConflictError, ValidationError } from './access.service.js';
 
 type Row = Record<string, unknown>;
 const value = (row: Row, names: string[]) => { const key = Object.keys(row).find(key => names.includes(key.trim().toLowerCase())); return String(key ? row[key] ?? '' : '').trim(); };
-const norm = (text: string) => text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+export const normalizeVoterText = (text: string) => text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+const norm = normalizeVoterText;
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 async function geocode(address: string) {
   const key = process.env.GOOGLE_MAPS_API_KEY;
@@ -28,5 +29,27 @@ export async function importVoters(user: DecodedIdToken, orgId: string, campId: 
   const batch = ref.firestore.batch(); voters.forEach(voter => batch.set(ref.collection('voters').doc(String(voter.id)), voter));
   seededVisits.forEach(({ voter, decision, when }) => batch.set(ref.collection('visits').doc(), { voterId: voter.id, visitUid: user.uid, startedAt: when, completedAt: when, state: decision === 'undecided' ? 'pending_revisit' : 'completed', conversion: { decision, timestamp: when }, feedback: { seeded: true } }));
   const importRef = ref.collection('imports').doc(); const report = { importedCount: voters.length, duplicateCount, noGeoCount, nearDuplicateCount, seededVisits: seededVisits.length, errorRows, totalProcessedRows: rows.length }; batch.set(importRef, { status: 'completed', timestamp: FieldValue.serverTimestamp(), counts: report, errorRows, file: file.originalname }); await batch.commit(); return report;
+}
+type CreateVoterInput = { name?: unknown; address?: unknown; phone?: unknown; email?: unknown; lat?: unknown; lng?: unknown; confirmSimilar?: unknown };
+const textInput = (input: unknown) => typeof input === 'string' ? input.trim() : '';
+
+/** Creates one voter whose coordinates were selected by Google Places in the browser. */
+export async function createVoter(user: DecodedIdToken, orgId: string, campId: string, input: CreateVoterInput) {
+  assertCampaignManager(user, orgId, campId);
+  const name = textInput(input.name); const address = textInput(input.address); const phone = textInput(input.phone); const email = textInput(input.email);
+  const lat = Number(input.lat); const lng = Number(input.lng);
+  if (!name || !address) throw new ValidationError('Nombre y dirección son obligatorios.');
+  if (!Number.isFinite(lat) || lat < -90 || lat > 90 || !Number.isFinite(lng) || lng < -180 || lng > 180) throw new ValidationError('Elegí una dirección válida de las sugerencias de Google Maps.');
+
+  const ref = campaignRef(orgId, campId);
+  const duplicateKey = `${norm(name)}|${norm(address)}`;
+  const existing = await ref.collection('voters').get();
+  const similar = existing.docs.find((doc) => `${norm(String(doc.data().name ?? ''))}|${norm(String(doc.data().address ?? ''))}` === duplicateKey);
+  if (similar && input.confirmSimilar !== true) throw new ConflictError(`Ya existe un elector similar: ${String(similar.data().name ?? 'Elector')}. ¿Confirmás que es una persona distinta?`, { similarVoter: { id: similar.id, name: String(similar.data().name ?? ''), address: String(similar.data().address ?? '') } });
+
+  const voterRef = ref.collection('voters').doc();
+  const voter = { name, address, phone: phone || null, email: email || null, lat, lng, state: 'unvisited', visitedAt: null, lastVisitUid: null, feedback: null, conversions: { yes: 0, no: 0, undecided: 0, last_decision: null }, createdAt: FieldValue.serverTimestamp() };
+  await voterRef.set(voter);
+  return { id: voterRef.id, ...voter, createdAt: null };
 }
 export async function listVoters(user: DecodedIdToken, orgId: string, campId: string) { assertCampaignAccess(user, orgId, campId); const snap = await campaignRef(orgId, campId).collection('voters').get(); return snap.docs.map(doc => ({ id: doc.id, ...doc.data() })); }

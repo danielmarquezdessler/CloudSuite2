@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthenticatedQuery } from '../../../lib/api';
+import { authenticatedFetch } from '../../../lib/api';
 import { useCampaign } from '../Organization/useCampaign';
 import ImportVoters from '../Organization/Voters/ImportVoters';
 import ContentPanel from '../../../components/Shared/ContentPanel';
@@ -12,8 +13,9 @@ import StatCard from '../../../components/Shared/StatCard';
 import PageContainer from '../../../components/Shared/PageContainer';
 import { cacheVoters, cachedVoters } from '../../../lib/offlineVisits';
 import { useOfflineSync } from '../../../context/OfflineSyncContext';
+import CreateVoterModal, { ManualVoterInput } from './CreateVoterModal';
 
-type Voter = { id: string; name: string; phone?: string; address?: string; section?: string; state: string; teamName?: string; lastVisitAt?: string };
+type Voter = { id: string; name: string; phone?: string; email?: string; address?: string; lat?: number | null; lng?: number | null; section?: string; state: string; teamName?: string; lastVisitAt?: string };
 const labels: Record<string, string> = { unvisited: 'Listo para visitar', converted_yes: 'Favorable', converted_no: 'No favorable', undecided: 'Indeciso' };
 
 export default function VotersList() {
@@ -22,6 +24,7 @@ export default function VotersList() {
   const [search, setSearch] = useState('');
   const [state, setState] = useState('');
   const [importOpen, setImportOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
   const [offlineVoters, setOfflineVoters] = useState<Voter[]>([]);
   const { online } = useOfflineSync();
   const path = campaign ? `/api/organizations/${campaign.orgId}/campaigns/${campaign.campId}/voters` : null;
@@ -33,10 +36,16 @@ export default function VotersList() {
   const count = (value: string) => voters.filter(voter => voter.state === value).length;
   const percent = (value: string) => voters.length ? Math.round(count(value) / voters.length * 100) : 0;
   const loadError = online ? campaignError || error?.message : '';
+  const createVoter = async (values: ManualVoterInput) => {
+    if (!user || !campaign) throw new Error('No pudimos identificar la campaña activa.');
+    await authenticatedFetch(user, `/api/organizations/${campaign.orgId}/campaigns/${campaign.campId}/voters`, { method: 'POST', body: JSON.stringify(values) });
+    await reloadVoters();
+  };
 
   return <PageContainer>
-    <HeroBanner icon="users" title="Electores" subtitle="Importa y prepara tu lista de electores para planificar y realizar visitas de campaña." subtitleDetail="Convierte datos en oportunidades. Organiza, segmenta y asigna electores a tu equipo." tags={[{ icon:'file', label:'Importa desde Excel o CSV' }, { icon:'users', label:'Segmenta y organiza' }, { icon:'user-check', label:'Asigna a tus equipos' }]} ctaLabel="Importar electores" ctaIcon="upload-cloud" onCtaClick={() => setImportOpen(true)} />
+    <HeroBanner icon="users" title="Electores" subtitle="Importa y prepara tu lista de electores para planificar y realizar visitas de campaña." subtitleDetail="Convierte datos en oportunidades. Organiza, segmenta y asigna electores a tu equipo." tags={[{ icon:'file', label:'Importa desde Excel o CSV' }, { icon:'users', label:'Segmenta y organiza' }, { icon:'user-check', label:'Asigna a tus equipos' }]} secondaryCtaLabel="Crear elector" secondaryCtaIcon="plus" onSecondaryCtaClick={() => setCreateOpen(true)} ctaLabel="Importar electores" ctaIcon="upload-cloud" onCtaClick={() => setImportOpen(true)} />
     <ImportVoters open={importOpen} onOpenChange={setImportOpen} showTrigger={false} onImported={() => void reloadVoters()} />
+    <CreateVoterModal show={createOpen} onHide={() => setCreateOpen(false)} onCreate={createVoter} existingVoters={voters} />
 
     <div className="cd-dashboard__kpis">
       <StatCard icon="users" value={voters.length} label="Total de electores" caption={voters.length ? `${voters.length} registros cargados` : 'Sin registros aún'} />

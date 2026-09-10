@@ -4,6 +4,10 @@ import { db } from '../config/firebase.js';
 export class ForbiddenError extends Error {}
 export class ValidationError extends Error {}
 export class NotFoundError extends Error {}
+/** A recoverable conflict that the caller may explicitly confirm. */
+export class ConflictError extends Error {
+  constructor(message: string, public readonly details?: Record<string, unknown>) { super(message); }
+}
 
 export function assertCampaignAccess(user: DecodedIdToken, orgId: string, campId: string) {
   const camps = user.camps as Record<string, boolean> | undefined;
