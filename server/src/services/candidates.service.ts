@@ -50,7 +50,7 @@ async function readablePhoto(path: unknown, token: unknown) {
 }
 
 async function serialize(id: string, data: FirebaseFirestore.DocumentData) {
-  return { id, name: String(data.name ?? ''), type: String(data.type ?? ''), customType: data.customType ?? null, party: data.party ?? null, isPrincipal: Boolean(data.isPrincipal), photoUrl: await readablePhoto(data.photoUrl, data.photoDownloadToken), createdAt: data.createdAt?.toDate?.().toISOString?.() ?? null };
+  return { id, name: String(data.name ?? ''), type: String(data.type ?? ''), customType: data.customType ?? null, party: data.party ?? null, isPrincipal: Boolean(data.isPrincipal), groupId: typeof data.groupId === 'string' ? data.groupId : null, slateRole: data.slateRole === 'titular' || data.slateRole === 'suplente' ? data.slateRole : null, order: Number.isInteger(data.order) ? data.order : null, photoUrl: await readablePhoto(data.photoUrl, data.photoDownloadToken), createdAt: data.createdAt?.toDate?.().toISOString?.() ?? null };
 }
 
 export async function listCandidates(user: DecodedIdToken, orgId: string, campId: string) {
@@ -61,9 +61,9 @@ export async function listCandidates(user: DecodedIdToken, orgId: string, campId
 
 export async function createCandidate(user: DecodedIdToken, orgId: string, campId: string, input: CandidateInput, photo?: Express.Multer.File) {
   assertCampaignManager(user, orgId, campId); const data = normalize(input); const ref = campaignRef(orgId, campId).collection('candidates').doc(); const uploaded = await uploadPhoto(ref.id, photo);
-  try { await ref.set({ ...data, photoUrl: uploaded?.storagePath ?? null, photoDownloadToken: uploaded?.downloadToken ?? null, isPrincipal: false, createdAt: FieldValue.serverTimestamp(), createdBy: user.uid }); }
+  try { await ref.set({ ...data, photoUrl: uploaded?.storagePath ?? null, photoDownloadToken: uploaded?.downloadToken ?? null, isPrincipal: false, groupId: null, slateRole: null, order: null, createdAt: FieldValue.serverTimestamp(), createdBy: user.uid }); }
   catch (error) { if (uploaded) await storage.bucket().file(`candidates/${ref.id}.jpg`).delete().catch(() => undefined); throw error; }
-  return serialize(ref.id, { ...data, photoUrl: uploaded?.storagePath ?? null, photoDownloadToken: uploaded?.downloadToken ?? null, isPrincipal: false, createdAt: null });
+  return serialize(ref.id, { ...data, photoUrl: uploaded?.storagePath ?? null, photoDownloadToken: uploaded?.downloadToken ?? null, isPrincipal: false, groupId: null, slateRole: null, order: null, createdAt: null });
 }
 
 export async function updateCandidate(user: DecodedIdToken, orgId: string, campId: string, candidateId: string, input: CandidateInput, photo?: Express.Multer.File) {

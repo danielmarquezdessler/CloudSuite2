@@ -29,6 +29,11 @@ campaignRouter.put('/organizations/:orgId/campaigns/:campId', requireAuth, contr
 campaignRouter.delete('/organizations/:orgId/campaigns/:campId', requireAuth, controller.removeOrganizationCampaign);
 campaignRouter.get(`${base}/candidates`, requireAuth, controller.getCandidates);
 campaignRouter.post(`${base}/candidates`, requireAuth, candidatePhotoUpload, controller.postCandidate);
+campaignRouter.get(`${base}/candidate-groups`, requireAuth, controller.getCandidateGroups);
+campaignRouter.post(`${base}/candidate-groups`, requireAuth, controller.postCandidateGroup);
+campaignRouter.put(`${base}/candidate-groups/:groupId`, requireAuth, controller.putCandidateGroup);
+campaignRouter.delete(`${base}/candidate-groups/:groupId`, requireAuth, controller.removeCandidateGroup);
+campaignRouter.put(`${base}/candidates/:candidateId/slate`, requireAuth, controller.putCandidateSlate);
 campaignRouter.put(`${base}/candidates/:candidateId`, requireAuth, candidatePhotoUpload, controller.putCandidate);
 campaignRouter.delete(`${base}/candidates/:candidateId`, requireAuth, controller.removeCandidate);
 campaignRouter.post(`${base}/candidates/:candidateId/set-principal`, requireAuth, controller.setPrincipalCandidate);
