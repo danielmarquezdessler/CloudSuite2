@@ -4,6 +4,7 @@ import { assertCampaignManager, campaignRef, NotFoundError, ValidationError } fr
 
 type CandidateGroupInput = { name?: string };
 type SlateInput = { groupId?: string | null; slateRole?: string | null; order?: number | string | null };
+type SlateOrderInput = { groupId?: string; titulares?: string[]; suplentes?: string[] };
 
 function groupCollection(orgId: string, campId: string) {
   return campaignRef(orgId, campId).collection('candidateGroups');
@@ -97,4 +98,32 @@ export async function assignCandidateSlate(user: DecodedIdToken, orgId: string, 
   }
   await candidate.update({ groupId, slateRole, order, updatedAt: FieldValue.serverTimestamp(), updatedBy: user.uid });
   return { id: candidateId, groupId, slateRole, order };
+}
+
+export async function reorderCandidateSlate(user: DecodedIdToken, orgId: string, campId: string, input: SlateOrderInput) {
+  assertCampaignManager(user, orgId, campId);
+  const groupId = typeof input.groupId === 'string' ? input.groupId.trim() : '';
+  if (!groupId) throw new ValidationError('Indicá la lista electoral a ordenar.');
+  const titulares = Array.isArray(input.titulares) ? input.titulares : [];
+  const suplentes = Array.isArray(input.suplentes) ? input.suplentes : [];
+  const ids = [...titulares, ...suplentes];
+  if (ids.some((id) => typeof id !== 'string' || !id.trim()) || new Set(ids).size !== ids.length) throw new ValidationError('La lista contiene candidatos inválidos o repetidos.');
+
+  const campaign = campaignRef(orgId, campId);
+  const [group, current] = await Promise.all([campaign.collection('candidateGroups').doc(groupId).get(), campaign.collection('candidates').where('groupId', '==', groupId).get()]);
+  if (!group.exists) throw new NotFoundError('El grupo de candidatos no existe.');
+  const currentIds = current.docs.map((candidate) => candidate.id).sort();
+  const requestedIds = [...ids].sort();
+  if (currentIds.length !== requestedIds.length || currentIds.some((id, index) => id !== requestedIds[index])) throw new ValidationError('La lista cambió. Actualizá la página e intentá de nuevo.');
+
+  const updates = [
+    ...titulares.map((id, index) => ({ id, slateRole: 'titular' as const, order: index + 1 })),
+    ...suplentes.map((id, index) => ({ id, slateRole: 'suplente' as const, order: index + 1 }))
+  ];
+  for (let offset = 0; offset < updates.length; offset += 400) {
+    const batch = campaign.firestore.batch();
+    for (const update of updates.slice(offset, offset + 400)) batch.update(campaign.collection('candidates').doc(update.id), { groupId, slateRole: update.slateRole, order: update.order, updatedAt: FieldValue.serverTimestamp(), updatedBy: user.uid });
+    await batch.commit();
+  }
+  return { groupId, titulares, suplentes };
 }

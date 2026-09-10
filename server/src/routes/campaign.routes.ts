@@ -33,6 +33,7 @@ campaignRouter.get(`${base}/candidate-groups`, requireAuth, controller.getCandid
 campaignRouter.post(`${base}/candidate-groups`, requireAuth, controller.postCandidateGroup);
 campaignRouter.put(`${base}/candidate-groups/:groupId`, requireAuth, controller.putCandidateGroup);
 campaignRouter.delete(`${base}/candidate-groups/:groupId`, requireAuth, controller.removeCandidateGroup);
+campaignRouter.put(`${base}/candidates/slate-order`, requireAuth, controller.putCandidateSlateOrder);
 campaignRouter.put(`${base}/candidates/:candidateId/slate`, requireAuth, controller.putCandidateSlate);
 campaignRouter.put(`${base}/candidates/:candidateId`, requireAuth, candidatePhotoUpload, controller.putCandidate);
 campaignRouter.delete(`${base}/candidates/:candidateId`, requireAuth, controller.removeCandidate);

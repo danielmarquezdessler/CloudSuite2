@@ -89,12 +89,21 @@ try {
   if (firstTitle !== 1 || secondTitle !== 1) throw new Error('La lista no renderizó los titulares esperados en la vista de dos columnas.');
 
   console.log('E2E grupos de candidatos: reordenando un titular y verificando Firestore');
+  const reorderResponse = page.waitForResponse((response) => response.request().method() === 'PUT' && new URL(response.url()).pathname.endsWith('/candidates/slate-order') && response.ok());
   await page.getByRole('button', { name: `Bajar a ${titularNames[0]}`, exact: true }).click();
-  await page.locator('.cd-slate-candidate', { hasText: titularNames[0] }).getByText(/Orden 2/, { exact: false }).waitFor();
+  await reorderResponse;
+  await page.locator('.cd-slate-candidate', { hasText: titularNames[0] }).getByText(/Puesto #2/, { exact: false }).waitFor();
   const assigned = await Promise.all([...titulars, ...suplentes].map((candidate) => campaign.collection('candidates').doc(candidate.id).get()));
   const docs = assigned.map((snapshot) => snapshot.data());
   if (docs.filter((data) => data?.groupId === group.id && data?.slateRole === 'titular').length !== 3 || docs.filter((data) => data?.groupId === group.id && data?.slateRole === 'suplente').length !== 2) throw new Error(`Firestore no conservó 3 titulares y 2 suplentes: ${JSON.stringify(docs)}`);
   if (docs[0]?.order !== 2 || docs[1]?.order !== 1) throw new Error(`El orden reordenado no persistió en Firestore: titular1=${docs[0]?.order}, titular2=${docs[1]?.order}`);
+  console.log('E2E grupos de candidatos: arrastrando un titular a Suplentes');
+  const moveRoleResponse = page.waitForResponse((response) => response.request().method() === 'PUT' && new URL(response.url()).pathname.endsWith('/candidates/slate-order') && response.ok());
+  await page.locator(`[data-candidate-id="${titulars[0].id}"]`).dragTo(page.locator('[data-slate-role="suplente"]'));
+  await moveRoleResponse;
+  await page.locator(`[data-candidate-id="${titulars[0].id}"]`).getByText(/Puesto #[1-3]/, { exact: false }).waitFor();
+  const moved = await campaign.collection('candidates').doc(titulars[0].id).get();
+  if (moved.data()?.slateRole !== 'suplente' || ![1, 2, 3].includes(moved.data()?.order)) throw new Error(`El drag-and-drop no cambió el candidato a una posición válida de Suplentes: ${JSON.stringify(moved.data())}`);
   console.log('E2E grupos de candidatos: asignando un candidato existente desde la lista');
   await page.getByRole('button', { name: 'Agregar candidatos existentes', exact: true }).click();
   await choose('#existing-candidate', existingName);
@@ -109,7 +118,7 @@ try {
   if (principalAfter !== principalBefore) throw new Error(`La gestión de listas alteró el candidato Principal: antes=${principalBefore}, después=${principalAfter}`);
   await mkdir(screenshots, { recursive: true });
   await page.screenshot({ path: resolve(screenshots, 'candidate-groups-e2e-real.png'), fullPage: true });
-  console.log(`Grupos E2E real OK: ${groupName}; 3 titulares, 2 suplentes, candidato existente agregado, orden persistido y Principal sin cambios.`);
+  console.log(`Grupos E2E real OK: ${groupName}; puestos # visibles, orden persistido, drag-and-drop Titular→Suplente, candidato existente agregado y Principal sin cambios.`);
 } finally {
   await browser.close();
 }
