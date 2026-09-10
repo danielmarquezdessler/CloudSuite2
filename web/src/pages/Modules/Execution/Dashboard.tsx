@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Chart from 'react-apexcharts';
+import { Link } from 'react-router-dom';
 import { useCampaign } from '../Organization/useCampaign';
-import { authenticatedFetch } from '../../../lib/api';
+import { authenticatedFetch, useAuthenticatedQuery } from '../../../lib/api';
 import { Toast } from '../../../components/Toast';
 import HeroBanner from '../../../components/Shared/HeroBanner';
 import KpiCard from '../../../components/Shared/KpiCard';
@@ -9,8 +10,12 @@ import Card from '../../../components/Shared/Card';
 import EmptyState from '../../../components/Shared/EmptyState';
 import SelectControl from '../../../components/Shared/SelectControl';
 import PageContainer from '../../../components/Shared/PageContainer';
+import MapContainer from '../../../components/Planning/MapContainer';
+import GoogleMapCanvas from '../../../components/Shared/GoogleMapCanvas';
+import Stack from '../../../components/Shared/Stack';
 
 type Summary = { totalVoters:number; visitedCount:number; convertedYes:number; convertedNo:number; undecidedCount:number; conversionRate:number; coverageRate:number; teamStats:Array<{teamName:string;conversionsCount:number}>; topMilitants:Array<{uid:string;name:string;visitsCount:number;conversionsCount:number;conversionRate:number}> };
+type MapVoter = { id:string; name:string; lat?:number | null; lng?:number | null; state:string };
 const empty: Summary = { totalVoters:0, visitedCount:0, convertedYes:0, convertedNo:0, undecidedCount:0, conversionRate:0, coverageRate:0, teamStats:[], topMilitants:[] };
 
 export default function CampaignDashboard() {
@@ -21,6 +26,9 @@ export default function CampaignDashboard() {
   const [analyticsError, setAnalyticsError] = useState('');
   const [from, setFrom] = useState(new Date(Date.now() - 29 * 86400000).toISOString().slice(0, 10));
   const [to, setTo] = useState(new Date().toISOString().slice(0, 10));
+  const votersPath = campaign ? `/api/organizations/${campaign.orgId}/campaigns/${campaign.campId}/voters` : null;
+  const { data: votersData, loading: votersLoading, error: votersError } = useAuthenticatedQuery<MapVoter[]>(user, votersPath, [campaign?.orgId, campaign?.campId]);
+  const mapPoints = (votersData ?? []).filter((voter) => voter.lat != null && voter.lng != null) as Array<MapVoter & { lat:number; lng:number }>;
 
   const loadAnalytics = useCallback(() => {
     if (!user || !campaign) return;
@@ -68,6 +76,9 @@ export default function CampaignDashboard() {
       <Card icon="people" title="Conversiones por Equipo" subtitle="Compara el desempeño de tus equipos de campaña.">{summary.teamStats.length ? <Chart type="bar" height={240} options={{ xaxis:{ categories:summary.teamStats.map((team) => team.teamName) }, colors:['#2f6fe4'], dataLabels:{ enabled:false }, grid:{ borderColor:'#eef2f8' } }} series={[{ name:'SI', data:summary.teamStats.map((team) => team.conversionsCount) }]} /> : <EmptyState icon="users" title="Aún no hay equipos registrados" description="Asigna miembros a equipos para ver sus conversiones." ctaLabel="Crear primer equipo" />}</Card>
       <Card icon="award" title="Top 10 militantes por visitas" subtitle="Conoce quiénes están impulsando la campaña." flushBody>{summary.topMilitants.length ? <table className="cd-dashboard__table"><thead><tr><th>MILITANTE</th><th>VISITAS</th><th>SI</th><th>TASA</th></tr></thead><tbody>{summary.topMilitants.map((militant) => <tr key={militant.uid}><td>{militant.name}</td><td>{militant.visitsCount}</td><td>{militant.conversionsCount}</td><td>{militant.conversionRate}%</td></tr>)}</tbody></table> : <EmptyState icon="award" title="Todavía no hay visitas registradas" description="Los militantes aparecerán aquí cuando comiences a registrar visitas." />}</Card>
     </div>
+    <Card icon="map" title="Mapa de electores" subtitle="Distribución de los electores de la campaña activa." headerAction={<Link className="btn btn-outline-primary btn-sm" to="/electoral-conversion/mapa">Ver mapa completo</Link>}>
+      {votersLoading ? <EmptyState icon="map" title="Cargando mapa" description="Estamos ubicando los electores de tu campaña." /> : votersError ? <EmptyState icon="map" title="No pudimos cargar el mapa" description={votersError.message} /> : mapPoints.length ? <MapContainer compact sidebar={<Stack gap="sm"><h2 className="h6 mb-0">Estados</h2><small className="text-muted">{mapPoints.length} electores geolocalizados</small><span className="cd-map-legend"><i className="cd-map-legend__dot cd-map-legend__dot--gray" />Sin visita</span><span className="cd-map-legend"><i className="cd-map-legend__dot cd-map-legend__dot--blue" />Visitado</span><span className="cd-map-legend"><i className="cd-map-legend__dot cd-map-legend__dot--green" />SI</span><span className="cd-map-legend"><i className="cd-map-legend__dot cd-map-legend__dot--red" />NO</span><span className="cd-map-legend"><i className="cd-map-legend__dot cd-map-legend__dot--yellow" />Indeciso</span><Link className="btn btn-primary btn-sm" to="/electoral-conversion/mapa">Ver mapa completo</Link></Stack>}><GoogleMapCanvas points={mapPoints} compact ariaLabel="Mapa resumen de electores" /></MapContainer> : <EmptyState icon="map" title="No hay puntos geolocalizados" description="Importá electores con direcciones válidas para verlos en el mapa." ctaLabel="Ver mapa completo" />}
+    </Card>
     </>}
     {notice && <Toast message={notice} onClose={() => setNotice('')} />}
   </PageContainer>;
