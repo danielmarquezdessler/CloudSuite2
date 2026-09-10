@@ -6,7 +6,7 @@ import { chromium } from 'playwright';
 const webDir = fileURLToPath(new URL('../', import.meta.url));
 const envPath = fileURLToPath(new URL('../.env.test', import.meta.url));
 const screenshots = fileURLToPath(new URL('../.screenshots/', import.meta.url));
-const baseUrl = (process.env.E2E_PRODUCTION_URL ?? 'https://politicfy-cloudsuite.web.app').replace(/\/$/, '');
+const baseUrl = (process.env.E2E_PRODUCTION_URL ?? 'https://app.politicfy.com').replace(/\/$/, '');
 const executablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE || 'C:/Users/Admin/AppData/Local/ms-playwright/chromium-1234/chrome-win64/chrome.exe';
 
 function parseEnv(source) {
@@ -55,7 +55,9 @@ try {
   console.log(`Login Firebase y GET /api/me reales OK: org=${me.organization.id}, campañas=${me.campaigns.length}.`);
 
   const functionName = `Función Producción ${Date.now().toString(36)}`;
+  const functionsReady = page.waitForResponse((response) => response.request().method() === 'GET' && /\/campaigns\/[^/]+\/functions$/.test(new URL(response.url()).pathname) && response.status() === 200, { timeout: 20_000 });
   await page.goto(`${baseUrl}/organization/functions`, { waitUntil: 'domcontentloaded', timeout: 45_000 });
+  await functionsReady;
   await page.getByRole('button', { name: 'Crear nueva función', exact: true }).first().click();
   await page.getByLabel('Nombre').fill(functionName);
   await page.getByLabel('Descripción').fill('Dato verificable creado por la prueba E2E de producción.');

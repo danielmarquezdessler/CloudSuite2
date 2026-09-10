@@ -21,6 +21,7 @@
     "test:organization-crud": "node scripts/test-organization-crud.mjs",
     "test:e2e": "node scripts/test-e2e-real.mjs",
     "test:e2e:production": "node scripts/test-production-e2e.mjs",
+    "test:e2e:brief43-production": "node scripts/test-brief43-production.mjs",
     "test:e2e:user": "node scripts/test-create-user-e2e.mjs",
     "test:e2e:selects": "node scripts/test-select-controls-e2e.mjs",
     "test:e2e:user-actions": "node scripts/test-user-actions-e2e.mjs",
