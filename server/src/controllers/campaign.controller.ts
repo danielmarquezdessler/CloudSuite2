@@ -8,6 +8,7 @@ import { invalidateAnalytics } from '../services/analytics.service.js';
 import * as users from '../services/users.service.js';
 import * as campaigns from '../services/campaigns.service.js';
 import * as candidates from '../services/candidates.service.js';
+import * as orgChart from '../services/org-chart.service.js';
 
 const params = (request: Request) => ({ orgId: request.params.orgId, campId: request.params.campId });
 const ids = (request: Request) => [String(request.params.orgId), String(request.params.campId)] as const;
@@ -47,6 +48,8 @@ export const postInvitation = async (r: Request, s: Response) => { try { const [
 export const removeInvitation = async (r: Request, s: Response) => { try { await invitations.revokeInvitation(r.user!, ...ids(r), String(r.params.invId)); s.status(204).end(); } catch (e) { fail(s, e); } };
 export const resendInvitation = async (r: Request, s: Response) => { try { s.json(await invitations.resendInvitation(r.user!, ...ids(r), String(r.params.invId))); } catch (e) { fail(s, e); } };
 export const putMember = async (r: Request, s: Response) => { try { s.json(await invitations.updateMember(r.user!, ...ids(r), String(r.params.memberId), r.body)); } catch (e) { fail(s, e); } };
+export const putMemberReportsTo = async (r: Request, s: Response) => { try { s.json(await orgChart.setReportsTo(r.user!, ...ids(r), String(r.params.memberId), r.body)); } catch (e) { fail(s, e); } };
+export const getOrgChart = async (r: Request, s: Response) => { try { s.json(await orgChart.getOrgChart(r.user!, ...ids(r))); } catch (e) { fail(s, e); } };
 export const removeMember = async (r: Request, s: Response) => { try { await invitations.removeMember(r.user!, ...ids(r), String(r.params.memberId)); s.status(204).end(); } catch (e) { fail(s, e); } };
 export const removeTeamMember = async (r: Request, s: Response) => { try { await invitations.removeTeamMember(r.user!, ...ids(r), String(r.params.teamId), String(r.params.memberId)); s.status(204).end(); } catch (e) { fail(s, e); } };
 export const getInvitationPreview = async (r: Request, s: Response) => { try { s.json(await invitations.previewInvitation(String(r.query.token ?? ''))); } catch (e) { fail(s, e); } };

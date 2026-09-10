@@ -43,6 +43,8 @@ campaignRouter.delete(`${base}/teams/:teamId`, requireAuth, controller.removeTea
 campaignRouter.get(`${base}/teams/:teamId/members`, requireAuth, controller.getTeamMembers);
 campaignRouter.get(`${base}/members`, requireAuth, controller.getMembers);
 campaignRouter.put(`${base}/members/:memberId`, requireAuth, controller.putMember);
+campaignRouter.put(`${base}/members/:memberId/reports-to`, requireAuth, controller.putMemberReportsTo);
+campaignRouter.get(`${base}/org-chart`, requireAuth, controller.getOrgChart);
 campaignRouter.delete(`${base}/members/:memberId`, requireAuth, controller.removeMember);
 campaignRouter.delete(`${base}/teams/:teamId/members/:memberId`, requireAuth, controller.removeTeamMember);
 campaignRouter.get(`${base}/invitations`, requireAuth, controller.getInvitations);
