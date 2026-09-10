@@ -35,7 +35,7 @@ export default function CreateVoterModal({ show, onHide, onCreate, onUpdate, vot
   useEffect(() => {
     if (!show) return;
     const next = voter ? { name: voter.name, phone: voter.phone ?? '', email: voter.email ?? '', address: voter.address ?? '', lat: voter.lat ?? null, lng: voter.lng ?? null, barrio: voter.barrio ?? '', dni: voter.dni ?? '', sexo: voter.sexo ?? '', fechaNacimiento: voter.fechaNacimiento ?? '', edadAproximada: voter.edadAproximada === undefined || voter.edadAproximada === null ? '' : String(voter.edadAproximada), observaciones: voter.observaciones ?? '', tags: voter.tags ?? [], householdId: voter.householdId ?? '' } : blank();
-    setValues(next); setAgeMode(next.fechaNacimiento ? 'date' : 'approximate'); setPlacesError(''); setPlacesReady(false); setError(''); setSimilar(null);
+    setValues(next); setAgeMode(next.edadAproximada ? 'approximate' : 'date'); setPlacesError(''); setPlacesReady(false); setError(''); setSimilar(null);
   }, [show, voter?.id]);
 
   useEffect(() => {
