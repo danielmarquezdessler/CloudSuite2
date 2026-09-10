@@ -11,11 +11,13 @@ import SearchInput from '../../../components/Shared/SearchInput';
 import SelectControl from '../../../components/Shared/SelectControl';
 import StatCard from '../../../components/Shared/StatCard';
 import PageContainer from '../../../components/Shared/PageContainer';
+import Inline from '../../../components/Shared/Inline';
+import MultiSelectControl from '../../../components/Shared/MultiSelectControl';
 import { cacheVoters, cachedVoters } from '../../../lib/offlineVisits';
 import { useOfflineSync } from '../../../context/OfflineSyncContext';
 import CreateVoterModal, { ManualVoterInput } from './CreateVoterModal';
 
-type Voter = { id: string; name: string; phone?: string; email?: string; address?: string; lat?: number | null; lng?: number | null; section?: string; state: string; teamName?: string; lastVisitAt?: string };
+type Voter = { id: string; name: string; phone?: string; email?: string; address?: string; lat?: number | null; lng?: number | null; tags?: string[]; section?: string; state: string; teamName?: string; lastVisitAt?: string };
 const labels: Record<string, string> = { unvisited: 'Listo para visitar', converted_yes: 'Favorable', converted_no: 'No favorable', undecided: 'Indeciso' };
 
 export default function VotersList() {
@@ -25,6 +27,8 @@ export default function VotersList() {
   const [state, setState] = useState('');
   const [importOpen, setImportOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
+  const [editingVoter, setEditingVoter] = useState<Voter | null>(null);
+  const [tagFilter, setTagFilter] = useState<string[]>([]);
   const [offlineVoters, setOfflineVoters] = useState<Voter[]>([]);
   const { online } = useOfflineSync();
   const path = campaign ? `/api/organizations/${campaign.orgId}/campaigns/${campaign.campId}/voters` : null;
@@ -32,7 +36,8 @@ export default function VotersList() {
   useEffect(() => { if (campaign) void cachedVoters(campaign.orgId, campaign.campId).then(setOfflineVoters); }, [campaign?.campId, campaign?.orgId]);
   useEffect(() => { if (campaign && data) void cacheVoters(campaign.orgId, campaign.campId, data).then(() => setOfflineVoters(data)); }, [campaign?.campId, campaign?.orgId, data]);
   const voters = (online ? data : offlineVoters) ?? data ?? offlineVoters;
-  const visible = useMemo(() => voters.filter(voter => `${voter.name} ${voter.phone ?? ''} ${voter.address ?? ''}`.toLowerCase().includes(search.toLowerCase()) && (!state || voter.state === state)), [voters, search, state]);
+  const tagSuggestions = useMemo(() => [...new Map(voters.flatMap((voter) => voter.tags ?? []).map((tag) => [tag.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(), tag])).values()].sort((a, b) => a.localeCompare(b, 'es')), [voters]);
+  const visible = useMemo(() => voters.filter(voter => `${voter.name} ${voter.phone ?? ''} ${voter.address ?? ''}`.toLowerCase().includes(search.toLowerCase()) && (!state || voter.state === state) && (!tagFilter.length || tagFilter.every((tag) => (voter.tags ?? []).some((voterTag) => voterTag.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase() === tag.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase())))), [voters, search, state, tagFilter]);
   const count = (value: string) => voters.filter(voter => voter.state === value).length;
   const percent = (value: string) => voters.length ? Math.round(count(value) / voters.length * 100) : 0;
   const loadError = online ? campaignError || error?.message : '';
@@ -41,11 +46,16 @@ export default function VotersList() {
     await authenticatedFetch(user, `/api/organizations/${campaign.orgId}/campaigns/${campaign.campId}/voters`, { method: 'POST', body: JSON.stringify(values) });
     await reloadVoters();
   };
+  const updateVoter = async (voterId: string, values: ManualVoterInput) => {
+    if (!user || !campaign) throw new Error('No pudimos identificar la campaña activa.');
+    await authenticatedFetch(user, `/api/organizations/${campaign.orgId}/campaigns/${campaign.campId}/voters/${voterId}`, { method: 'PUT', body: JSON.stringify(values) });
+    await reloadVoters();
+  };
 
   return <PageContainer>
     <HeroBanner icon="users" title="Electores" subtitle="Importa y prepara tu lista de electores para planificar y realizar visitas de campaña." subtitleDetail="Convierte datos en oportunidades. Organiza, segmenta y asigna electores a tu equipo." tags={[{ icon:'file', label:'Importa desde Excel o CSV' }, { icon:'users', label:'Segmenta y organiza' }, { icon:'user-check', label:'Asigna a tus equipos' }]} secondaryCtaLabel="Crear elector" secondaryCtaIcon="plus" onSecondaryCtaClick={() => setCreateOpen(true)} ctaLabel="Importar electores" ctaIcon="upload-cloud" onCtaClick={() => setImportOpen(true)} />
     <ImportVoters open={importOpen} onOpenChange={setImportOpen} showTrigger={false} onImported={() => void reloadVoters()} />
-    <CreateVoterModal show={createOpen} onHide={() => setCreateOpen(false)} onCreate={createVoter} existingVoters={voters} />
+    <CreateVoterModal show={createOpen || Boolean(editingVoter)} onHide={() => { setCreateOpen(false); setEditingVoter(null); }} onCreate={createVoter} onUpdate={updateVoter} voter={editingVoter} existingVoters={voters} tagSuggestions={tagSuggestions} />
 
     <div className="cd-dashboard__kpis">
       <StatCard icon="users" value={voters.length} label="Total de electores" caption={voters.length ? `${voters.length} registros cargados` : 'Sin registros aún'} />
@@ -57,13 +67,14 @@ export default function VotersList() {
     <div className="cd-page-controls" aria-label="Filtros de electores">
       <SearchInput value={search} onChange={event => setSearch(event.target.value)} placeholder="Buscar elector por nombre, teléfono, dirección o sección…" aria-label="Buscar elector" />
       <SelectControl ariaLabel="Estado" label={labels[state] ?? 'Todos los estados'} options={[{ value:'', label:'Todos los estados' }, ...Object.entries(labels).map(([value, label]) => ({ value, label }))]} value={state} onChange={setState} />
+      <MultiSelectControl ariaLabel="Filtrar por tags" label="Todos los tags" value={tagFilter} onChange={setTagFilter} options={tagSuggestions.map((tag) => ({ value: tag, label: tag }))} />
       <SelectControl icon="people" label="Todos los equipos" />
       <SelectControl icon="map" label="Todas las secciones" />
       <button className="cd-filter-more" type="button">Más filtros</button>
     </div>
 
     <ContentPanel icon="users" title="Lista de electores" subtitle="Gestiona tu base de electores, asigna segmentos y prepara tus visitas." headerAction={<span className="cd-panel-count">{voters.length} electores</span>}>
-      {loadError ? <EmptyState icon="users" title="No pudimos cargar los electores" description={loadError} ctaLabel="Reintentar" onCtaClick={() => void (campaignError ? reloadCampaign() : reloadVoters())} /> : loading && online ? <EmptyState icon="users" title="Cargando electores" description="Estamos preparando la lista de tu campaña." /> : visible.length ? <div className="cd-table-scroll"><table className="cd-data-table"><thead><tr><th>NOMBRE</th><th>TELÉFONO</th><th>DIRECCIÓN</th><th>SECCIÓN</th><th>ESTADO</th><th>EQUIPO</th><th>ÚLTIMA VISITA</th><th>ACCIONES</th></tr></thead><tbody>{visible.map(voter => <tr key={voter.id}><td>{voter.name}</td><td>{voter.phone || '—'}</td><td>{voter.address || '—'}</td><td>{voter.section || '—'}</td><td><span className="cd-state-pill">{labels[voter.state] ?? voter.state}</span></td><td>{voter.teamName || '—'}</td><td>{voter.lastVisitAt ? new Date(voter.lastVisitAt).toLocaleDateString('es-AR') : '—'}</td><td><button className="btn btn-sm btn-primary" onClick={() => navigate(`/visit/${voter.id}`)}>Visitar</button></td></tr>)}</tbody></table></div> : <EmptyState icon="users" title="Aún no hay electores para mostrar" description="Importa tu lista de electores desde un archivo Excel o CSV para comenzar a organizar y planificar tus visitas de campaña." ctaLabel="Importar electores" onCtaClick={() => setImportOpen(true)} />}
+      {loadError ? <EmptyState icon="users" title="No pudimos cargar los electores" description={loadError} ctaLabel="Reintentar" onCtaClick={() => void (campaignError ? reloadCampaign() : reloadVoters())} /> : loading && online ? <EmptyState icon="users" title="Cargando electores" description="Estamos preparando la lista de tu campaña." /> : visible.length ? <div className="cd-table-scroll"><table className="cd-data-table"><thead><tr><th>NOMBRE</th><th>TELÉFONO</th><th>DIRECCIÓN</th><th>TAGS</th><th>SECCIÓN</th><th>ESTADO</th><th>EQUIPO</th><th>ÚLTIMA VISITA</th><th>ACCIONES</th></tr></thead><tbody>{visible.map(voter => <tr key={voter.id}><td>{voter.name}</td><td>{voter.phone || '—'}</td><td>{voter.address || '—'}</td><td><Inline gap="xs" wrap>{voter.tags?.length ? voter.tags.map((tag) => <span className="cd-voter-tag" key={tag}>{tag}</span>) : <span>—</span>}</Inline></td><td>{voter.section || '—'}</td><td><span className="cd-state-pill">{labels[voter.state] ?? voter.state}</span></td><td>{voter.teamName || '—'}</td><td>{voter.lastVisitAt ? new Date(voter.lastVisitAt).toLocaleDateString('es-AR') : '—'}</td><td><Inline gap="xs" wrap><button className="btn btn-sm btn-outline-primary" onClick={() => setEditingVoter(voter)}>Editar</button><button className="btn btn-sm btn-primary" onClick={() => navigate(`/visit/${voter.id}`)}>Visitar</button></Inline></td></tr>)}</tbody></table></div> : <EmptyState icon="users" title="Aún no hay electores para mostrar" description="Importa tu lista de electores desde un archivo Excel o CSV para comenzar a organizar y planificar tus visitas de campaña." ctaLabel="Importar electores" onCtaClick={() => setImportOpen(true)} />}
       <footer className="cd-table-footer"><span>Mostrando {visible.length} de {voters.length} electores</span><span>Filas por página&nbsp;&nbsp; 10</span></footer>
     </ContentPanel>
   </PageContainer>;

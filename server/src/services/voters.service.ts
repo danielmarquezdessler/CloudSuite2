@@ -30,8 +30,9 @@ export async function importVoters(user: DecodedIdToken, orgId: string, campId: 
   seededVisits.forEach(({ voter, decision, when }) => batch.set(ref.collection('visits').doc(), { voterId: voter.id, visitUid: user.uid, startedAt: when, completedAt: when, state: decision === 'undecided' ? 'pending_revisit' : 'completed', conversion: { decision, timestamp: when }, feedback: { seeded: true } }));
   const importRef = ref.collection('imports').doc(); const report = { importedCount: voters.length, duplicateCount, noGeoCount, nearDuplicateCount, seededVisits: seededVisits.length, errorRows, totalProcessedRows: rows.length }; batch.set(importRef, { status: 'completed', timestamp: FieldValue.serverTimestamp(), counts: report, errorRows, file: file.originalname }); await batch.commit(); return report;
 }
-type CreateVoterInput = { name?: unknown; address?: unknown; phone?: unknown; email?: unknown; lat?: unknown; lng?: unknown; confirmSimilar?: unknown };
+type CreateVoterInput = { name?: unknown; address?: unknown; phone?: unknown; email?: unknown; lat?: unknown; lng?: unknown; tags?: unknown; confirmSimilar?: unknown };
 const textInput = (input: unknown) => typeof input === 'string' ? input.trim() : '';
+const normalizeTags = (input: unknown) => Array.isArray(input) ? [...new Map(input.map((tag) => textInput(tag)).filter(Boolean).slice(0, 30).map((tag) => [norm(tag), tag])).values()] : [];
 
 /** Creates one voter whose coordinates were selected by Google Places in the browser. */
 export async function createVoter(user: DecodedIdToken, orgId: string, campId: string, input: CreateVoterInput) {
@@ -48,8 +49,36 @@ export async function createVoter(user: DecodedIdToken, orgId: string, campId: s
   if (similar && input.confirmSimilar !== true) throw new ConflictError(`Ya existe un elector similar: ${String(similar.data().name ?? 'Elector')}. ¿Confirmás que es una persona distinta?`, { similarVoter: { id: similar.id, name: String(similar.data().name ?? ''), address: String(similar.data().address ?? '') } });
 
   const voterRef = ref.collection('voters').doc();
-  const voter = { name, address, phone: phone || null, email: email || null, lat, lng, state: 'unvisited', visitedAt: null, lastVisitUid: null, feedback: null, conversions: { yes: 0, no: 0, undecided: 0, last_decision: null }, createdAt: FieldValue.serverTimestamp() };
+  const voter = { name, address, phone: phone || null, email: email || null, lat, lng, tags: normalizeTags(input.tags), state: 'unvisited', visitedAt: null, lastVisitUid: null, feedback: null, conversions: { yes: 0, no: 0, undecided: 0, last_decision: null }, createdAt: FieldValue.serverTimestamp() };
   await voterRef.set(voter);
   return { id: voterRef.id, ...voter, createdAt: null };
+}
+type UpdateVoterInput = CreateVoterInput & { tags?: unknown };
+
+export async function updateVoter(user: DecodedIdToken, orgId: string, campId: string, voterId: string, input: UpdateVoterInput) {
+  assertCampaignManager(user, orgId, campId);
+  const voterRef = campaignRef(orgId, campId).collection('voters').doc(voterId);
+  const snapshot = await voterRef.get();
+  if (!snapshot.exists) throw new ValidationError('El elector no existe.');
+  const current = snapshot.data()!;
+  const name = textInput(input.name) || String(current.name ?? '');
+  const address = textInput(input.address) || String(current.address ?? '');
+  if (!name || !address) throw new ValidationError('Nombre y dirección son obligatorios.');
+  const coordinatesChanged = input.lat !== undefined || input.lng !== undefined;
+  const lat = coordinatesChanged ? Number(input.lat) : current.lat;
+  const lng = coordinatesChanged ? Number(input.lng) : current.lng;
+  if (address !== String(current.address ?? '') && (!Number.isFinite(lat) || !Number.isFinite(lng))) throw new ValidationError('Elegí una dirección válida de las sugerencias de Google Maps.');
+  if (coordinatesChanged && (lat !== null || lng !== null) && (!Number.isFinite(lat) || lat < -90 || lat > 90 || !Number.isFinite(lng) || lng < -180 || lng > 180)) throw new ValidationError('Las coordenadas del elector no son válidas.');
+  const data = {
+    name,
+    address,
+    phone: textInput(input.phone) || null,
+    email: textInput(input.email) || null,
+    tags: input.tags === undefined ? (Array.isArray(current.tags) ? current.tags : []) : normalizeTags(input.tags),
+    ...(coordinatesChanged ? { lat, lng } : {}),
+    updatedAt: FieldValue.serverTimestamp()
+  };
+  await voterRef.update(data);
+  return { id: voterId, ...data, updatedAt: null };
 }
 export async function listVoters(user: DecodedIdToken, orgId: string, campId: string) { assertCampaignAccess(user, orgId, campId); const snap = await campaignRef(orgId, campId).collection('voters').get(); return snap.docs.map(doc => ({ id: doc.id, ...doc.data() })); }
