@@ -1,11 +1,11 @@
 
-import { Link, useLocation } from "react-router-dom";
-import React, { useCallback, useEffect, useState } from "react";
-import FeatherIcon from "feather-icons-react";
-import { useTranslation } from "react-i18next";
+import { Link, useLocation } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import FeatherIcon from 'feather-icons-react';
+import { useTranslation } from 'react-i18next';
 
 interface MenuItem {
-  id: number;
+  id?: string;
   label: string;
   type?: string;
   icon?: string;
@@ -15,122 +15,57 @@ interface MenuItem {
   submenu?: MenuItem[];
 }
 
-const NestedMenu: React.FC<{ menuItems: any }> = ({ menuItems }) => {  //MenuItem[]
+const SIDEBAR_STATE_KEY = 'cloudsuite.sidebar.modules';
+const DEFAULT_MODULES: Record<string, boolean> = { organization: true, 'electoral-conversion': false, planning: false, execution: false };
+
+const NestedMenu: React.FC<{ menuItems: any }> = ({ menuItems }) => {
   const router = useLocation();
-  const [openMenuId, setOpenMenuId] = useState<number | null>(null);
   const { t } = useTranslation();
-
-
-  const initializeOpenMenu = (items: MenuItem[], path: string): number | null => {
-    for (const item of items) {
-      if (item.link === path) {
-        return item.id;
-      }
-      if (item.submenu) {
-        const submenuOpenId = initializeOpenMenu(item.submenu, path);
-        if (submenuOpenId !== null) {
-          return item.id;
-        }
-      }
+  const [openModules, setOpenModules] = useState<Record<string, boolean>>(() => {
+    try {
+      const saved = window.localStorage.getItem(SIDEBAR_STATE_KEY);
+      return saved ? { ...DEFAULT_MODULES, ...JSON.parse(saved) } : DEFAULT_MODULES;
+    } catch {
+      return DEFAULT_MODULES;
     }
-    return null;
-  };
+  });
 
   useEffect(() => {
-    const storedOpenMenuId = localStorage.getItem("openMenuId");
-    if (storedOpenMenuId) {
-      setOpenMenuId(JSON.parse(storedOpenMenuId));
-    } else {
-      const initialOpenMenuId = initializeOpenMenu(menuItems, router.pathname);
-      setOpenMenuId(initialOpenMenuId);
-    }
+    const activeModule = menuItems.find((item: MenuItem) => item.submenu?.some((child: MenuItem) => child.link === router.pathname));
+    if (activeModule?.id) setOpenModules((previous) => previous[activeModule.id!] ? previous : { ...previous, [activeModule.id!]: true });
   }, [menuItems, router.pathname]);
 
-  const handleMenuClick = (id: number, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setOpenMenuId(prevOpenMenuId => (prevOpenMenuId === id ? null : id));
-  };
+  useEffect(() => { window.localStorage.setItem(SIDEBAR_STATE_KEY, JSON.stringify(openModules)); }, [openModules]);
 
-  useEffect(() => {
-    localStorage.setItem("openMenuId", JSON.stringify(openMenuId));
-  }, [openMenuId]);
+  const toggleModule = (id: string) => setOpenModules((previous) => ({ ...previous, [id]: !previous[id] }));
+  const isActive = (item: MenuItem) => item.link === router.pathname;
 
-  const hasActiveLink = useCallback(
-    (list: MenuItem[]) => {
-      if (!list) return false;
-      for (const menuItem of list) {
-        if (menuItem.link === router.pathname) {
-          return true;
-        } else if (menuItem.submenu && hasActiveLink(menuItem.submenu)) {
-          return true;
-        }
-      }
-      return false;
-    },
-    [router.pathname]
-  );
+  return <>
+    {menuItems.map((item: MenuItem) => {
+      if (item.type === 'HEADER') return <li key={item.label} className="pc-item pc-caption"><label>{t(item.label)}</label></li>;
+      if (!item.submenu) return <li key={item.id} className={`pc-item ${isActive(item) ? 'active' : ''}`}>
+        <Link to={item.link || '#'} className="pc-link" data-page={item.dataPage}>
+          {item.icon && <span className="pc-micon"><i className={item.icon} /></span>}
+          <span className="pc-mtext">{t(item.label)}</span>{item.badge && <span className="pc-badge">{item.badge}</span>}
+        </Link>
+      </li>;
 
-  const hasOpenedSubMenu = useCallback(
-    (list: MenuItem[], openMenuId: number | null) => {
-      if (!list) return false;
-      for (const menuItem of list) {
-        if (menuItem.id === openMenuId) {
-          return true;
-        } else if (menuItem.submenu && hasOpenedSubMenu(menuItem.submenu, openMenuId)) {
-          return true;
-        }
-      }
-      return false;
-    },
-    [openMenuId]
-  );
-
-  const renderMenu = (items: MenuItem[]) => {
-    return items.map((item, index) => (
-      <li
-        key={index}
-        onClick={(e) => {
-          item.type !== "HEADER" && handleMenuClick(item.id, e);
-        }}
-        className={`pc-item ${item.type === "HEADER"
-          ? "pc-caption"
-          : item.type === "HASHMENU"
-            ? "pc-hashmenu"
-            : ""
-          } ${openMenuId === item.id || hasOpenedSubMenu(item.submenu || [], openMenuId)
-            ? "pc-trigger"
-            : ""
-          } ${item.link === router.pathname || hasActiveLink(item.submenu || [])
-            ? "active"
-            : ""}`}
-      >
-        {item.type === "HEADER" && <label suppressHydrationWarning>{t(item.label)}</label>}
-        {item.type !== "HEADER" && (
-          <Link to={item.link || "#"} className="pc-link">
-            {item.icon && (
-              <span className="pc-micon">
-                <i className={item.icon}></i>
-              </span>
-            )}
-            <span className="pc-mtext" suppressHydrationWarning>{t(item.label)}</span>
-            {item.submenu && (
-              <span className="pc-arrow">
-                <FeatherIcon icon="chevron-right" />
-              </span>
-            )}
-            {item.badge && <span className="pc-badge">{item.badge}</span>}
-          </Link>
-        )}
-        {(openMenuId === item.id || hasOpenedSubMenu(item.submenu || [], openMenuId)) && (
-          <ul className={`pc-submenu open`} style={{ display: "block" }}>
-            {renderMenu(item.submenu || [])}
-          </ul>
-        )}
-      </li>
-    ));
-  };
-
-  return <>{renderMenu(menuItems)}</>;
+      const expanded = Boolean(item.id && openModules[item.id]);
+      const containsActiveItem = item.submenu.some(isActive);
+      return <li key={item.id} data-sidebar-module={item.id} className={`pc-item pc-hasmenu cloudsuite-sidebar-module ${expanded ? 'pc-trigger' : ''} ${containsActiveItem ? 'active' : ''}`}>
+        <button type="button" className="pc-link cloudsuite-sidebar-module__toggle" aria-expanded={expanded} aria-controls={`sidebar-module-${item.id}`} onClick={() => item.id && toggleModule(item.id)}>
+          <span className="pc-mtext">{t(item.label)}</span><span className="pc-arrow"><FeatherIcon icon="chevron-right" /></span>
+        </button>
+        <ul id={`sidebar-module-${item.id}`} className="pc-submenu">
+          {item.submenu.map((child: MenuItem) => <li key={child.id} className={`pc-item ${isActive(child) ? 'active' : ''}`}>
+            <Link to={child.link || '#'} className="pc-link" data-page={child.dataPage}>
+              {child.icon && <span className="pc-micon"><i className={child.icon} /></span>}<span className="pc-mtext">{t(child.label)}</span>
+            </Link>
+          </li>)}
+        </ul>
+      </li>;
+    })}
+  </>;
 };
 
 export default NestedMenu;

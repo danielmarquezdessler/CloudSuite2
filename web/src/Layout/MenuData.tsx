@@ -393,33 +393,49 @@ const templateMenuItems = [
 const menuItems = [
     { label: 'CloudSuite', type: 'HEADER' },
     { id: 'dashboard', label: 'Dashboard', icon: 'ph-duotone ph-gauge', link: '/dashboard', dataPage: 'dashboard' },
-    { label: 'Organización', type: 'HEADER' },
-    { id: 'organization-campaigns', label: 'Campañas', icon: 'ph-duotone ph-target', link: '/organization/campaigns', dataPage: 'campaigns' },
-    { id: 'organization-functions', label: 'Funciones', icon: 'ph-duotone ph-identification-badge', link: '/organization/functions', dataPage: 'functions' },
-    { id: 'organization-teams', label: 'Equipos', icon: 'ph-duotone ph-users-three', link: '/organization/teams', dataPage: 'teams' },
-    { id: 'organization-users', label: 'Usuarios', icon: 'ph-duotone ph-user-plus', link: '/organization/users', dataPage: 'users' }
-    ,{ label: 'Conversión electoral', type: 'HEADER' }
-    ,{ id: 'voters', label: 'Electores', icon: 'ph-duotone ph-users', link: '/electoral-conversion/voters', dataPage: 'voters' }
-    ,{ id: 'voters-map', label: 'Mapa', icon: 'ph-duotone ph-map-trifold', link: '/electoral-conversion/map', dataPage: 'map' }
-    ,{ id: 'planning-questions', label: 'Preguntas de visita', icon: 'ph-duotone ph-question', link: '/planning/questions', dataPage: 'questions' }
-    ,{ label: 'Planificación', type: 'HEADER' }
-    ,{ id: 'planning-calendar', label: 'Calendario', icon: 'ph-duotone ph-calendar', link: '/planning/calendar', dataPage: 'calendar' }
-    ,{ id: 'planning-territory', label: 'Territorio', icon: 'ph-duotone ph-map-trifold', link: '/planning/territory', dataPage: 'territory' }
-    ,{ id: 'planning-goals', label: 'Metas', icon: 'ph-duotone ph-target', link: '/planning/goals', dataPage: 'goals' }
-    ,{ id: 'planning-routes', label: 'Rutas', icon: 'ph-duotone ph-route', link: '/planning/routes', dataPage: 'routes' }
-    ,{ id: 'planning-surveys', label: 'Encuestas', icon: 'ph-duotone ph-clipboard-text', link: '/planning/surveys', dataPage: 'surveys' }
-    ,{ id: 'planning-budget', label: 'Presupuesto', icon: 'ph-duotone ph-wallet', link: '/planning/budget', dataPage: 'budget' }
-    ,{ id: 'planning-advisor', label: 'Asesor IA', icon: 'ph-duotone ph-sparkle', link: '/planning/advisor', dataPage: 'advisor' }
-    ,{ label: 'Ejecución', type: 'HEADER' }
-    ,{ id: 'execution-live', label: 'Visitas en vivo', icon: 'ph-duotone ph-broadcast', link: '/execution/live', dataPage: 'execution-live' }
-    ,{ id: 'execution-heatmap', label: 'Mapa de calor', icon: 'ph-duotone ph-fire', link: '/execution/heatmap', dataPage: 'execution-heatmap' }
-    ,{ id: 'execution-undecided', label: 'Indecisos', icon: 'ph-duotone ph-question', link: '/execution/undecided', dataPage: 'execution-undecided' }
-    ,{ id: 'execution-tasks', label: 'Tareas', icon: 'ph-duotone ph-clipboard-text', link: '/execution/tasks', dataPage: 'execution-tasks' }
-    ,{ id: 'execution-productivity', label: 'Productividad', icon: 'ph-duotone ph-chart-bar', link: '/execution/productivity', dataPage: 'execution-productivity' }
-    ,{ id: 'execution-incidents', label: 'Incidencias', icon: 'ph-duotone ph-warning-circle', link: '/execution/incidents', dataPage: 'execution-incidents' }
-    ,{ id: 'execution-daily-summary', label: 'Resumen de jornada', icon: 'ph-duotone ph-chart-line-up', link: '/execution/daily-summary', dataPage: 'execution-daily-summary' }
-    ,{ label: 'Sistema', type: 'HEADER' }
-    ,{ id: 'audit-log', label: 'Control de Revisión', icon: 'ph-duotone ph-shield-check', link: '/control-de-revision', dataPage: 'audit-log' }
+    {
+        type: 'HASHMENU', id: 'organization', label: 'Organización',
+        submenu: [
+            { id: 'organization-campaigns', label: 'Campañas', icon: 'ph-duotone ph-target', link: '/organization/campaigns', dataPage: 'campaigns' },
+            { id: 'organization-functions', label: 'Funciones', icon: 'ph-duotone ph-identification-badge', link: '/organization/functions', dataPage: 'functions' },
+            { id: 'organization-teams', label: 'Equipos', icon: 'ph-duotone ph-users-three', link: '/organization/teams', dataPage: 'teams' },
+            { id: 'organization-users', label: 'Usuarios', icon: 'ph-duotone ph-user-plus', link: '/organization/users', dataPage: 'users' }
+        ]
+    },
+    {
+        type: 'HASHMENU', id: 'electoral-conversion', label: 'Conversión electoral',
+        submenu: [
+            { id: 'voters', label: 'Electores', icon: 'ph-duotone ph-users', link: '/electoral-conversion/voters', dataPage: 'voters' },
+            { id: 'voters-map', label: 'Mapa', icon: 'ph-duotone ph-map-trifold', link: '/electoral-conversion/map', dataPage: 'map' },
+            { id: 'planning-questions', label: 'Preguntas de visita', icon: 'ph-duotone ph-question', link: '/planning/questions', dataPage: 'questions' }
+        ]
+    },
+    {
+        type: 'HASHMENU', id: 'planning', label: 'Planificación',
+        submenu: [
+            { id: 'planning-calendar', label: 'Calendario', icon: 'ph-duotone ph-calendar', link: '/planning/calendar', dataPage: 'calendar' },
+            { id: 'planning-territory', label: 'Territorio', icon: 'ph-duotone ph-map-trifold', link: '/planning/territory', dataPage: 'territory' },
+            { id: 'planning-goals', label: 'Metas', icon: 'ph-duotone ph-target', link: '/planning/goals', dataPage: 'goals' },
+            { id: 'planning-routes', label: 'Rutas', icon: 'ph-duotone ph-route', link: '/planning/routes', dataPage: 'routes' },
+            { id: 'planning-surveys', label: 'Encuestas', icon: 'ph-duotone ph-clipboard-text', link: '/planning/surveys', dataPage: 'surveys' },
+            { id: 'planning-budget', label: 'Presupuesto', icon: 'ph-duotone ph-wallet', link: '/planning/budget', dataPage: 'budget' },
+            { id: 'planning-advisor', label: 'Asesor IA', icon: 'ph-duotone ph-sparkle', link: '/planning/advisor', dataPage: 'advisor' }
+        ]
+    },
+    {
+        type: 'HASHMENU', id: 'execution', label: 'Ejecución',
+        submenu: [
+            { id: 'execution-live', label: 'Visitas en vivo', icon: 'ph-duotone ph-broadcast', link: '/execution/live', dataPage: 'execution-live' },
+            { id: 'execution-heatmap', label: 'Mapa de calor', icon: 'ph-duotone ph-fire', link: '/execution/heatmap', dataPage: 'execution-heatmap' },
+            { id: 'execution-undecided', label: 'Indecisos', icon: 'ph-duotone ph-question', link: '/execution/undecided', dataPage: 'execution-undecided' },
+            { id: 'execution-tasks', label: 'Tareas', icon: 'ph-duotone ph-clipboard-text', link: '/execution/tasks', dataPage: 'execution-tasks' },
+            { id: 'execution-productivity', label: 'Productividad', icon: 'ph-duotone ph-chart-bar', link: '/execution/productivity', dataPage: 'execution-productivity' },
+            { id: 'execution-incidents', label: 'Incidencias', icon: 'ph-duotone ph-warning-circle', link: '/execution/incidents', dataPage: 'execution-incidents' },
+            { id: 'execution-daily-summary', label: 'Resumen de jornada', icon: 'ph-duotone ph-chart-line-up', link: '/execution/daily-summary', dataPage: 'execution-daily-summary' }
+        ]
+    },
+    { label: 'Sistema', type: 'HEADER' },
+    { id: 'audit-log', label: 'Control de Revisión', icon: 'ph-duotone ph-shield-check', link: '/control-de-revision', dataPage: 'audit-log' }
 ];
 
 export { menuItems, templateMenuItems };

@@ -10,48 +10,39 @@ const Sidebar = () => {
   const router = useLocation();
   const { layoutLanguages } = useSelector((state: any) => state.Theme);
   const { t, i18n } = useTranslation();
-  const [openMenu, setOpenMenu] = useState<any>({});
+  const sidebarStateKey = "cloudsuite.sidebar.modules";
+  const [openMenu, setOpenMenu] = useState<Record<string, boolean>>(() => {
+    const defaults = { organization: true, "electoral-conversion": false, planning: false, execution: false };
+    try {
+      const stored = window.localStorage.getItem(sidebarStateKey);
+      return stored ? { ...defaults, ...JSON.parse(stored) } : defaults;
+    } catch {
+      return defaults;
+    }
+  });
 
   useEffect(() => {
     // Update i18n language
     i18n.changeLanguage(layoutLanguages);
   }, [layoutLanguages]);
 
-  const handleMenuClick = (id: any) => {
-    setOpenMenu((prevOpenMenu: any) => ({
+  const handleMenuClick = (id: string) => {
+    setOpenMenu((prevOpenMenu) => ({
       ...prevOpenMenu,
       [id]: !prevOpenMenu[id]
     }));
   };
 
   useEffect(() => {
-    // Initialize openMenu state based on local storage or current location
-    const initialOpenMenu: any = {};
-
-    const checkSubmenu = (submenu: any) => {
-      if (!submenu) return false;
-      return submenu.some((subItem: any) => router.pathname.startsWith(subItem.link));
-    };
-
-    menuItems.forEach((menuItem: any) => {
-      if (menuItem.submenu) {
-        initialOpenMenu[menuItem.id] = checkSubmenu(menuItem.submenu);
-        menuItem.submenu.forEach((subItem: any) => {
-          if (subItem.submenu) {
-            initialOpenMenu[subItem.id] = checkSubmenu(subItem.submenu);
-          }
-        });
-      } else {
-        initialOpenMenu[menuItem.id] = router.pathname === menuItem.link;
-      }
-    });
-
-    setOpenMenu(initialOpenMenu);
+    const activeModule = menuItems.find((item: any) => item.submenu?.some((subItem: any) => router.pathname === subItem.link));
+    if (activeModule?.id) {
+      setOpenMenu((previous) => previous[activeModule.id] ? previous : { ...previous, [activeModule.id]: true });
+    }
   }, [router.pathname]);
 
   useEffect(() => {
     // Save openMenu state to local storage
-    localStorage.setItem("openMenu", JSON.stringify(openMenu));
+    localStorage.setItem(sidebarStateKey, JSON.stringify(openMenu));
   }, [openMenu]);
 
   const isMenuActive = (menuItem: any) => {
@@ -90,34 +81,24 @@ const Sidebar = () => {
               ) : (
                 <React.Fragment>
                   <li
-                    className={`pc-item pc-hasmenu ${openMenu[item.id] ||
-                      item.submenu?.some((subItem: any) =>
-                        isMenuActive(subItem)
-                      )
-                      ? "pc-trigger active"
-                      : ""
-                      }`}
+                    data-sidebar-module={item.id}
+                    className={`pc-item pc-hasmenu cloudsuite-sidebar-module ${openMenu[item.id] ? "pc-trigger active" : ""}`}
                   >
-                    <span
-                      className="pc-link"
-                      onClick={() => {
-                        handleMenuClick(item.id);
-                      }}
+                    <button
+                      type="button"
+                      className="pc-link cloudsuite-sidebar-module__toggle"
+                      aria-expanded={Boolean(openMenu[item.id])}
+                      aria-controls={`sidebar-module-${item.id}`}
+                      onClick={() => handleMenuClick(item.id)}
                     >
-                      <span className="pc-micon">
-                        <i className={`${item.icon}`}></i>
-                      </span>
                       <span className="pc-mtext">{t(item.label)}</span>
                       <span className="pc-arrow">
                         <FeatherIcon icon="chevron-right" />
                       </span>
-                    </span>
+                    </button>
                     <ul
-                      // className="pc-submenu"
+                      id={`sidebar-module-${item.id}`}
                       className={`pc-submenu ${openMenu[item.id] ? "open" : ""}`}
-                      style={{
-                        display: openMenu[item.id] ? "block" : "none"
-                      }}
                     >
                       {(item.submenu || []).map((subItem: any, key: any) => (
                         !subItem.submenu ? (
@@ -131,6 +112,7 @@ const Sidebar = () => {
                               to={subItem.link || "#"}
                               data-page={subItem.dataPage}
                             >
+                              <span className="pc-micon"><i className={subItem.icon}></i></span>
                               {t(subItem.label)}
                             </Link>
                           </li>
