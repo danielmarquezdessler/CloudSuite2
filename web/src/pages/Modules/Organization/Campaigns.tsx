@@ -1,6 +1,7 @@
 import { FormEvent, useMemo, useState } from 'react';
 import Chart from 'react-apexcharts';
 import { Button, Modal } from 'react-bootstrap';
+import { useNavigate } from 'react-router-dom';
 import { authenticatedFetch, useAuthenticatedQuery } from '../../../lib/api';
 import ContentPanel from '../../../components/Shared/ContentPanel';
 import EmptyState from '../../../components/Shared/EmptyState';
@@ -11,6 +12,7 @@ import Inline from '../../../components/Shared/Inline';
 import Stack from '../../../components/Shared/Stack';
 import { Toast } from '../../../components/Toast';
 import { useCampaign } from './useCampaign';
+import { useActiveCampaign } from '../../../context/CampaignContext';
 
 type Campaign = { id: string; nombre: string; createdAt: string | null; memberCount: number; voterCount: number };
 type Comparison = Campaign & { totalVoters: number; totalVisits: number; coveragePercent: number; principal: { name: string; type: string } | null; conversion: { yes: { count: number; percent: number }; no: { count: number; percent: number }; undecided: { count: number; percent: number } } };
@@ -34,6 +36,8 @@ function comparisonValue(item: Comparison, metric: 'principal' | 'voters' | 'vis
 
 export default function Campaigns() {
   const { user, campaign, error: campaignError, reload: reloadCampaign } = useCampaign();
+  const { activateCampaign } = useActiveCampaign();
+  const navigate = useNavigate();
   const path = campaign ? `/api/organizations/${campaign.orgId}/campaigns` : null;
   const campaignsQuery = useAuthenticatedQuery<Campaign[]>(user, path, [campaign?.orgId]);
   const campaigns = campaignsQuery.data ?? [];
@@ -45,6 +49,9 @@ export default function Campaigns() {
   const [showEditor, setShowEditor] = useState(false);
   const [name, setName] = useState('');
   const [deleting, setDeleting] = useState<Campaign | null>(null);
+  const [cloning, setCloning] = useState<Campaign | null>(null);
+  const [cloneName, setCloneName] = useState('');
+  const [copyOptions, setCopyOptions] = useState({ equipos: true, funciones: true, preguntas: true, candidatos: true });
   const [confirmation, setConfirmation] = useState('');
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<{ message: string; variant: 'success' | 'danger' } | null>(null);
@@ -57,6 +64,7 @@ export default function Campaigns() {
 
   const openCreate = () => { setEditing(null); setName(''); setShowEditor(true); };
   const openRename = (item: Campaign) => { setEditing(item); setName(item.nombre); setShowEditor(true); };
+  const openClone = (item: Campaign) => { setCloning(item); setCloneName(`${item.nombre} (copia)`); setCopyOptions({ equipos: true, funciones: true, preguntas: true, candidatos: true }); };
   const toggleSelected = (id: string) => { setSelected((current) => current.includes(id) ? current.filter((value) => value !== id) : [...current, id]); setComparison(null); };
   const compare = async () => {
     if (!user || !path || selected.length < 2 || comparing) return;
@@ -92,6 +100,21 @@ export default function Campaigns() {
       setNotice({ message: caught instanceof Error ? caught.message : 'No pudimos eliminar la campaña.', variant: 'danger' });
     } finally { setSaving(false); }
   };
+  const clone = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!user || !path || !cloning || saving) return;
+    setSaving(true);
+    try {
+      const created = await authenticatedFetch<Campaign>(user, `${path}/${cloning.id}/clone`, { method: 'POST', body: JSON.stringify({ nombre: cloneName, copiar: copyOptions }) });
+      await user.getIdToken(true);
+      activateCampaign(created);
+      setCloning(null);
+      setNotice({ message: `La campaña “${created.nombre}” fue duplicada y ahora está activa.`, variant: 'success' });
+      navigate('/dashboard');
+    } catch (caught) {
+      setNotice({ message: caught instanceof Error ? caught.message : 'No pudimos duplicar la campaña.', variant: 'danger' });
+    } finally { setSaving(false); }
+  };
 
   return <PageContainer><Stack gap="lg">
     <HeroBanner icon={view === 'compare' ? 'bars' : 'target'} title={view === 'compare' ? 'Comparador entre Campañas' : 'Gestión de Campañas'} subtitle={view === 'compare' ? 'Contrastá resultados y cobertura de dos o más campañas.' : 'Creá y organizá las campañas de tu organización.'} subtitleDetail={view === 'compare' ? 'Las métricas usan exclusivamente los datos vigentes de cada campaña.' : 'Cada campaña mantiene sus equipos, electores, planificación y actividad completamente aislados.'} tags={view === 'compare' ? [{ icon: 'bars', label: 'Comparación real' }, { icon: 'target', label: 'Métricas vigentes' }] : [{ icon: 'target', label: 'Datos aislados' }, { icon: 'users', label: 'Equipos por campaña' }, { icon: 'bars', label: 'Control centralizado' }]} ctaLabel={view === 'compare' ? undefined : 'Crear nueva campaña'} onCtaClick={openCreate} />
@@ -104,10 +127,11 @@ export default function Campaigns() {
     </Stack> : <Stack gap="lg">
       <div className="cd-dashboard__kpis"><KpiCard icon="target" value={campaigns.length} label="Total de campañas" caption={campaigns.length === 1 ? 'Una campaña activa' : 'Campañas de la organización'} /><KpiCard icon="people" iconColor="green" value={totalMembers} label="Miembros asignados" caption="Vínculos entre todas las campañas" /><KpiCard icon="people" iconColor="purple" value={totalVoters} label="Electores registrados" caption="Bases de electores aisladas" /><KpiCard icon="trend" iconColor="orange" value={busiest?.nombre ?? '—'} label="Campaña más activa" caption={busiest ? `${busiest.voterCount} electores · ${busiest.memberCount} miembros` : 'Sin actividad todavía'} /></div>
       <ContentPanel icon="target" title="Campañas de la organización" subtitle="Administrá cada campaña sin mezclar sus equipos, electores ni planificación." headerAction={<Button size="sm" onClick={openCreate}>Crear nueva campaña</Button>}>
-        {failure ? <EmptyState icon="target" title="No pudimos cargar las campañas" description={failure} ctaLabel="Reintentar" onCtaClick={() => void (campaignError ? reloadCampaign() : campaignsQuery.reload())} /> : campaignsQuery.loading ? <EmptyState icon="target" title="Cargando campañas" description="Estamos preparando la organización." /> : campaigns.length ? <div className="cd-table-scroll"><table className="cd-data-table"><thead><tr><th>CAMPAÑA</th><th>CREADA</th><th>MIEMBROS</th><th>ELECTORES</th><th>ACCIONES</th></tr></thead><tbody>{campaigns.map((item) => <tr key={item.id}><td><strong>{item.nombre}</strong></td><td>{dateLabel(item.createdAt)}</td><td>{item.memberCount}</td><td>{item.voterCount}</td><td><Inline gap="sm" wrap><Button size="sm" variant="outline-primary" onClick={() => openRename(item)}>Editar</Button><Button size="sm" variant="outline-danger" onClick={() => { setDeleting(item); setConfirmation(''); }}>Eliminar</Button></Inline></td></tr>)}</tbody></table></div> : <EmptyState icon="target" title="Todavía no hay campañas" description="Creá la primera campaña para comenzar a organizar tu operación." ctaLabel="Crear nueva campaña" onCtaClick={openCreate} />}
+        {failure ? <EmptyState icon="target" title="No pudimos cargar las campañas" description={failure} ctaLabel="Reintentar" onCtaClick={() => void (campaignError ? reloadCampaign() : campaignsQuery.reload())} /> : campaignsQuery.loading ? <EmptyState icon="target" title="Cargando campañas" description="Estamos preparando la organización." /> : campaigns.length ? <div className="cd-table-scroll"><table className="cd-data-table"><thead><tr><th>CAMPAÑA</th><th>CREADA</th><th>MIEMBROS</th><th>ELECTORES</th><th>ACCIONES</th></tr></thead><tbody>{campaigns.map((item) => <tr key={item.id}><td><strong>{item.nombre}</strong></td><td>{dateLabel(item.createdAt)}</td><td>{item.memberCount}</td><td>{item.voterCount}</td><td><Inline gap="sm" wrap><Button size="sm" variant="outline-primary" onClick={() => openRename(item)}>Editar</Button><Button size="sm" variant="outline-primary" onClick={() => openClone(item)}>Duplicar</Button><Button size="sm" variant="outline-danger" onClick={() => { setDeleting(item); setConfirmation(''); }}>Eliminar</Button></Inline></td></tr>)}</tbody></table></div> : <EmptyState icon="target" title="Todavía no hay campañas" description="Creá la primera campaña para comenzar a organizar tu operación." ctaLabel="Crear nueva campaña" onCtaClick={openCreate} />}
       </ContentPanel>
     </Stack>}
     <Modal show={showEditor} onHide={() => !saving && setShowEditor(false)}><form onSubmit={submit}><Modal.Header closeButton><Modal.Title>{editing ? 'Renombrar campaña' : 'Crear nueva campaña'}</Modal.Title></Modal.Header><Modal.Body><Stack gap="sm"><div><label className="form-label" htmlFor="campaign-name">Nombre de la campaña</label><input id="campaign-name" className="form-control" value={name} onChange={(event) => setName(event.target.value)} required maxLength={120} autoFocus /></div><p className="small text-muted mb-0">La campaña tendrá sus propios miembros, electores, equipos y planificación.</p></Stack></Modal.Body><Modal.Footer><Button variant="secondary" onClick={() => setShowEditor(false)} disabled={saving}>Cancelar</Button><Button type="submit" disabled={saving}>{saving ? 'Guardando…' : editing ? 'Guardar nombre' : 'Crear campaña'}</Button></Modal.Footer></form></Modal>
+    <Modal show={Boolean(cloning)} onHide={() => !saving && setCloning(null)}><form onSubmit={clone}><Modal.Header closeButton><Modal.Title>Duplicar campaña</Modal.Title></Modal.Header><Modal.Body><Stack gap="md"><p className="mb-0 text-muted">La nueva campaña conservará solo la estructura que selecciones. Sus electores, visitas, tareas, incidentes y auditoría comenzarán vacíos.</p><div><label className="form-label" htmlFor="campaign-clone-name">Nombre de la nueva campaña</label><input id="campaign-clone-name" className="form-control" value={cloneName} onChange={(event) => setCloneName(event.target.value)} required maxLength={120} autoFocus /></div><fieldset><legend className="fs-6 mb-2">Copiar estructura</legend><Stack gap="sm">{([{ key: 'equipos', label: 'Equipos (sin miembros ni líder)' }, { key: 'funciones', label: 'Funciones' }, { key: 'preguntas', label: 'Preguntas de visita' }, { key: 'candidatos', label: 'Candidatos (sin Principal)' }] as const).map(({ key, label }) => <label className="form-check" key={key}><input className="form-check-input" type="checkbox" checked={copyOptions[key]} onChange={(event) => setCopyOptions((current) => ({ ...current, [key]: event.target.checked }))} /><span className="form-check-label">{label}</span></label>)}</Stack></fieldset></Stack></Modal.Body><Modal.Footer><Button variant="secondary" onClick={() => setCloning(null)} disabled={saving}>Cancelar</Button><Button type="submit" disabled={saving}>{saving ? 'Duplicando…' : 'Duplicar campaña'}</Button></Modal.Footer></form></Modal>
     <Modal show={Boolean(deleting)} onHide={() => !saving && setDeleting(null)}><Modal.Header closeButton><Modal.Title>Eliminar campaña</Modal.Title></Modal.Header><Modal.Body><Stack gap="sm"><p className="mb-0">Esta acción eliminará definitivamente los equipos, electores, visitas, planificación, auditoría y demás datos propios de la campaña. Las cuentas de usuario se conservarán.</p><div><label className="form-label" htmlFor="campaign-delete-confirmation">Para confirmar, escribí exactamente: <strong>{deleting?.nombre}</strong></label><input id="campaign-delete-confirmation" className="form-control" value={confirmation} onChange={(event) => setConfirmation(event.target.value)} autoComplete="off" /></div></Stack></Modal.Body><Modal.Footer><Button variant="secondary" onClick={() => setDeleting(null)} disabled={saving}>Cancelar</Button><Button variant="danger" onClick={() => void remove()} disabled={saving || confirmation !== deleting?.nombre}>{saving ? 'Eliminando…' : 'Eliminar campaña'}</Button></Modal.Footer></Modal>
     {notice && <Toast message={notice.message} variant={notice.variant} onClose={() => setNotice(null)} />}
   </Stack></PageContainer>;

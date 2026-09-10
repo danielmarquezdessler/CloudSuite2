@@ -20,6 +20,7 @@ campaignRouter.delete('/organizations/:orgId/users/:userId', requireAuth, contro
 campaignRouter.get('/organizations/:orgId/campaigns', requireAuth, controller.getOrganizationCampaigns);
 campaignRouter.get('/organizations/:orgId/campaigns/compare', requireAuth, controller.compareOrganizationCampaigns);
 campaignRouter.post('/organizations/:orgId/campaigns', requireAuth, controller.postOrganizationCampaign);
+campaignRouter.post('/organizations/:orgId/campaigns/:campId/clone', requireAuth, controller.cloneOrganizationCampaign);
 campaignRouter.put('/organizations/:orgId/campaigns/:campId', requireAuth, controller.putOrganizationCampaign);
 campaignRouter.delete('/organizations/:orgId/campaigns/:campId', requireAuth, controller.removeOrganizationCampaign);
 campaignRouter.get(`${base}/candidates`, requireAuth, controller.getCandidates);

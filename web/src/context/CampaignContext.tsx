@@ -13,6 +13,7 @@ type CampaignContextValue = {
   loading: boolean;
   error: string;
   setActiveCampaignId: (campaignId: string) => void;
+  activateCampaign: (campaign: CampaignOption) => void;
   createCampaign: (nombre: string) => Promise<CampaignOption>;
   reload: () => Promise<void>;
 };
@@ -85,22 +86,26 @@ export function CampaignProvider({ children }: { children: ReactNode }) {
     if (user) localStorage.setItem(storageKey(user.uid), campaignId);
   }, [campaigns, user]);
 
+  const activateCampaign = useCallback((campaign: CampaignOption) => {
+    setCampaigns((current) => current.some((item) => item.id === campaign.id)
+      ? current.map((item) => item.id === campaign.id ? { ...item, ...campaign } : item)
+      : [...current, campaign]);
+    setActiveId(campaign.id);
+    if (user) localStorage.setItem(storageKey(user.uid), campaign.id);
+  }, [user]);
+
   const createCampaign = useCallback(async (nombre: string) => {
     if (!user || !organizationId) throw new Error('No hay una organización activa.');
     const result = await authenticatedRequest<CampaignOption>(user, `/api/organizations/${organizationId}/campaigns`, { method: 'POST', body: JSON.stringify({ nombre }) });
     if (result.error || !result.data) throw result.error ?? new Error('No pudimos crear la campaña.');
     await user.getIdToken(true);
     const created = result.data;
-    setCampaigns((current) => [...current, created]);
-    // The newly created campaign is not yet in the closed-over campaigns array,
-    // so select it directly instead of routing through the membership guard.
-    setActiveId(created.id);
-    localStorage.setItem(storageKey(user.uid), created.id);
+    activateCampaign(created);
     return created;
-  }, [organizationId, user]);
+  }, [activateCampaign, organizationId, user]);
 
   const activeCampaign = useMemo(() => campaigns.find((campaign) => campaign.id === activeCampaignId) ?? null, [activeCampaignId, campaigns]);
-  const value = useMemo(() => ({ organizationId, role, campaigns, activeCampaign, activeCampaignId, loading, error, setActiveCampaignId, createCampaign, reload }), [organizationId, role, campaigns, activeCampaign, activeCampaignId, loading, error, setActiveCampaignId, createCampaign, reload]);
+  const value = useMemo(() => ({ organizationId, role, campaigns, activeCampaign, activeCampaignId, loading, error, setActiveCampaignId, activateCampaign, createCampaign, reload }), [organizationId, role, campaigns, activeCampaign, activeCampaignId, loading, error, setActiveCampaignId, activateCampaign, createCampaign, reload]);
   return <CampaignContext.Provider value={value}>{children}</CampaignContext.Provider>;
 }
 

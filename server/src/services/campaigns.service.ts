@@ -1,9 +1,11 @@
 import { DecodedIdToken } from 'firebase-admin/auth';
 import { FieldValue } from 'firebase-admin/firestore';
+import { randomUUID } from 'node:crypto';
 import { adminAuth, db, storage } from '../config/firebase.js';
 import { ForbiddenError, NotFoundError, ValidationError } from './access.service.js';
 
 type CampaignInput = { nombre?: string };
+type CloneInput = CampaignInput & { copiar?: { equipos?: boolean; funciones?: boolean; preguntas?: boolean; candidatos?: boolean } };
 
 function organizationRef(orgId: string) {
   return db.collection('organizations').doc(orgId);
@@ -117,6 +119,40 @@ export async function renameCampaign(user: DecodedIdToken, orgId: string, campId
   const nombre = campaignName(input);
   await campaign.update({ nombre, updatedAt: FieldValue.serverTimestamp(), updatedBy: user.uid });
   return { id: campId, nombre };
+}
+
+async function copyCandidatePhoto(source: unknown, candidateId: string) {
+  if (typeof source !== 'string' || !source.startsWith('gs://')) return { photoUrl: null, photoDownloadToken: null };
+  const sourcePath = source.replace(/^gs:\/\/[^/]+\//, ''); const destinationPath = `candidates/${candidateId}.jpg`;
+  const token = randomUUID();
+  await storage.bucket().file(sourcePath).copy(storage.bucket().file(destinationPath));
+  await storage.bucket().file(destinationPath).setMetadata({ metadata: { firebaseStorageDownloadTokens: token } });
+  return { photoUrl: `gs://${storage.bucket().name}/${destinationPath}`, photoDownloadToken: token };
+}
+
+export async function cloneCampaign(user: DecodedIdToken, orgId: string, sourceCampId: string, input: CloneInput) {
+  assertOrganizationClient(user, orgId);
+  const source = organizationRef(orgId).collection('campaigns').doc(sourceCampId);
+  if (!(await source.get()).exists) throw new NotFoundError('La campaña a duplicar no existe.');
+  const copied = { equipos: input.copiar?.equipos !== false, funciones: input.copiar?.funciones !== false, preguntas: input.copiar?.preguntas !== false, candidatos: input.copiar?.candidatos !== false };
+  const created = await createCampaign(user, orgId, { nombre: campaignName(input) });
+  const target = organizationRef(orgId).collection('campaigns').doc(created.id);
+  const [teams, functions, questionSets, candidates] = await Promise.all([
+    copied.equipos ? source.collection('teams').get() : Promise.resolve(null),
+    copied.funciones ? source.collection('functions').get() : Promise.resolve(null),
+    copied.preguntas ? source.collection('questionSets').get() : Promise.resolve(null),
+    copied.candidatos ? source.collection('candidates').get() : Promise.resolve(null)
+  ]);
+  const batch = db.batch();
+  teams?.docs.filter((item) => item.data().deleted !== true).forEach((item) => batch.set(target.collection('teams').doc(), { name: String(item.data().name ?? ''), description: String(item.data().description ?? ''), leaderId: null, deleted: false, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(), clonedFrom: item.id }));
+  functions?.docs.filter((item) => item.data().deleted !== true).forEach((item) => batch.set(target.collection('functions').doc(), { name: String(item.data().name ?? ''), description: String(item.data().description ?? ''), color: String(item.data().color ?? '#0060F0'), deleted: false, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(), clonedFrom: item.id }));
+  questionSets?.docs.forEach((item) => batch.set(target.collection('questionSets').doc(), { name: String(item.data().name ?? ''), questions: item.data().questions ?? [], active: Boolean(item.data().active), createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(), createdBy: user.uid, clonedFrom: item.id }));
+  await batch.commit();
+  for (const item of candidates?.docs ?? []) {
+    const ref = target.collection('candidates').doc(); const photo = await copyCandidatePhoto(item.data().photoUrl, ref.id);
+    await ref.set({ name: String(item.data().name ?? ''), type: String(item.data().type ?? ''), ...(item.data().type === 'Otro' && item.data().customType ? { customType: String(item.data().customType) } : {}), party: item.data().party ?? null, ...photo, isPrincipal: false, createdAt: FieldValue.serverTimestamp(), createdBy: user.uid, clonedFrom: item.id });
+  }
+  return { ...created, copied };
 }
 
 async function removeCampaignClaim(uid: string, orgId: string, campId: string) {
