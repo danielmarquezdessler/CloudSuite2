@@ -1,0 +1,10 @@
+# Keep Cloud Build uploads limited to the Docker build context.
+.gcloudignore
+.git
+.gitignore
+node_modules/
+dist/
+.env
+.env.*
+*.log
+*.tsbuildinfo

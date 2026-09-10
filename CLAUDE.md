@@ -34,6 +34,15 @@ Ningún componente puede renderizar dos o más elementos hermanos (bloques de te
 - `npm run test:e2e` desde `web/` ejecuta `scripts/test-e2e-real.mjs`: usa Firebase Auth, la API Node y Firestore reales, inicia Vite en el puerto 5188 y levanta la API en 8080 únicamente si no hay una API sana. No intercepta ni simula HTTP.
 - Para regenerar el entorno, eliminá solo el usuario E2E en Firebase Authentication y su organización de prueba indicada por `web/.env.test` en Firestore; luego eliminá o vaciá ese archivo local y ejecutá `npm run test:e2e`. Se requiere ADC local vigente con `gcloud auth application-default login`.
 
+## Cómo desplegar a producción
+
+- Plataforma: Cloud Run (`cloudsuite-api`) y Firebase Hosting, ambos en el proyecto `politicfy-cloudsuite`; Cloud Run se publica en `southamerica-east1` y usa la cuenta `cloudsuite-api@politicfy-cloudsuite.iam.gserviceaccount.com`.
+- Requisitos locales: `gcloud auth login`, `gcloud auth application-default login`, `firebase login --reauth`, Docker/Cloud Build habilitado y `web/.env` con la configuración Firebase pública y `VITE_GOOGLE_MAPS_API_KEY`.
+- Los secretos nunca se copian al repositorio ni se imprimen. Maps y Gemini se cargan en Secret Manager desde sus `.env` locales con el procedimiento operativo vigente. Para cargar o rotar Resend se ejecuta `node scripts/set-resend-secret.mjs`, que solicita la clave por terminal y la guarda directamente como `RESEND_API_KEY` en Secret Manager.
+- Despliegue completo: desde la raíz, ejecutar `node scripts/deploy-production.mjs`. El script construye y publica la imagen en Artifact Registry, despliega Cloud Run con secretos inyectados, consulta su URL, compila `web/` con `VITE_FIREBASE_API_URL` apuntando a esa URL y publica Firebase Hosting.
+- La API recibe `APP_URL=https://app.politicfy.com` y `WEB_ORIGINS` con el dominio productivo, los dos dominios por defecto de Firebase y los orígenes locales. Los valores `localhost` que permanecen en código son únicamente fallbacks de desarrollo cuando falta la variable de entorno.
+- Antes de anunciar un despliegue, comprobar `GET <Cloud Run URL>/health`, abrir `https://politicfy-cloudsuite.web.app`, iniciar sesión real y crear un dato de prueba mediante la interfaz. Para el dominio personalizado, usar exclusivamente los registros DNS que Firebase Hosting muestre en ese momento; nunca inventar registros.
+
 ## Estado actual
 
 - Monorepo creado con frontend y backend separados, rebrandeado con la identidad visual de CloudSuite y su logo.
@@ -52,3 +61,4 @@ Ningún componente puede renderizar dos o más elementos hermanos (bloques de te
 - Planificación incorporada: calendario, circuito/zona territorial, metas dinámicas, rutas, encuestas, presupuesto y asesor con sugerencias persistentes; todas sus escrituras pasan por la API Admin SDK.
 - E2E real de Organización incorporado: login Firebase persistente y comprobaciones sin mocks de creación y recarga de Funciones, Equipos e Invitaciones contra Firestore.
 - Sistema de espaciado estructural incorporado: `Stack` e `Inline` centralizan la separación interna de cards, textos y acciones.
+- Configuración de producción preparada: Firebase Hosting sirve `web/dist` con rewrite SPA; scripts reproducibles construyen/despliegan Cloud Run y Hosting sin versionar secretos.
