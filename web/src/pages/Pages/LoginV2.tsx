@@ -7,6 +7,7 @@ import { changeThemeMode } from "../../toolkit/thunk";
 import cloudsuiteLogo from '../../assets/images/cloudsuite.svg';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../../lib/firebase';
+import { firebaseAuthErrorMessage } from '../../lib/authErrorMessages';
 
 const LoginV2 = () => {
     const dispatch = useDispatch<any>();
@@ -24,7 +25,7 @@ const LoginV2 = () => {
             await signInWithEmailAndPassword(auth, String(form.get('email')), String(form.get('password')));
             navigate('/dashboard');
         } catch (caughtError) {
-            setError(caughtError instanceof Error ? caughtError.message : 'No pudimos iniciar sesión.');
+            setError(firebaseAuthErrorMessage(caughtError) ?? (caughtError instanceof Error ? caughtError.message : 'No pudimos iniciar sesión.'));
         } finally {
             setIsSubmitting(false);
         }

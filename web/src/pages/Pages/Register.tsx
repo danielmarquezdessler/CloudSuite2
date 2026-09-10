@@ -5,6 +5,7 @@ import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import cloudsuiteLogo from '../../assets/images/cloudsuite.svg';
 import { authenticatedFetch } from '../../lib/api';
 import { auth } from '../../lib/firebase';
+import { firebaseAuthErrorMessage } from '../../lib/authErrorMessages';
 
 const Register = () => {
   const navigate = useNavigate();
@@ -30,7 +31,7 @@ const Register = () => {
       await credential.user.getIdToken(true);
       navigate('/dashboard');
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : 'No pudimos crear la cuenta.');
+      setError(firebaseAuthErrorMessage(caughtError) ?? (caughtError instanceof Error ? caughtError.message : 'No pudimos crear la cuenta.'));
     } finally {
       setIsSubmitting(false);
     }

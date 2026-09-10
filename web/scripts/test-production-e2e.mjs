@@ -37,6 +37,12 @@ try {
   console.log(`Abriendo producción: ${baseUrl}`);
   await page.goto(baseUrl, { waitUntil: 'domcontentloaded', timeout: 45_000 });
   await page.getByLabel('Email').fill(env.E2E_EMAIL);
+  await page.getByLabel('Contraseña').fill('contraseña-incorrecta-e2e');
+  await page.getByRole('button', { name: 'Ingresar', exact: true }).click();
+  await page.getByRole('alert').getByText('El email o la contraseña no son correctos.', { exact: true }).waitFor();
+  await page.screenshot({ path: resolve(screenshots, 'production-login-error.png'), fullPage: false });
+  console.log('Login inválido mostró el mensaje amigable en español.');
+  await page.getByLabel('Email').fill(env.E2E_EMAIL);
   await page.getByLabel('Contraseña').fill(env.E2E_PASSWORD);
   await page.getByRole('button', { name: 'Ingresar', exact: true }).click();
   await waitForDashboard(page);

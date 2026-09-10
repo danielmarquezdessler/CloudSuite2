@@ -11,6 +11,15 @@ export type CreateOrganizationUserInput = {
 export type UpdateOrganizationUserInput = CreateOrganizationUserInput;
 const MAX_AVATAR_BYTES = 8 * 1024 * 1024;
 
+function userAuthValidationError(error: unknown) {
+  const code = error && typeof error === 'object' && 'code' in error && typeof error.code === 'string' ? error.code : '';
+  if (code === 'auth/email-already-exists') return new ValidationError('Ya existe una cuenta con ese email.');
+  if (code === 'auth/invalid-password') return new ValidationError('La contraseña debe tener al menos 6 caracteres.');
+  if (code === 'auth/user-not-found') return new ValidationError('La cuenta de usuario no existe.');
+  if (code === 'auth/user-disabled') return new ValidationError('Esta cuenta fue deshabilitada. Contactá al administrador.');
+  return error;
+}
+
 function assertOrganizationAdmin(user: DecodedIdToken, orgId: string) {
   if (user.orgId !== orgId || (user.role !== 'cliente' && user.role !== 'admin')) throw new ForbiddenError('Solo el Cliente o un administrador puede gestionar usuarios.');
 }
@@ -81,7 +90,12 @@ export async function createOrganizationUser(user: DecodedIdToken, orgId: string
     }
   } else if (data.functionId || data.teamId) throw new ValidationError('Elegí una campaña para asignar una función o equipo.');
 
-  const created = await adminAuth.createUser({ email: data.email, password: data.password, displayName: data.displayName });
+  let created;
+  try {
+    created = await adminAuth.createUser({ email: data.email, password: data.password, displayName: data.displayName });
+  } catch (error) {
+    throw userAuthValidationError(error);
+  }
   try {
     const avatarReference = await uploadAvatar(created.uid, avatar);
     const photoURL = avatarReference?.storagePath ?? null;
@@ -161,7 +175,11 @@ export async function updateOrganizationUser(user: DecodedIdToken, orgId: string
   } else if (data.functionId || data.teamId) throw new ValidationError('Elegí una campaña para asignar una función o equipo.');
 
   // El avatar se conserva como referencia gs:// en Firestore; Firebase Auth recibe el resto de las credenciales editables.
-  await adminAuth.updateUser(targetUid, { displayName: data.displayName, email: data.email, ...(data.password ? { password: data.password } : {}) });
+  try {
+    await adminAuth.updateUser(targetUid, { displayName: data.displayName, email: data.email, ...(data.password ? { password: data.password } : {}) });
+  } catch (error) {
+    throw userAuthValidationError(error);
+  }
 
   const batch = db.batch();
   batch.update(profileRef, { firstName: data.firstName, lastName: data.lastName, displayName: data.displayName, email: data.email, phone: data.phone, photoURL, avatarDownloadToken, updatedAt: FieldValue.serverTimestamp() });
