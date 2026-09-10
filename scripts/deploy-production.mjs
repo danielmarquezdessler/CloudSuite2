@@ -1,6 +1,8 @@
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { dirname, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const project = 'politicfy-cloudsuite';
@@ -15,18 +17,33 @@ function run(command, args, options = {}) {
 }
 
 run('gcloud', ['builds', 'submit', 'server', `--project=${project}`, `--tag=${repository}`]);
-run('gcloud', [
-  'run', 'deploy', service,
-  `--project=${project}`,
-  `--region=${region}`,
-  `--image=${repository}`,
-  `--service-account=${serviceAccount}`,
-  '--allow-unauthenticated',
-  '--port=8080',
-  '--min-instances=0',
-  '--set-env-vars=PROJECT_ID=politicfy-cloudsuite,GOOGLE_CLOUD_PROJECT=politicfy-cloudsuite,APP_URL=https://app.politicfy.com,WEB_ORIGINS=https://app.politicfy.com,https://politicfy-cloudsuite.web.app,https://politicfy-cloudsuite.firebaseapp.com,http://localhost:5173,http://127.0.0.1:5173',
-  '--set-secrets=RESEND_API_KEY=RESEND_API_KEY:latest,GEMINI_API_KEY=GEMINI_API_KEY:latest,GOOGLE_MAPS_API_KEY=GOOGLE_MAPS_API_KEY:latest'
-]);
+const temporaryDirectory = mkdtempSync(join(tmpdir(), 'cloudsuite-run-'));
+const environmentFile = join(temporaryDirectory, 'environment.yaml');
+writeFileSync(environmentFile, [
+  `PROJECT_ID: ${project}`,
+  `GOOGLE_CLOUD_PROJECT: ${project}`,
+  'APP_URL: https://app.politicfy.com',
+  'WEB_ORIGINS: "https://app.politicfy.com,https://politicfy-cloudsuite.web.app,https://politicfy-cloudsuite.firebaseapp.com,http://localhost:5173,http://127.0.0.1:5173"'
+].join('\n'));
+
+try {
+  run('gcloud', [
+    'run', 'deploy', service,
+    `--project=${project}`,
+    `--region=${region}`,
+    `--image=${repository}`,
+    `--service-account=${serviceAccount}`,
+    // La política de organización prohíbe bindings allUsers; esta opción publica
+    // el endpoint sin crear ese binding, para que Firebase Hosting pueda usarlo.
+    '--no-invoker-iam-check',
+    '--port=8080',
+    '--min-instances=0',
+    `--env-vars-file=${environmentFile}`,
+    '--set-secrets=RESEND_API_KEY=RESEND_API_KEY:latest,GEMINI_API_KEY=GEMINI_API_KEY:latest,GOOGLE_MAPS_API_KEY=GOOGLE_MAPS_API_KEY:latest'
+  ]);
+} finally {
+  rmSync(temporaryDirectory, { recursive: true, force: true });
+}
 
 const apiUrl = execFileSync(executable('gcloud'), ['run', 'services', 'describe', service, `--project=${project}`, `--region=${region}`, '--format=value(status.url)'], { cwd: root, encoding: 'utf8', shell: process.platform === 'win32' }).trim();
 run('npm', ['run', 'build'], { cwd: resolve(root, 'web'), env: { ...process.env, VITE_FIREBASE_API_URL: apiUrl } });
