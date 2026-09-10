@@ -23,6 +23,8 @@ import Heatmap from '../pages/Modules/Execution/Heatmap';
 import Undecided from '../pages/Modules/Execution/Undecided';
 import Tasks from '../pages/Modules/Execution/Tasks';
 import Productivity from '../pages/Modules/Execution/Productivity';
+import Incidents from '../pages/Modules/Execution/Incidents';
+import DailySummary from '../pages/Modules/Execution/DailySummary';
 // import AffiliateDashboard from "../pages/AffiliateDashboard";
 // import InvoiceDashboard from "../pages/InvoiceDashboard";
 // import FinaceDashboard from "../pages/FinaceDashboard";
@@ -212,6 +214,8 @@ const routes = [
     { path: "/execution/undecided", component: <Undecided /> },
     { path: "/execution/tasks", component: <Tasks /> },
     { path: "/execution/productivity", component: <Productivity /> },
+    { path: "/execution/incidents", component: <Incidents /> },
+    { path: "/execution/daily-summary", component: <DailySummary /> },
     // { path: "/affiliate-dashboard", component: <AffiliateDashboard /> },
     // { path: "/invoice-dashboard", component: <InvoiceDashboard /> },
     // { path: "/finance-dashboard", component: <FinaceDashboard /> },

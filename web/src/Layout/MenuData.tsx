@@ -416,6 +416,8 @@ const menuItems = [
     ,{ id: 'execution-undecided', label: 'Indecisos', icon: 'ph-duotone ph-question', link: '/execution/undecided', dataPage: 'execution-undecided' }
     ,{ id: 'execution-tasks', label: 'Tareas', icon: 'ph-duotone ph-clipboard-text', link: '/execution/tasks', dataPage: 'execution-tasks' }
     ,{ id: 'execution-productivity', label: 'Productividad', icon: 'ph-duotone ph-chart-bar', link: '/execution/productivity', dataPage: 'execution-productivity' }
+    ,{ id: 'execution-incidents', label: 'Incidencias', icon: 'ph-duotone ph-warning-circle', link: '/execution/incidents', dataPage: 'execution-incidents' }
+    ,{ id: 'execution-daily-summary', label: 'Resumen de jornada', icon: 'ph-duotone ph-chart-line-up', link: '/execution/daily-summary', dataPage: 'execution-daily-summary' }
     ,{ label: 'Sistema', type: 'HEADER' }
     ,{ id: 'audit-log', label: 'Control de Revisión', icon: 'ph-duotone ph-shield-check', link: '/control-de-revision', dataPage: 'audit-log' }
 ];

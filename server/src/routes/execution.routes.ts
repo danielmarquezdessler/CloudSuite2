@@ -1,10 +1,12 @@
 import { Router } from 'express';
 import { requireAuth } from '../middleware/requireAuth.js';
 import * as controller from '../controllers/execution.controller.js';
+import multer from 'multer';
 
 export const executionRouter = Router();
 const base = '/organizations/:orgId/campaigns/:campId/execution';
 const campaignBase = '/organizations/:orgId/campaigns/:campId';
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 } });
 executionRouter.get(`${base}/heatmap-points`, requireAuth, controller.getHeatmapPoints);
 executionRouter.get(`${base}/undecided`, requireAuth, controller.getUndecided);
 executionRouter.get(`${campaignBase}/tasks`, requireAuth, controller.getTasks);
@@ -12,3 +14,8 @@ executionRouter.post(`${campaignBase}/tasks`, requireAuth, controller.postTask);
 executionRouter.put(`${campaignBase}/tasks/:taskId`, requireAuth, controller.putTask);
 executionRouter.delete(`${campaignBase}/tasks/:taskId`, requireAuth, controller.deleteTask);
 executionRouter.get(`${base}/productivity`, requireAuth, controller.getProductivity);
+executionRouter.get(`${campaignBase}/incidents`, requireAuth, controller.getIncidents);
+executionRouter.post(`${campaignBase}/incidents`, requireAuth, upload.single('photo'), controller.postIncident);
+executionRouter.put(`${campaignBase}/incidents/:incidentId`, requireAuth, controller.putIncident);
+executionRouter.get(`${base}/daily-summary`, requireAuth, controller.getDailySummary);
+executionRouter.post(`${base}/daily-summary`, requireAuth, controller.postDailySummary);
