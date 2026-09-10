@@ -21,6 +21,8 @@ import SettingsPlaceholder from '../pages/Modules/System/SettingsPlaceholder';
 import LiveVisits from '../pages/Modules/Execution/LiveVisits';
 import Heatmap from '../pages/Modules/Execution/Heatmap';
 import Undecided from '../pages/Modules/Execution/Undecided';
+import Tasks from '../pages/Modules/Execution/Tasks';
+import Productivity from '../pages/Modules/Execution/Productivity';
 // import AffiliateDashboard from "../pages/AffiliateDashboard";
 // import InvoiceDashboard from "../pages/InvoiceDashboard";
 // import FinaceDashboard from "../pages/FinaceDashboard";
@@ -208,6 +210,8 @@ const routes = [
     { path: "/execution/live", component: <LiveVisits /> },
     { path: "/execution/heatmap", component: <Heatmap /> },
     { path: "/execution/undecided", component: <Undecided /> },
+    { path: "/execution/tasks", component: <Tasks /> },
+    { path: "/execution/productivity", component: <Productivity /> },
     // { path: "/affiliate-dashboard", component: <AffiliateDashboard /> },
     // { path: "/invoice-dashboard", component: <InvoiceDashboard /> },
     // { path: "/finance-dashboard", component: <FinaceDashboard /> },

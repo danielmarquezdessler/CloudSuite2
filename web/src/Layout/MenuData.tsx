@@ -414,6 +414,8 @@ const menuItems = [
     ,{ id: 'execution-live', label: 'Visitas en vivo', icon: 'ph-duotone ph-broadcast', link: '/execution/live', dataPage: 'execution-live' }
     ,{ id: 'execution-heatmap', label: 'Mapa de calor', icon: 'ph-duotone ph-fire', link: '/execution/heatmap', dataPage: 'execution-heatmap' }
     ,{ id: 'execution-undecided', label: 'Indecisos', icon: 'ph-duotone ph-question', link: '/execution/undecided', dataPage: 'execution-undecided' }
+    ,{ id: 'execution-tasks', label: 'Tareas', icon: 'ph-duotone ph-clipboard-text', link: '/execution/tasks', dataPage: 'execution-tasks' }
+    ,{ id: 'execution-productivity', label: 'Productividad', icon: 'ph-duotone ph-chart-bar', link: '/execution/productivity', dataPage: 'execution-productivity' }
     ,{ label: 'Sistema', type: 'HEADER' }
     ,{ id: 'audit-log', label: 'Control de Revisión', icon: 'ph-duotone ph-shield-check', link: '/control-de-revision', dataPage: 'audit-log' }
 ];

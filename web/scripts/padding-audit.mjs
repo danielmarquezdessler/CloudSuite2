@@ -16,6 +16,7 @@ const pages = [
   ['Territorio', '/planning/territory'], ['Metas', '/planning/goals'], ['Rutas', '/planning/routes'],
   ['Encuestas', '/planning/surveys'], ['Presupuesto', '/planning/budget'], ['Asesor', '/planning/advisor'],
   ['Visitas en vivo', '/execution/live'], ['Mapa de calor', '/execution/heatmap'], ['Indecisos', '/execution/undecided']
+  ,['Tareas', '/execution/tasks'], ['Productividad', '/execution/productivity']
 ];
 const minimumPadding = 12;
 const minimumHeaderGap = 16;
