@@ -5,12 +5,12 @@ import Inline from '../../../components/Shared/Inline';
 import Stack from '../../../components/Shared/Stack';
 import TagInput from '../../../components/Shared/TagInput';
 
-export type ManualVoterInput = { name: string; phone: string; email: string; address: string; lat: number | null; lng: number | null; tags: string[]; confirmSimilar?: boolean };
-type ExistingVoter = { id: string; name: string; phone?: string; email?: string; address?: string; lat?: number | null; lng?: number | null; tags?: string[] };
+export type ManualVoterInput = { name: string; phone: string; email: string; address: string; lat: number | null; lng: number | null; tags: string[]; householdId: string; confirmSimilar?: boolean };
+type ExistingVoter = { id: string; name: string; phone?: string; email?: string; address?: string; lat?: number | null; lng?: number | null; tags?: string[]; householdId?: string | null };
 type Props = { show: boolean; onHide: () => void; onCreate: (values: ManualVoterInput) => Promise<void>; onUpdate?: (voterId: string, values: ManualVoterInput) => Promise<void>; voter?: ExistingVoter | null; existingVoters: ExistingVoter[]; tagSuggestions?: string[] };
 
 const normalize = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
-const blank = (): ManualVoterInput => ({ name: '', phone: '', email: '', address: '', lat: null, lng: null, tags: [] });
+const blank = (): ManualVoterInput => ({ name: '', phone: '', email: '', address: '', lat: null, lng: null, tags: [], householdId: '' });
 
 export default function CreateVoterModal({ show, onHide, onCreate, onUpdate, voter = null, existingVoters, tagSuggestions = [] }: Props) {
   const addressInput = useRef<HTMLInputElement>(null);
@@ -23,7 +23,7 @@ export default function CreateVoterModal({ show, onHide, onCreate, onUpdate, vot
 
   useEffect(() => {
     if (!show || !addressInput.current) return;
-    setValues(voter ? { name: voter.name, phone: voter.phone ?? '', email: voter.email ?? '', address: voter.address ?? '', lat: voter.lat ?? null, lng: voter.lng ?? null, tags: voter.tags ?? [] } : blank());
+    setValues(voter ? { name: voter.name, phone: voter.phone ?? '', email: voter.email ?? '', address: voter.address ?? '', lat: voter.lat ?? null, lng: voter.lng ?? null, tags: voter.tags ?? [], householdId: voter.householdId ?? '' } : blank());
     let listener: any;
     let cancelled = false;
     setPlacesError('');
@@ -73,6 +73,7 @@ export default function CreateVoterModal({ show, onHide, onCreate, onUpdate, vot
         <div><label className="form-label" htmlFor="voter-address">Dirección</label><input ref={addressInput} id="voter-address" className="form-control" value={values.address} onChange={(event) => { const address = event.target.value; setValues((current) => ({ ...current, address, lat: null, lng: null })); }} placeholder="Empezá a escribir una dirección de Córdoba" autoComplete="off" required /><small className={placesError ? 'text-danger' : 'text-muted'}>{placesError || (values.lat !== null ? 'Dirección verificada y lista para el mapa.' : 'Elegí una sugerencia de Google Places para confirmar la ubicación.')}</small></div>
         <div className="row g-3"><div className="col-md-6"><label className="form-label" htmlFor="voter-phone">Teléfono <span className="text-muted">(opcional)</span></label><input id="voter-phone" className="form-control" value={values.phone} onChange={(event) => setValues((current) => ({ ...current, phone: event.target.value }))} autoComplete="tel" /></div><div className="col-md-6"><label className="form-label" htmlFor="voter-email">Email <span className="text-muted">(opcional)</span></label><input id="voter-email" type="email" className="form-control" value={values.email} onChange={(event) => setValues((current) => ({ ...current, email: event.target.value }))} autoComplete="email" /></div></div>
         <TagInput id="voter-tags" value={values.tags} onChange={(tags) => setValues((current) => ({ ...current, tags }))} suggestions={tagSuggestions} />
+        {editing && <div><label className="form-label" htmlFor="voter-household">Identificador de hogar <span className="text-muted">(opcional)</span></label><input id="voter-household" className="form-control" value={values.householdId} onChange={(event) => setValues((current) => ({ ...current, householdId: event.target.value }))} placeholder="Automático según la dirección" /><small className="text-muted">Dejalo vacío para que el sistema lo agrupe automáticamente por dirección.</small></div>}
       </>}
     </Stack></Modal.Body>
     <Modal.Footer><Button variant="secondary" onClick={close} disabled={saving}>Cancelar</Button>{!similar && <Button onClick={() => void submit()} disabled={saving}>{saving ? 'Guardando…' : editing ? 'Guardar cambios' : 'Crear elector'}</Button>}</Modal.Footer>

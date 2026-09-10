@@ -11,6 +11,7 @@ import Inline from '../../../components/Shared/Inline';
 import OfflineVisitStatus from '../../../components/Shared/OfflineVisitStatus';
 import PageContainer from '../../../components/Shared/PageContainer';
 import Stack from '../../../components/Shared/Stack';
+import SelectControl from '../../../components/Shared/SelectControl';
 
 const fallback: OfflineQuestion[] = [
   { id: 'children', text: '¿Tiene hijos en edad escolar?', type: 'radio', isRequired: false, options: [{ label: 'Sí', value: 'si' }, { label: 'No', value: 'no' }] },
@@ -30,6 +31,9 @@ export default function VisitScreen() {
   const [draft, setDraft] = useState<VisitDraft | null>(null);
   const [error, setError] = useState('');
   const [toast, setToast] = useState('');
+  const [household, setHousehold] = useState<Array<{ id: string; name: string; householdId?: string | null }>>([]);
+  const [applyToHousehold, setApplyToHousehold] = useState(false);
+  const [householdDecisions, setHouseholdDecisions] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!user || !campaign || !voterId) return;
@@ -44,6 +48,15 @@ export default function VisitScreen() {
       .then((data: { active: { questions: OfflineQuestion[] } | null }) => { if (data.active?.questions?.length) setQuestions(data.active.questions); })
       .catch(() => setQuestions(fallback));
   }, [campaign?.campId, campaign?.orgId, user]);
+
+  useEffect(() => {
+    if (!user || !campaign || !voterId) return;
+    void authenticatedFetch<Array<{ id: string; name: string; householdId?: string | null }>>(user, `/api/organizations/${campaign.orgId}/campaigns/${campaign.campId}/voters`).then((voters) => {
+      const currentVoter = voters.find((voter) => voter.id === voterId);
+      const members = currentVoter?.householdId ? voters.filter((voter) => voter.householdId === currentVoter.householdId) : [];
+      setHousehold(members); setHouseholdDecisions(Object.fromEntries(members.map((member) => [member.id, member.id === voterId ? 'yes' : 'undecided'])));
+    }).catch(() => setHousehold([]));
+  }, [campaign?.campId, campaign?.orgId, user, voterId]);
 
   useEffect(() => {
     if (!user || !campaign) return;
@@ -108,6 +121,15 @@ export default function VisitScreen() {
       window.setTimeout(() => navigate('/electoral-conversion/voters'), 900);
     } catch (caught) { setError(caught instanceof Error ? caught.message : 'No se pudo guardar la visita localmente.'); }
   };
+  const decideHousehold = async () => {
+    if (!user || !campaign || household.length < 2 || !household[0]?.householdId) return;
+    try {
+      setError('');
+      if (!navigator.onLine) throw new Error('La visita para todo el hogar necesita conexión para registrar a cada persona. Podés registrar esta visita individual sin conexión.');
+      await authenticatedFetch(user, `/api/organizations/${campaign.orgId}/campaigns/${campaign.campId}/households/${household[0].householdId}/visits`, { method: 'POST', body: JSON.stringify({ feedback: { responses: questions.map(question => ({ questionId: question.id, question: question.text, answer: answers[question.id] ?? null })), notes, timestamp: new Date().toISOString() }, decisions: householdDecisions }) });
+      setToast(`Visita registrada para ${household.length} personas ✓`); window.setTimeout(() => navigate('/electoral-conversion/voters'), 900);
+    } catch (caught) { setError(caught instanceof Error ? caught.message : 'No se pudo registrar la visita del hogar.'); }
+  };
 
   const renderQuestion = (question: OfflineQuestion) => <div key={question.id}><label className="form-label">{question.text}{question.isRequired && ' *'}</label>{question.type === 'text' ? <input className="form-control" value={String(answers[question.id] ?? '')} onChange={event => updateAnswer(question, event.target.value)} /> : question.options.map(option => <div className="form-check" key={option.value}><input className="form-check-input" id={`${question.id}-${option.value}`} type={question.type === 'radio' ? 'radio' : 'checkbox'} name={question.id} checked={question.type === 'checkbox' ? Array.isArray(answers[question.id]) && answers[question.id].includes(option.value) : answers[question.id] === option.value} onChange={() => updateAnswer(question, option.value)} /><label className="form-check-label" htmlFor={`${question.id}-${option.value}`}>{option.label}</label></div>)}</div>;
 
@@ -117,9 +139,10 @@ export default function VisitScreen() {
       <Stack gap="md">
         {error && <div className="alert alert-danger mb-0" role="alert">{error}</div>}
         {!draft ? <div className="text-muted">Preparando la visita para que puedas continuar incluso sin señal…</div> : <>
+          {household.length > 1 && <div className="alert alert-info mb-0"><Stack gap="sm"><span>Este hogar tiene {household.length - 1} {household.length - 1 === 1 ? 'persona más' : 'personas más'} — podés registrar una sola conversación para todos.</span>{!applyToHousehold && <Inline gap="sm"><Button size="sm" variant="outline-primary" onClick={() => setApplyToHousehold(true)}>Registrar visita para todo el hogar</Button></Inline>}{applyToHousehold && <span className="small">Vas a completar el feedback una vez y elegir una decisión individual para cada persona al final.</span>}</Stack></div>}
           {current.map(renderQuestion)}
           {step === 2 && <div><label className="form-label" htmlFor="visit-notes">Observaciones de la visita</label><textarea className="form-control" id="visit-notes" rows={6} value={notes} onChange={event => updateDraft({ notes: event.target.value })} /></div>}
-          {step === 3 && <Stack gap="sm"><h2 className="h5 mb-0">{principal ? `¿Vota a ${principal.name} para ${principal.type === 'Otro' ? principal.customType || 'Otro' : principal.type}?` : '¿Vota al candidato?'}</h2><Inline gap="sm" wrap><Button variant="success" size="lg" onClick={() => void decide('yes')}>SI</Button><Button variant="danger" size="lg" onClick={() => void decide('no')}>NO</Button><Button variant="warning" size="lg" onClick={() => void decide('undecided')}>INDECISO</Button></Inline></Stack>}
+          {step === 3 && <Stack gap="sm"><h2 className="h5 mb-0">{principal ? `¿Vota a ${principal.name} para ${principal.type === 'Otro' ? principal.customType || 'Otro' : principal.type}?` : '¿Vota al candidato?'}</h2>{applyToHousehold ? <Stack gap="sm"><p className="text-muted mb-0">Decisión individual de cada integrante del hogar:</p>{household.map((member) => <Inline gap="sm" className="justify-content-between align-items-center" key={member.id}><strong>{member.name}</strong><SelectControl ariaLabel={`Decisión de ${member.name}`} label={householdDecisions[member.id] === 'yes' ? 'SI' : householdDecisions[member.id] === 'no' ? 'NO' : 'INDECISO'} value={householdDecisions[member.id]} options={[{ value:'yes', label:'SI' }, { value:'no', label:'NO' }, { value:'undecided', label:'INDECISO' }]} onChange={(decision) => setHouseholdDecisions((current) => ({ ...current, [member.id]: decision }))} /></Inline>)}<Inline gap="sm"><Button variant="primary" size="lg" onClick={() => void decideHousehold()}>Registrar visitas del hogar</Button></Inline></Stack> : <Inline gap="sm" wrap><Button variant="success" size="lg" onClick={() => void decide('yes')}>SI</Button><Button variant="danger" size="lg" onClick={() => void decide('no')}>NO</Button><Button variant="warning" size="lg" onClick={() => void decide('undecided')}>INDECISO</Button></Inline>}</Stack>}
           <Inline gap="sm" className="justify-content-between" wrap>{step > 0 ? <Button variant="outline-secondary" onClick={() => updateDraft({ step: step - 1 })}>Anterior</Button> : <span />}{step < 3 && <Button onClick={() => void next()}>Siguiente</Button>}</Inline>
         </>}
       </Stack>

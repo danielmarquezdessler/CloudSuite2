@@ -4,6 +4,7 @@ votersRouter.post(`${base}/voters/import`, requireAuth, upload.single('file'), c
 votersRouter.get(`${base}/voters`, requireAuth, controller.getVoters);
 votersRouter.post(`${base}/voters`, requireAuth, controller.createVoter);
 votersRouter.put(`${base}/voters/:voterId`, requireAuth, controller.updateVoter);
+votersRouter.post(`${base}/households/:householdId/visits`, requireAuth, controller.householdVisit);
 votersRouter.post(`${base}/voters/:voterId/visits`, requireAuth, controller.startVisit);
 votersRouter.post(`${base}/voters/:voterId/visits/:visitId/feedback`, requireAuth, controller.feedback);
 votersRouter.post(`${base}/voters/:voterId/visits/:visitId/conversion`, requireAuth, controller.conversion);

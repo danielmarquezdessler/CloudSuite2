@@ -43,6 +43,7 @@
     "test:e2e:candidate-groups": "node scripts/test-candidate-groups-e2e-real.mjs",
     "test:e2e:create-voter": "node scripts/test-create-voter-places-e2e.mjs",
     "test:e2e:voter-tags": "node scripts/test-voter-tags-e2e.mjs",
+    "test:e2e:voter-households": "node scripts/test-voter-households-e2e.mjs",
     "test:e2e:campaign-compare": "node scripts/test-campaign-compare-e2e-real.mjs",
     "test:e2e:campaign-clone": "node scripts/test-campaign-clone-e2e-real.mjs",
     "test:e2e:campaign-templates": "node scripts/test-campaign-templates-e2e-real.mjs",
