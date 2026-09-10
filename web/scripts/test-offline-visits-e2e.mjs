@@ -102,6 +102,12 @@ try {
     const pending = await indexedDbCounts(page);
     if (pending.queue < 3 || pending.drafts < 1) throw new Error(`La visita offline no quedó persistida completamente: ${JSON.stringify(pending)}`);
     await page.screenshot({ path: resolve(screenshots, `offline-${decision}-pending.png`), fullPage: true });
+    // Simula que el militante deja la pantalla: al reabrir la visita sin red,
+    // el mismo borrador y su decisión final deben salir desde IndexedDB.
+    await page.locator('tr').filter({ hasText: name }).getByRole('button', { name: 'Visitar', exact: true }).click();
+    await page.getByText('Paso 4 de 4').waitFor();
+    await page.goBack();
+    await page.waitForURL(/electoral-conversion\/voters/);
     const conversionRequest = page.waitForResponse(response => response.request().method() === 'POST' && response.url().includes('/conversion') && response.status() === 204);
     await context.setOffline(false);
     await page.evaluate(() => window.dispatchEvent(new Event('online')));
