@@ -13,6 +13,7 @@ const suffix = Date.now().toString(36);
 const groupName = `Concejo Deliberante ${suffix}`;
 const titularNames = [1, 2, 3].map((index) => `Titular Concejo ${index} ${suffix}`);
 const suplenteNames = [1, 2].map((index) => `Suplente Concejo ${index} ${suffix}`);
+const existingName = `Candidato existente ${suffix}`;
 
 const browser = await chromium.launch({ headless: true, executablePath });
 const page = await browser.newPage({ viewport: { width: 1440, height: 980 } });
@@ -33,6 +34,17 @@ async function createCandidate(name, role) {
   const slate = page.waitForResponse((response) => response.request().method() === 'PUT' && /\/candidates\/[^/]+\/slate$/.test(new URL(response.url()).pathname) && response.ok());
   await page.getByRole('button', { name: 'Guardar candidato', exact: true }).click();
   const candidate = await (await created).json(); await slate;
+  await page.getByText(name, { exact: true }).waitFor();
+  return candidate;
+}
+
+async function createUngroupedCandidate(name) {
+  await page.getByRole('button', { name: 'Agregar candidato', exact: true }).first().click();
+  await page.locator('#candidate-name').fill(name);
+  await choose('#candidate-type', 'Concejal');
+  const created = page.waitForResponse((response) => response.request().method() === 'POST' && /\/candidates$/.test(new URL(response.url()).pathname) && response.status() === 201);
+  await page.getByRole('button', { name: 'Guardar candidato', exact: true }).click();
+  const candidate = await (await created).json();
   await page.getByText(name, { exact: true }).waitFor();
   return candidate;
 }
@@ -66,8 +78,9 @@ try {
   console.log('E2E grupos de candidatos: creando tres titulares y dos suplentes reales');
   const titulars = []; for (const name of titularNames) titulars.push(await createCandidate(name, 'titular'));
   const suplentes = []; for (const name of suplenteNames) suplentes.push(await createCandidate(name, 'suplente'));
+  const existing = await createUngroupedCandidate(existingName);
 
-  await page.getByRole('button', { name: 'Listas y grupos', exact: true }).click();
+  await page.getByRole('tab', { name: 'Listas y grupos', exact: true }).click();
   await choose('[aria-label="Elegir lista de candidatos"]', `${groupName} · 3 titulares · 2 suplentes`);
   await page.getByText('Titulares', { exact: true }).waitFor();
   for (const name of [...titularNames, ...suplenteNames]) await page.getByText(name, { exact: true }).waitFor();
@@ -82,11 +95,21 @@ try {
   const docs = assigned.map((snapshot) => snapshot.data());
   if (docs.filter((data) => data?.groupId === group.id && data?.slateRole === 'titular').length !== 3 || docs.filter((data) => data?.groupId === group.id && data?.slateRole === 'suplente').length !== 2) throw new Error(`Firestore no conservó 3 titulares y 2 suplentes: ${JSON.stringify(docs)}`);
   if (docs[0]?.order !== 2 || docs[1]?.order !== 1) throw new Error(`El orden reordenado no persistió en Firestore: titular1=${docs[0]?.order}, titular2=${docs[1]?.order}`);
+  console.log('E2E grupos de candidatos: asignando un candidato existente desde la lista');
+  await page.getByRole('button', { name: 'Agregar candidatos existentes', exact: true }).click();
+  await choose('#existing-candidate', existingName);
+  await choose('#existing-candidate-role', 'Suplente');
+  const assignmentResponse = page.waitForResponse((response) => response.request().method() === 'PUT' && new URL(response.url()).pathname.endsWith(`/candidates/${existing.id}/slate`) && response.ok());
+  await page.getByRole('button', { name: 'Agregar a la lista', exact: true }).click();
+  await assignmentResponse;
+  await page.locator('.cd-slate-candidate', { hasText: existingName }).waitFor();
+  const assignedExisting = await campaign.collection('candidates').doc(existing.id).get();
+  if (assignedExisting.data()?.groupId !== group.id || assignedExisting.data()?.slateRole !== 'suplente') throw new Error(`El candidato existente no quedó asignado a la lista: ${JSON.stringify(assignedExisting.data())}`);
   const principalAfter = (await campaign.collection('candidates').where('isPrincipal', '==', true).get()).docs.map((item) => item.id).sort().join(',');
   if (principalAfter !== principalBefore) throw new Error(`La gestión de listas alteró el candidato Principal: antes=${principalBefore}, después=${principalAfter}`);
   await mkdir(screenshots, { recursive: true });
   await page.screenshot({ path: resolve(screenshots, 'candidate-groups-e2e-real.png'), fullPage: true });
-  console.log(`Grupos E2E real OK: ${groupName}; 3 titulares, 2 suplentes, orden persistido y Principal sin cambios.`);
+  console.log(`Grupos E2E real OK: ${groupName}; 3 titulares, 2 suplentes, candidato existente agregado, orden persistido y Principal sin cambios.`);
 } finally {
   await browser.close();
 }
