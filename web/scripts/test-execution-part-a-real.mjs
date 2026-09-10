@@ -1,0 +1,64 @@
+import { readFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
+import { chromium } from 'playwright';
+
+const env = Object.fromEntries((await readFile(new URL('../.env.test', import.meta.url), 'utf8')).split(/\r?\n/).filter(Boolean).map(line => { const i = line.indexOf('='); return [line.slice(0, i), line.slice(i + 1)]; }));
+const app = process.env.E2E_WEB_URL ?? 'http://127.0.0.1:5173';
+const fixture = fileURLToPath(new URL('./fixtures/execution-voter.csv', import.meta.url));
+const executablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE ?? 'C:/Users/Admin/AppData/Local/ms-playwright/chromium-1234/chrome-win64/chrome.exe';
+const browser = await chromium.launch({ headless: true, executablePath });
+try {
+  // Las dos pestañas deben compartir el mismo BrowserContext: Firebase persiste la
+  // sesión por origen/contexto, no entre contextos aislados creados por browser.newPage().
+  const context = await browser.newContext({ viewport:{ width:1440, height:980 } });
+  const page = await context.newPage(); page.setDefaultTimeout(20000);
+  console.log('E2E ejecución: iniciando sesión Firebase real');
+  await page.goto(app); await page.getByLabel('Email').fill(env.E2E_EMAIL); await page.getByLabel('Contraseña').fill(env.E2E_PASSWORD); await page.getByRole('button',{name:'Ingresar',exact:true}).click(); await page.waitForURL(/dashboard/);
+  console.log('E2E ejecución: sesión autenticada; importando elector');
+  await page.goto(`${app}/electoral-conversion/voters`); const importButton = page.getByRole('button',{name:'Importar electores',exact:true}).first(); await importButton.click(); await page.locator('input[type=file]').setInputFiles(fixture); await page.getByRole('button',{name:'Importar',exact:true}).click(); await page.getByText(/Importados|duplicados/i).waitFor(); await page.getByRole('button',{name:'Cerrar',exact:true}).click(); await page.getByText('Elector Ejecución Real',{exact:true}).waitFor();
+  console.log('E2E ejecución: elector disponible en lista; abriendo feed en vivo');
+  const live = await context.newPage(); live.setDefaultTimeout(20000);
+  live.on('console', message => { if (message.type() === 'error') console.error(`Browser console: ${message.text()}`); });
+  live.on('pageerror', error => console.error(`Browser page error: ${error.message}`));
+  await live.goto(`${app}/execution/live`); await live.getByRole('heading',{name:'Panel de Visitas en Vivo'}).waitFor();
+  await live.waitForTimeout(1500);
+  const liveCountBefore = await live.locator('.execution-live-item').count();
+  await live.goto(`${app}/execution/undecided`);
+  const beforeRow = live.locator('tr').filter({ hasText: 'Elector Ejecución Real' });
+  await beforeRow.waitFor();
+  const visitsBefore = Number((await beforeRow.locator('td').nth(2).textContent())?.trim());
+  if (!Number.isFinite(visitsBefore)) throw new Error('No se pudo leer el conteo previo de visitas del elector de prueba.');
+  await live.goto(`${app}/execution/live`); await live.getByRole('heading',{name:'Panel de Visitas en Vivo'}).waitFor();
+  await live.waitForTimeout(800);
+  console.log(`E2E ejecución: feed inicial=${liveCountBefore}; visitas previas del indeciso=${visitsBefore}`);
+  console.log('E2E ejecución: registrando visita real como indeciso');
+  const row = page.locator('tr').filter({hasText:'Elector Ejecución Real'});
+  await row.getByRole('button',{name:'Visitar'}).click();
+  await page.getByText('Paso 1 de 4').waitFor();
+  await page.getByRole('button',{name:'Siguiente'}).click();
+  await page.getByText('Paso 2 de 4').waitFor();
+  for (const input of await page.locator('input.form-control:visible').all()) await input.fill('respuesta E2E');
+  const radioNames = await page.locator('input[type=radio]:visible').evaluateAll(inputs => [...new Set(inputs.map(input => input.getAttribute('name')).filter(Boolean))]);
+  for (const name of radioNames) await page.locator(`input[type=radio][name="${name}"]:visible`).first().check();
+  const checkboxNames = await page.locator('input[type=checkbox]:visible').evaluateAll(inputs => [...new Set(inputs.map(input => input.getAttribute('name')).filter(Boolean))]);
+  for (const name of checkboxNames) await page.locator(`input[type=checkbox][name="${name}"]:visible`).first().check();
+  await page.getByRole('button',{name:'Siguiente'}).click();
+  await page.getByText('Paso 3 de 4').waitFor();
+  await page.locator('textarea:visible').fill('Visita real E2E');
+  await page.getByRole('button',{name:'Siguiente'}).click();
+  await page.getByText('Paso 4 de 4').waitFor();
+  await page.getByRole('button',{name:'INDECISO'}).click();
+  await page.waitForURL(/electoral-conversion\/voters/);
+  await live.waitForFunction((count) => document.querySelectorAll('.execution-live-item').length >= count, liveCountBefore + 1);
+  await live.waitForFunction(() => document.querySelector('.execution-live-item .badge')?.textContent?.includes('Indeciso') ?? false);
+  const liveBody = await live.locator('body').innerText();
+  await live.screenshot({ path: '.screenshots/execution-live-after-visit.png', fullPage: true });
+  if (!liveBody.includes('Elector Ejecución Real')) throw new Error(`El feed dejó de mostrar el elector tras la visita. Estado real: ${liveBody.slice(-1000)}`);
+  const liveText = await live.locator('.execution-live-list').textContent();
+  console.log('E2E ejecución: onSnapshot recibió la visita sin refrescar');
+  await live.goto(`${app}/execution/undecided`); const undecidedRow = live.locator('tr').filter({hasText:'Elector Ejecución Real'}); await undecidedRow.waitFor(); const visitsAfter = Number((await undecidedRow.locator('td').nth(2).textContent())?.trim()); if (visitsAfter !== visitsBefore + 1) throw new Error(`Conteo de visitas inesperado: antes=${visitsBefore}, después=${visitsAfter}`);
+  const undecidedKpi = await live.locator('.cd-kpi-card').filter({ hasText: 'Total indecisos' }).locator('.cd-kpi-card__value').textContent();
+  const averageKpi = await live.locator('.cd-kpi-card').filter({ hasText: 'Promedio de visitas' }).locator('.cd-kpi-card__value').textContent();
+  if (Number(undecidedKpi) < 1 || Number(averageKpi) < visitsAfter) throw new Error(`KPIs de indecisos desactualizados: total=${undecidedKpi}, promedio=${averageKpi}, visitas=${visitsAfter}`);
+  console.log(`E2E ejecución real OK: feed="${liveText}", indeciso visitas=${visitsAfter}, KPIs total=${undecidedKpi} promedio=${averageKpi}`);
+} finally { await browser.close(); }

@@ -15,7 +15,7 @@ async function geocode(address: string) {
   if (!response.ok || data.status !== 'OK' || !data.results?.[0]) return null;
   const result = data.results[0]; return { lat: result.geometry.location.lat, lng: result.geometry.location.lng, formattedAddress: result.formatted_address };
 }
-function parseFile(file: Express.Multer.File) { const workbook = XLSX.read(file.buffer, { type: 'buffer' }); const sheet = workbook.Sheets[workbook.SheetNames[0]]; return XLSX.utils.sheet_to_json<Row>(sheet, { defval: '' }); }
+function parseFile(file: Express.Multer.File) { const isCsv = /\.csv$/i.test(file.originalname); const workbook = isCsv ? XLSX.read(file.buffer.toString('utf8'), { type: 'string' }) : XLSX.read(file.buffer, { type: 'buffer' }); const sheet = workbook.Sheets[workbook.SheetNames[0]]; return XLSX.utils.sheet_to_json<Row>(sheet, { defval: '' }); }
 export async function importVoters(user: DecodedIdToken, orgId: string, campId: string, file: Express.Multer.File | undefined, allowNearDuplicates: boolean) {
   assertCampaignManager(user, orgId, campId); if (!file) throw new ValidationError('Seleccioná un archivo CSV o Excel.');
   const rows = parseFile(file); const ref = campaignRef(orgId, campId); const existing = await ref.collection('voters').get(); const known = new Set(existing.docs.map(doc => `${norm(String(doc.data().name ?? ''))}|${norm(String(doc.data().address ?? ''))}`));

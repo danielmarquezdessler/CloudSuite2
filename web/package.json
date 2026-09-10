@@ -29,7 +29,8 @@
     "test:e2e:auto-campaign": "node scripts/test-auto-campaign-e2e-real.mjs",
     "test:e2e:active-campaign": "node scripts/test-active-campaign-e2e-real.mjs",
     "visual:campaign-selector": "node scripts/capture-campaign-selector.mjs",
-    "test:planning-stability": "node scripts/test-planning-stability.mjs"
+    "test:planning-stability": "node scripts/test-planning-stability.mjs",
+    "test:e2e:execution-part-a": "node scripts/test-execution-part-a-real.mjs"
   },
   "dependencies": {
     "@ckeditor/ckeditor5-build-balloon": "^41.3.1",
