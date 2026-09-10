@@ -65,3 +65,4 @@ Ningún componente puede renderizar dos o más elementos hermanos (bloques de te
 - Configuración de producción preparada: Firebase Hosting sirve `web/dist` con rewrite SPA; scripts reproducibles construyen/despliegan Cloud Run y Hosting sin versionar secretos.
 - Primer despliegue de producción completado: API en Cloud Run con health y Firestore verificados, Firebase Hosting operativo y prueba E2E real de login, `/api/me` y creación de Función contra Firestore.
 - PWA offline incorporada: el shell de CloudSuite es instalable, la lista de electores se cachea en IndexedDB y cada visita se guarda primero en un borrador local con cola FIFO que se sincroniza automáticamente al recuperar conexión.
+- Candidatos por campaña incorporados: CRUD con fotos en Storage, candidato Principal para personalizar la decisión de visita y reinicio confirmado de métricas sin eliminar el historial de visitas.

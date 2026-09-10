@@ -26,6 +26,7 @@ export default function VisitScreen() {
   const syncState = useOfflineSync();
   const navigate = useNavigate();
   const [questions, setQuestions] = useState<OfflineQuestion[]>(fallback);
+  const [principal, setPrincipal] = useState<{ name: string; type: string; customType?: string | null } | null>(null);
   const [draft, setDraft] = useState<VisitDraft | null>(null);
   const [error, setError] = useState('');
   const [toast, setToast] = useState('');
@@ -42,6 +43,13 @@ export default function VisitScreen() {
     void authenticatedFetch(user, `/api/organizations/${campaign.orgId}/campaigns/${campaign.campId}/question-sets/active`)
       .then((data: { active: { questions: OfflineQuestion[] } | null }) => { if (data.active?.questions?.length) setQuestions(data.active.questions); })
       .catch(() => setQuestions(fallback));
+  }, [campaign?.campId, campaign?.orgId, user]);
+
+  useEffect(() => {
+    if (!user || !campaign) return;
+    void authenticatedFetch<Array<{ name: string; type: string; customType?: string | null; isPrincipal: boolean }>>(user, `/api/organizations/${campaign.orgId}/campaigns/${campaign.campId}/candidates`)
+      .then((items) => setPrincipal(items.find((candidate) => candidate.isPrincipal) ?? null))
+      .catch(() => setPrincipal(null));
   }, [campaign?.campId, campaign?.orgId, user]);
 
   useEffect(() => {
@@ -111,7 +119,7 @@ export default function VisitScreen() {
         {!draft ? <div className="text-muted">Preparando la visita para que puedas continuar incluso sin señal…</div> : <>
           {current.map(renderQuestion)}
           {step === 2 && <div><label className="form-label" htmlFor="visit-notes">Observaciones de la visita</label><textarea className="form-control" id="visit-notes" rows={6} value={notes} onChange={event => updateDraft({ notes: event.target.value })} /></div>}
-          {step === 3 && <Stack gap="sm"><h2 className="h5 mb-0">¿Vota al candidato?</h2><Inline gap="sm" wrap><Button variant="success" size="lg" onClick={() => void decide('yes')}>SI</Button><Button variant="danger" size="lg" onClick={() => void decide('no')}>NO</Button><Button variant="warning" size="lg" onClick={() => void decide('undecided')}>INDECISO</Button></Inline></Stack>}
+          {step === 3 && <Stack gap="sm"><h2 className="h5 mb-0">{principal ? `¿Vota a ${principal.name} para ${principal.type === 'Otro' ? principal.customType || 'Otro' : principal.type}?` : '¿Vota al candidato?'}</h2><Inline gap="sm" wrap><Button variant="success" size="lg" onClick={() => void decide('yes')}>SI</Button><Button variant="danger" size="lg" onClick={() => void decide('no')}>NO</Button><Button variant="warning" size="lg" onClick={() => void decide('undecided')}>INDECISO</Button></Inline></Stack>}
           <Inline gap="sm" className="justify-content-between" wrap>{step > 0 ? <Button variant="outline-secondary" onClick={() => updateDraft({ step: step - 1 })}>Anterior</Button> : <span />}{step < 3 && <Button onClick={() => void next()}>Siguiente</Button>}</Inline>
         </>}
       </Stack>

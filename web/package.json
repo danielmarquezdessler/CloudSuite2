@@ -36,7 +36,8 @@
     "test:e2e:execution-part-c": "node scripts/test-execution-part-c-real.mjs",
     "test:e2e:brief35": "node scripts/test-brief35-real.mjs",
     "test:e2e:offline-visits": "node scripts/test-offline-visits-e2e.mjs",
-    "test:e2e:sidebar": "node scripts/test-sidebar-modules-e2e.mjs"
+    "test:e2e:sidebar": "node scripts/test-sidebar-modules-e2e.mjs",
+    "test:e2e:candidates": "node scripts/test-candidates-e2e-real.mjs"
   },
   "dependencies": {
     "@ckeditor/ckeditor5-build-balloon": "^41.3.1",

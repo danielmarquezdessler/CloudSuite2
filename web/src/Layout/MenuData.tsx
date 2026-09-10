@@ -397,6 +397,7 @@ const menuItems = [
         type: 'HASHMENU', id: 'organization', label: 'Organización',
         submenu: [
             { id: 'organization-campaigns', label: 'Campañas', icon: 'ph-duotone ph-target', link: '/organization/campaigns', dataPage: 'campaigns' },
+            { id: 'organization-candidates', label: 'Candidatos', icon: 'ph-duotone ph-user-focus', link: '/organization/candidates', dataPage: 'candidates' },
             { id: 'organization-functions', label: 'Funciones', icon: 'ph-duotone ph-identification-badge', link: '/organization/functions', dataPage: 'functions' },
             { id: 'organization-teams', label: 'Equipos', icon: 'ph-duotone ph-users-three', link: '/organization/teams', dataPage: 'teams' },
             { id: 'organization-users', label: 'Usuarios', icon: 'ph-duotone ph-user-plus', link: '/organization/users', dataPage: 'users' }

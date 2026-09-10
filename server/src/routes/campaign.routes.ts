@@ -8,6 +8,10 @@ const avatarUpload = (request: Request, response: Response, next: NextFunction) 
   if (error instanceof multer.MulterError && error.code === 'LIMIT_FILE_SIZE') return response.status(413).json({ message: 'La imagen no puede superar los 8 MB.' });
   next(error);
 });
+const candidatePhotoUpload = (request: Request, response: Response, next: NextFunction) => upload.single('photo')(request, response, (error) => {
+  if (error instanceof multer.MulterError && error.code === 'LIMIT_FILE_SIZE') return response.status(413).json({ message: 'La imagen no puede superar los 8 MB.' });
+  next(error);
+});
 const base = '/organizations/:orgId/campaigns/:campId';
 campaignRouter.get('/organizations/:orgId/users', requireAuth, controller.getOrganizationUsers);
 campaignRouter.post('/organizations/:orgId/users', requireAuth, avatarUpload, controller.postOrganizationUser);
@@ -17,6 +21,11 @@ campaignRouter.get('/organizations/:orgId/campaigns', requireAuth, controller.ge
 campaignRouter.post('/organizations/:orgId/campaigns', requireAuth, controller.postOrganizationCampaign);
 campaignRouter.put('/organizations/:orgId/campaigns/:campId', requireAuth, controller.putOrganizationCampaign);
 campaignRouter.delete('/organizations/:orgId/campaigns/:campId', requireAuth, controller.removeOrganizationCampaign);
+campaignRouter.get(`${base}/candidates`, requireAuth, controller.getCandidates);
+campaignRouter.post(`${base}/candidates`, requireAuth, candidatePhotoUpload, controller.postCandidate);
+campaignRouter.put(`${base}/candidates/:candidateId`, requireAuth, candidatePhotoUpload, controller.putCandidate);
+campaignRouter.delete(`${base}/candidates/:candidateId`, requireAuth, controller.removeCandidate);
+campaignRouter.post(`${base}/candidates/:candidateId/set-principal`, requireAuth, controller.setPrincipalCandidate);
 campaignRouter.get(`${base}/functions`, requireAuth, controller.getFunctions);
 campaignRouter.post(`${base}/functions`, requireAuth, controller.postFunction);
 campaignRouter.put(`${base}/functions/:funcId`, requireAuth, controller.putFunction);

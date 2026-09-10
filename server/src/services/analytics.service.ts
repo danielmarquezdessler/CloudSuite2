@@ -18,12 +18,17 @@ export function invalidateAnalytics(orgId: string, campId: string) {
 
 async function collect(orgId: string, campId: string) {
   const campaign = campaignRef(orgId, campId);
-  const [votersSnap, visitsSnap, membersSnap, teamsSnap, functionsSnap] = await Promise.all([
-    campaign.collection('voters').get(), campaign.collection('visits').get(), campaign.collection('members').get(),
+  const [campaignSnapshot, votersSnap, visitsSnap, membersSnap, teamsSnap, functionsSnap] = await Promise.all([
+    campaign.get(), campaign.collection('voters').get(), campaign.collection('visits').get(), campaign.collection('members').get(),
     campaign.collection('teams').where('deleted', '!=', true).get(), campaign.collection('functions').where('deleted', '!=', true).get()
   ]);
   const voters = votersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Entity));
-  const visits = visitsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Entity));
+  // A Principal change preserves the historical visits for auditability but begins a
+  // new conversion measurement period. Older visits must not repopulate the KPIs.
+  const resetAt = toDate(campaignSnapshot.data()?.metricsResetAt);
+  const visits = visitsSnap.docs
+    .map(doc => ({ id: doc.id, ...doc.data() } as Entity))
+    .filter(visit => !resetAt || (toDate(visit.startedAt) ?? toDate(visit.completedAt) ?? new Date(0)) >= resetAt);
   const members = membersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Entity));
   const teams = teamsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Entity));
   const functions = functionsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Entity));

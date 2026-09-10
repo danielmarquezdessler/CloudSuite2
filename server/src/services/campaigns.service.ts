@@ -1,6 +1,6 @@
 import { DecodedIdToken } from 'firebase-admin/auth';
 import { FieldValue } from 'firebase-admin/firestore';
-import { adminAuth, db } from '../config/firebase.js';
+import { adminAuth, db, storage } from '../config/firebase.js';
 import { ForbiddenError, NotFoundError, ValidationError } from './access.service.js';
 
 type CampaignInput = { nombre?: string };
@@ -103,15 +103,21 @@ export async function deleteCampaign(user: DecodedIdToken, orgId: string, campId
   if (campaigns.size <= 1) throw new ValidationError('Debe existir al menos una campaña.');
 
   const campaignRef = campaign.ref;
-  const [members, pendingInvitations] = await Promise.all([
+  const [members, pendingInvitations, candidates] = await Promise.all([
     campaignRef.collection('members').get(),
-    organization.collection('invitations').where('campaignId', '==', campId).where('status', '==', 'pending').get()
+    organization.collection('invitations').where('campaignId', '==', campId).where('status', '==', 'pending').get(),
+    campaignRef.collection('candidates').get()
   ]);
   // recursiveDelete elimina el documento de campaña y todas sus subcolecciones: voters, visits,
   // teams, functions, calendar, circuitos, zones, goals, routes, questionSets, budgets,
   // aiSuggestions, auditLog y cualquier colección futura propia de la campaña.
   await db.recursiveDelete(campaignRef);
   await Promise.all([
+    ...candidates.docs.map((candidate) => {
+      const photo = candidate.data().photoUrl;
+      const path = typeof photo === 'string' && photo.startsWith('gs://') ? photo.replace(/^gs:\/\/[^/]+\//, '') : '';
+      return path ? storage.bucket().file(path).delete().catch(() => undefined) : Promise.resolve();
+    }),
     ...members.docs.map((member) => removeCampaignClaim(member.id, orgId, campId)),
     ...pendingInvitations.docs.map((invitation) => invitation.ref.update({ status: 'revoked', revokedAt: FieldValue.serverTimestamp(), revokedReason: 'campaign_deleted' }))
   ]);

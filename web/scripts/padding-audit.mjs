@@ -11,7 +11,7 @@ const env = Object.fromEntries((await readFile(envFile, 'utf8')).split(/\r?\n/).
 
 const pages = [
   ['Dashboard', '/dashboard'], ['Funciones', '/organization/functions'], ['Equipos', '/organization/teams'],
-  ['Usuarios', '/organization/users'], ['Campañas', '/organization/campaigns'], ['Electores', '/electoral-conversion/voters'], ['Mapa', '/electoral-conversion/map'],
+  ['Usuarios', '/organization/users'], ['Campañas', '/organization/campaigns'], ['Candidatos', '/organization/candidates'], ['Electores', '/electoral-conversion/voters'], ['Mapa', '/electoral-conversion/map'],
   ['Preguntas de visita', '/planning/questions'], ['Control de Revisión', '/control-de-revision'], ['Calendario', '/planning/calendar'],
   ['Territorio', '/planning/territory'], ['Metas', '/planning/goals'], ['Rutas', '/planning/routes'],
   ['Encuestas', '/planning/surveys'], ['Presupuesto', '/planning/budget'], ['Asesor', '/planning/advisor'],

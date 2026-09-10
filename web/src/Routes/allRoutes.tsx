@@ -3,6 +3,7 @@ import Functions from '../pages/Modules/Organization/Functions';
 import Teams from '../pages/Modules/Organization/Teams';
 import Users from '../pages/Modules/Organization/Users';
 import Campaigns from '../pages/Modules/Organization/Campaigns';
+import Candidates from '../pages/Modules/Organization/Candidates';
 import JoinInvitation from '../pages/JoinInvitation';
 import VotersList from '../pages/Modules/ElectoralConversion/VotersList';
 import VisitScreen from '../pages/Modules/ElectoralConversion/VisitScreen';
@@ -194,6 +195,7 @@ const routes = [
     { path: "/organization/teams", component: <Teams /> },
     { path: "/organization/users", component: <Users /> },
     { path: "/organization/campaigns", component: <Campaigns /> },
+    { path: "/organization/candidates", component: <Candidates /> },
     { path: "/electoral-conversion/voters", component: <VotersList /> },
     { path: "/electoral-conversion/map", component: <VotersMap /> },
     { path: "/electoral-conversion/mapa", component: <VotersMap /> },
