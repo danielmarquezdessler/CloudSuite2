@@ -63,7 +63,9 @@ try {
       const headers = [...document.querySelectorAll('[data-card-header="true"]')].filter(visible).map((element) => {
         const next = element.nextElementSibling;
         const gap = next && visible(next) ? next.getBoundingClientRect().top - element.getBoundingClientRect().bottom : -1;
-        return { selector: selectorFor(element), gap, failed: gap < minHeaderGap };
+        // Subpixel layout can report 15.999... for the 16px CSS token.
+        // Keep the gate strict while allowing normal browser rounding noise.
+        return { selector: selectorFor(element), gap, failed: gap + 0.5 < minHeaderGap };
       });
       const ignoredGhosts = ['cd-hero', 'cd-page-controls', 'cd-search-input', 'cd-native-select', 'cd-select-control', 'cd-table-scroll', 'cd-map-stage', 'cd-map-notice', 'cd-state-pill', 'cd-user-identity'];
       const ghostCandidates = [...document.querySelectorAll('article, section, div')].filter((element) => {

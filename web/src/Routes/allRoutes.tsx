@@ -196,6 +196,7 @@ const routes = [
     { path: "/organization/campaigns", component: <Campaigns /> },
     { path: "/electoral-conversion/voters", component: <VotersList /> },
     { path: "/electoral-conversion/map", component: <VotersMap /> },
+    { path: "/electoral-conversion/mapa", component: <VotersMap /> },
     { path: "/visit/:voterId", component: <VisitScreen /> },
     { path: "/control-de-revision", component: <AuditLog /> },
     { path: "/audit-log", component: <AuditLog /> },
