@@ -32,17 +32,30 @@ export async function importVoters(user: DecodedIdToken, orgId: string, campId: 
   seededVisits.forEach(({ voter, decision, when }) => batch.set(ref.collection('visits').doc(), { voterId: voter.id, visitUid: user.uid, startedAt: when, completedAt: when, state: decision === 'undecided' ? 'pending_revisit' : 'completed', conversion: { decision, timestamp: when }, feedback: { seeded: true } }));
   const importRef = ref.collection('imports').doc(); const report = { importedCount: voters.length, duplicateCount, noGeoCount, nearDuplicateCount, seededVisits: seededVisits.length, errorRows, totalProcessedRows: rows.length }; batch.set(importRef, { status: 'completed', timestamp: FieldValue.serverTimestamp(), counts: report, errorRows, file: file.originalname }); await batch.commit(); return report;
 }
-type CreateVoterInput = { name?: unknown; address?: unknown; phone?: unknown; email?: unknown; lat?: unknown; lng?: unknown; tags?: unknown; householdId?: unknown; confirmSimilar?: unknown };
+type CreateVoterInput = { name?: unknown; address?: unknown; phone?: unknown; email?: unknown; lat?: unknown; lng?: unknown; dni?: unknown; sexo?: unknown; fechaNacimiento?: unknown; edadAproximada?: unknown; barrio?: unknown; observaciones?: unknown; tags?: unknown; householdId?: unknown; confirmSimilar?: unknown };
 const textInput = (input: unknown) => typeof input === 'string' ? input.trim() : '';
 const normalizeTags = (input: unknown) => Array.isArray(input) ? [...new Map(input.map((tag) => textInput(tag)).filter(Boolean).slice(0, 30).map((tag) => [norm(tag), tag])).values()] : [];
+const optionalText = (input: unknown, label: string, maxLength: number) => { const text = textInput(input); if (text.length > maxLength) throw new ValidationError(`${label} no puede superar los ${maxLength} caracteres.`); return text || null; };
+const optionalSexo = (input: unknown) => { const sexo = textInput(input); if (!sexo) return null; if (!['M', 'F', 'X', 'Prefiero no decir'].includes(sexo)) throw new ValidationError('El sexo seleccionado no es válido.'); return sexo; };
+const optionalBirthDate = (input: unknown) => { const date = textInput(input); if (!date) return null; if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(new Date(`${date}T00:00:00`).getTime())) throw new ValidationError('La fecha de nacimiento no es válida.'); return date; };
+const optionalApproximateAge = (input: unknown) => { if (input === undefined || input === null || input === '') return null; const age = Number(input); if (!Number.isInteger(age) || age < 0 || age > 130) throw new ValidationError('La edad aproximada debe ser un número entre 0 y 130.'); return age; };
+const coordinatesFromInput = (input: CreateVoterInput) => {
+  const hasLat = input.lat !== undefined && input.lat !== null && input.lat !== '';
+  const hasLng = input.lng !== undefined && input.lng !== null && input.lng !== '';
+  if (!hasLat && !hasLng) return { lat: null, lng: null };
+  const lat = Number(input.lat); const lng = Number(input.lng);
+  if (!hasLat || !hasLng || !Number.isFinite(lat) || lat < -90 || lat > 90 || !Number.isFinite(lng) || lng < -180 || lng > 180) throw new ValidationError('Las coordenadas del elector no son válidas.');
+  return { lat, lng };
+};
 
 /** Creates one voter whose coordinates were selected by Google Places in the browser. */
 export async function createVoter(user: DecodedIdToken, orgId: string, campId: string, input: CreateVoterInput) {
   assertCampaignManager(user, orgId, campId);
   const name = textInput(input.name); const address = textInput(input.address); const phone = textInput(input.phone); const email = textInput(input.email);
-  const lat = Number(input.lat); const lng = Number(input.lng);
   if (!name || !address) throw new ValidationError('Nombre y dirección son obligatorios.');
-  if (!Number.isFinite(lat) || lat < -90 || lat > 90 || !Number.isFinite(lng) || lng < -180 || lng > 180) throw new ValidationError('Elegí una dirección válida de las sugerencias de Google Maps.');
+  const { lat, lng } = coordinatesFromInput(input);
+  const fechaNacimiento = optionalBirthDate(input.fechaNacimiento); const edadAproximada = optionalApproximateAge(input.edadAproximada);
+  if (fechaNacimiento && edadAproximada !== null) throw new ValidationError('Ingresá fecha de nacimiento o edad aproximada, no ambas.');
 
   const ref = campaignRef(orgId, campId);
   const duplicateKey = `${norm(name)}|${norm(address)}`;
@@ -54,7 +67,7 @@ export async function createVoter(user: DecodedIdToken, orgId: string, campId: s
   const sameAddress = existing.docs.filter((doc) => norm(String(doc.data().address ?? '')) === norm(address));
   const manualHouseholdId = textInput(input.householdId);
   const householdId = manualHouseholdId || (sameAddress.length ? householdForAddress(address) : null);
-  const voter = { name, address, phone: phone || null, email: email || null, lat, lng, tags: normalizeTags(input.tags), householdId, state: 'unvisited', visitedAt: null, lastVisitUid: null, feedback: null, conversions: { yes: 0, no: 0, undecided: 0, last_decision: null }, createdAt: FieldValue.serverTimestamp() };
+  const voter = { name, address, phone: phone || null, email: email || null, dni: optionalText(input.dni, 'El DNI', 32), sexo: optionalSexo(input.sexo), fechaNacimiento, edadAproximada, barrio: optionalText(input.barrio, 'El barrio', 120), observaciones: optionalText(input.observaciones, 'Las observaciones', 4000), lat, lng, tags: normalizeTags(input.tags), householdId, state: 'unvisited', visitedAt: null, lastVisitUid: null, feedback: null, conversions: { yes: 0, no: 0, undecided: 0, last_decision: null }, createdAt: FieldValue.serverTimestamp() };
   const batch = ref.firestore.batch(); batch.set(voterRef, voter);
   if (sameAddress.length && !manualHouseholdId) sameAddress.forEach((doc) => batch.update(doc.ref, { householdId }));
   await batch.commit();
@@ -72,18 +85,24 @@ export async function updateVoter(user: DecodedIdToken, orgId: string, campId: s
   const address = textInput(input.address) || String(current.address ?? '');
   if (!name || !address) throw new ValidationError('Nombre y dirección son obligatorios.');
   const coordinatesChanged = input.lat !== undefined || input.lng !== undefined;
-  const lat = coordinatesChanged ? Number(input.lat) : current.lat;
-  const lng = coordinatesChanged ? Number(input.lng) : current.lng;
-  if (address !== String(current.address ?? '') && (!Number.isFinite(lat) || !Number.isFinite(lng))) throw new ValidationError('Elegí una dirección válida de las sugerencias de Google Maps.');
-  if (coordinatesChanged && (lat !== null || lng !== null) && (!Number.isFinite(lat) || lat < -90 || lat > 90 || !Number.isFinite(lng) || lng < -180 || lng > 180)) throw new ValidationError('Las coordenadas del elector no son válidas.');
+  const coordinates = coordinatesChanged ? coordinatesFromInput(input) : { lat: current.lat ?? null, lng: current.lng ?? null };
+  const fechaNacimiento = input.fechaNacimiento === undefined ? current.fechaNacimiento ?? null : optionalBirthDate(input.fechaNacimiento);
+  const edadAproximada = input.edadAproximada === undefined ? current.edadAproximada ?? null : optionalApproximateAge(input.edadAproximada);
+  if (fechaNacimiento && edadAproximada !== null) throw new ValidationError('Ingresá fecha de nacimiento o edad aproximada, no ambas.');
   const manualHouseholdId = input.householdId === undefined ? undefined : textInput(input.householdId);
   const data = {
     name,
     address,
     phone: textInput(input.phone) || null,
     email: textInput(input.email) || null,
+    dni: input.dni === undefined ? current.dni ?? null : optionalText(input.dni, 'El DNI', 32),
+    sexo: input.sexo === undefined ? current.sexo ?? null : optionalSexo(input.sexo),
+    fechaNacimiento,
+    edadAproximada,
+    barrio: input.barrio === undefined ? current.barrio ?? null : optionalText(input.barrio, 'El barrio', 120),
+    observaciones: input.observaciones === undefined ? current.observaciones ?? null : optionalText(input.observaciones, 'Las observaciones', 4000),
     tags: input.tags === undefined ? (Array.isArray(current.tags) ? current.tags : []) : normalizeTags(input.tags),
-    ...(coordinatesChanged ? { lat, lng } : {}),
+    ...(coordinatesChanged ? coordinates : {}),
     ...(manualHouseholdId !== undefined ? { householdId: manualHouseholdId || null } : {}),
     updatedAt: FieldValue.serverTimestamp()
   };

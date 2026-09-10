@@ -42,6 +42,7 @@
     "test:e2e:candidates": "node scripts/test-candidates-e2e-real.mjs",
     "test:e2e:candidate-groups": "node scripts/test-candidate-groups-e2e-real.mjs",
     "test:e2e:create-voter": "node scripts/test-create-voter-places-e2e.mjs",
+    "test:e2e:brief45": "node scripts/test-brief45-voters-e2e.mjs",
     "test:e2e:voter-tags": "node scripts/test-voter-tags-e2e.mjs",
     "test:e2e:voter-households": "node scripts/test-voter-households-e2e.mjs",
     "test:e2e:campaign-compare": "node scripts/test-campaign-compare-e2e-real.mjs",
