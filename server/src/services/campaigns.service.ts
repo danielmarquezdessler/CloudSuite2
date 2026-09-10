@@ -41,6 +41,55 @@ export async function listCampaigns(user: DecodedIdToken, orgId: string) {
   }));
 }
 
+const asDate = (value: unknown) => value && typeof (value as { toDate?: unknown }).toDate === 'function'
+  ? (value as { toDate: () => Date }).toDate() : null;
+const percent = (value: number, total: number) => total ? Math.round((value / total) * 1000) / 10 : 0;
+
+export async function compareCampaigns(user: DecodedIdToken, orgId: string, requestedIds: string[]) {
+  if (user.orgId !== orgId) throw new ForbiddenError('No tenés acceso a esta organización.');
+  const ids = [...new Set(requestedIds.map((id) => id.trim()).filter(Boolean))];
+  if (ids.length < 2) throw new ValidationError('Elegí al menos dos campañas para comparar.');
+  if (ids.length > 6) throw new ValidationError('Podés comparar hasta seis campañas a la vez.');
+  const allowed = (user.camps as Record<string, boolean> | undefined) ?? {};
+  if (user.role !== 'cliente' && ids.some((id) => !allowed[id])) throw new ForbiddenError('No tenés acceso a una de las campañas seleccionadas.');
+  const organization = organizationRef(orgId);
+  return Promise.all(ids.map(async (campId) => {
+    const campaign = organization.collection('campaigns').doc(campId);
+    const [campaignSnapshot, principalSnapshot, votersSnapshot, visitsSnapshot, membersSnapshot] = await Promise.all([
+      campaign.get(), campaign.collection('candidates').where('isPrincipal', '==', true).limit(1).get(), campaign.collection('voters').get(), campaign.collection('visits').get(), campaign.collection('members').get()
+    ]);
+    if (!campaignSnapshot.exists) throw new NotFoundError('Una de las campañas seleccionadas no existe.');
+    const resetAt = asDate(campaignSnapshot.data()?.metricsResetAt);
+    const voters = votersSnapshot.docs.map((doc) => doc.data());
+    const activeVisits = visitsSnapshot.docs.filter((visit) => {
+      if (!resetAt) return true;
+      const data = visit.data(); const occurredAt = asDate(data.startedAt) ?? asDate(data.completedAt);
+      return Boolean(occurredAt && occurredAt >= resetAt);
+    });
+    const visited = voters.filter((voter) => voter.state !== 'unvisited').length;
+    const yes = voters.filter((voter) => voter.state === 'converted_yes').length;
+    const no = voters.filter((voter) => voter.state === 'converted_no').length;
+    const undecided = voters.filter((voter) => voter.state === 'undecided').length;
+    const principal = principalSnapshot.docs[0]?.data();
+    const principalType = principal?.type === 'Otro' ? principal.customType || 'Otro' : principal?.type;
+    return {
+      id: campId,
+      nombre: String(campaignSnapshot.data()?.nombre ?? 'Campaña sin nombre'),
+      createdAt: campaignSnapshot.data()?.createdAt?.toDate?.().toISOString?.() ?? null,
+      principal: principal ? { name: String(principal.name ?? ''), type: String(principalType ?? '') } : null,
+      totalVoters: voters.length,
+      totalVisits: activeVisits.length,
+      coveragePercent: percent(visited, voters.length),
+      memberCount: membersSnapshot.size,
+      conversion: {
+        yes: { count: yes, percent: percent(yes, voters.length) },
+        no: { count: no, percent: percent(no, voters.length) },
+        undecided: { count: undecided, percent: percent(undecided, voters.length) }
+      }
+    };
+  }));
+}
+
 export async function createCampaign(user: DecodedIdToken, orgId: string, input: CampaignInput) {
   assertOrganizationClient(user, orgId);
   const nombre = campaignName(input);

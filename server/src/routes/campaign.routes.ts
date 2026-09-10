@@ -18,6 +18,7 @@ campaignRouter.post('/organizations/:orgId/users', requireAuth, avatarUpload, co
 campaignRouter.put('/organizations/:orgId/users/:userId', requireAuth, avatarUpload, controller.putOrganizationUser);
 campaignRouter.delete('/organizations/:orgId/users/:userId', requireAuth, controller.removeOrganizationUser);
 campaignRouter.get('/organizations/:orgId/campaigns', requireAuth, controller.getOrganizationCampaigns);
+campaignRouter.get('/organizations/:orgId/campaigns/compare', requireAuth, controller.compareOrganizationCampaigns);
 campaignRouter.post('/organizations/:orgId/campaigns', requireAuth, controller.postOrganizationCampaign);
 campaignRouter.put('/organizations/:orgId/campaigns/:campId', requireAuth, controller.putOrganizationCampaign);
 campaignRouter.delete('/organizations/:orgId/campaigns/:campId', requireAuth, controller.removeOrganizationCampaign);
