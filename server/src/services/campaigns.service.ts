@@ -4,8 +4,9 @@ import { randomUUID } from 'node:crypto';
 import { adminAuth, db, storage } from '../config/firebase.js';
 import { ForbiddenError, NotFoundError, ValidationError } from './access.service.js';
 
-type CampaignInput = { nombre?: string };
+type CampaignInput = { nombre?: string; templateId?: string };
 type CloneInput = CampaignInput & { copiar?: { equipos?: boolean; funciones?: boolean; preguntas?: boolean; candidatos?: boolean } };
+type TemplateInput = { nombre?: string; campId?: string };
 
 function organizationRef(orgId: string) {
   return db.collection('organizations').doc(orgId);
@@ -22,6 +23,22 @@ function campaignName(input: CampaignInput) {
   if (!nombre) throw new ValidationError('El nombre de la campaña es obligatorio.');
   if (nombre.length > 120) throw new ValidationError('El nombre de la campaña no puede superar los 120 caracteres.');
   return nombre;
+}
+
+function templateName(input: TemplateInput) {
+  const nombre = input.nombre?.trim();
+  if (!nombre) throw new ValidationError('El nombre de la plantilla es obligatorio.');
+  if (nombre.length > 120) throw new ValidationError('El nombre de la plantilla no puede superar los 120 caracteres.');
+  return nombre;
+}
+
+function templateStructures(target: FirebaseFirestore.DocumentReference, template: FirebaseFirestore.DocumentData, uid: string, batch: FirebaseFirestore.WriteBatch) {
+  const teams = Array.isArray(template.teams) ? template.teams : [];
+  const functions = Array.isArray(template.functions) ? template.functions : [];
+  const questionSets = Array.isArray(template.questionSets) ? template.questionSets : [];
+  teams.forEach((item) => batch.set(target.collection('teams').doc(), { name: String(item?.name ?? ''), description: String(item?.description ?? ''), leaderId: null, deleted: false, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(), templateId: template.id ?? null }));
+  functions.forEach((item) => batch.set(target.collection('functions').doc(), { name: String(item?.name ?? ''), description: String(item?.description ?? ''), color: String(item?.color ?? '#0060F0'), deleted: false, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(), templateId: template.id ?? null }));
+  questionSets.forEach((item) => batch.set(target.collection('questionSets').doc(), { name: String(item?.name ?? ''), questions: Array.isArray(item?.questions) ? item.questions : [], active: Boolean(item?.active), createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(), createdBy: uid, templateId: template.id ?? null }));
 }
 
 function serializeCampaign(id: string, data: FirebaseFirestore.DocumentData, memberCount: number, voterCount: number) {
@@ -97,12 +114,17 @@ export async function createCampaign(user: DecodedIdToken, orgId: string, input:
   const nombre = campaignName(input);
   const organization = organizationRef(orgId);
   if (!(await organization.get()).exists) throw new NotFoundError('La organización no existe.');
+  const template = input.templateId?.trim()
+    ? await organization.collection('campaignTemplates').doc(input.templateId.trim()).get()
+    : null;
+  if (template && !template.exists) throw new NotFoundError('La plantilla seleccionada no existe.');
   const campaign = organization.collection('campaigns').doc();
   const batch = db.batch();
   batch.set(campaign, { nombre, createdAt: FieldValue.serverTimestamp(), createdBy: user.uid });
   batch.set(campaign.collection('members').doc(user.uid), {
     email: user.email ?? '', displayName: user.name ?? user.email?.split('@')[0] ?? '', role: 'cliente', functionId: null, teamId: null, joinedAt: FieldValue.serverTimestamp()
   });
+  if (template) templateStructures(campaign, { id: template.id, ...template.data() }, user.uid, batch);
   await batch.commit();
 
   const authUser = await adminAuth.getUser(user.uid);
@@ -110,6 +132,51 @@ export async function createCampaign(user: DecodedIdToken, orgId: string, input:
   const camps = { ...((claims.camps as Record<string, boolean> | undefined) ?? {}), [campaign.id]: true };
   await adminAuth.setCustomUserClaims(user.uid, { ...claims, role: 'cliente', orgId, camps });
   return { id: campaign.id, nombre, memberCount: 1, voterCount: 0, createdAt: new Date().toISOString() };
+}
+
+export async function listCampaignTemplates(user: DecodedIdToken, orgId: string) {
+  assertOrganizationClient(user, orgId);
+  const templates = await organizationRef(orgId).collection('campaignTemplates').orderBy('createdAt', 'asc').get();
+  return templates.docs.map((item) => {
+    const data = item.data();
+    return {
+      id: item.id,
+      nombre: String(data.nombre ?? 'Plantilla sin nombre'),
+      createdAt: data.createdAt?.toDate?.().toISOString?.() ?? null,
+      functionCount: Array.isArray(data.functions) ? data.functions.length : 0,
+      teamCount: Array.isArray(data.teams) ? data.teams.length : 0,
+      questionSetCount: Array.isArray(data.questionSets) ? data.questionSets.length : 0
+    };
+  });
+}
+
+export async function saveCampaignTemplate(user: DecodedIdToken, orgId: string, input: TemplateInput) {
+  assertOrganizationClient(user, orgId);
+  const nombre = templateName(input);
+  const campId = input.campId?.trim();
+  if (!campId) throw new ValidationError('Elegí la campaña cuya estructura querés guardar.');
+  const campaign = organizationRef(orgId).collection('campaigns').doc(campId);
+  if (!(await campaign.get()).exists) throw new NotFoundError('La campaña no existe.');
+  const [teams, functions, questionSets] = await Promise.all([campaign.collection('teams').get(), campaign.collection('functions').get(), campaign.collection('questionSets').get()]);
+  const template = organizationRef(orgId).collection('campaignTemplates').doc();
+  await template.set({
+    nombre,
+    teams: teams.docs.filter((item) => item.data().deleted !== true).map((item) => ({ name: String(item.data().name ?? ''), description: String(item.data().description ?? '') })),
+    functions: functions.docs.filter((item) => item.data().deleted !== true).map((item) => ({ name: String(item.data().name ?? ''), description: String(item.data().description ?? ''), color: String(item.data().color ?? '#0060F0') })),
+    questionSets: questionSets.docs.map((item) => ({ name: String(item.data().name ?? ''), questions: item.data().questions ?? [], active: Boolean(item.data().active) })),
+    sourceCampaignId: campId,
+    createdAt: FieldValue.serverTimestamp(),
+    createdBy: user.uid
+  });
+  return { id: template.id, nombre, functionCount: functions.docs.filter((item) => item.data().deleted !== true).length, teamCount: teams.docs.filter((item) => item.data().deleted !== true).length, questionSetCount: questionSets.size, createdAt: new Date().toISOString() };
+}
+
+export async function deleteCampaignTemplate(user: DecodedIdToken, orgId: string, templateId: string) {
+  assertOrganizationClient(user, orgId);
+  const template = organizationRef(orgId).collection('campaignTemplates').doc(templateId);
+  if (!(await template.get()).exists) throw new NotFoundError('La plantilla no existe.');
+  await template.delete();
+  return { id: templateId, deleted: true };
 }
 
 export async function renameCampaign(user: DecodedIdToken, orgId: string, campId: string, input: CampaignInput) {
