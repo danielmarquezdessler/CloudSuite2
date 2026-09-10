@@ -19,6 +19,15 @@ type CampaignContextValue = {
 
 const CampaignContext = createContext<CampaignContextValue | undefined>(undefined);
 const storageKey = (uid: string) => `cloudsuite.activeCampaign.${uid}`;
+const snapshotKey = (uid: string) => `cloudsuite.campaignSnapshot.${uid}`;
+type CampaignSnapshot = { organizationId: string; role: string; campaigns: CampaignOption[] };
+
+function storedSnapshot(uid: string): CampaignSnapshot | null {
+  try {
+    const value = JSON.parse(localStorage.getItem(snapshotKey(uid)) ?? 'null') as CampaignSnapshot | null;
+    return value?.organizationId && Array.isArray(value.campaigns) && value.campaigns.length ? value : null;
+  } catch { return null; }
+}
 
 export function CampaignProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
@@ -37,6 +46,17 @@ export function CampaignProvider({ children }: { children: ReactNode }) {
     setLoading(true);
     const me = await authenticatedRequest<Me>(user, '/api/me');
     if (me.error || !me.data?.organization?.id || !me.data.campaigns?.length) {
+      const cached = storedSnapshot(user.uid);
+      if (!navigator.onLine && cached) {
+        const storedId = localStorage.getItem(storageKey(user.uid));
+        const nextId = cached.campaigns.some(campaign => campaign.id === activeCampaignId)
+          ? activeCampaignId
+          : cached.campaigns.some(campaign => campaign.id === storedId)
+            ? storedId
+            : cached.campaigns[0].id;
+        setOrganizationId(cached.organizationId); setRole(cached.role); setCampaigns(cached.campaigns); setActiveId(nextId); setError(''); setLoading(false);
+        return;
+      }
       setOrganizationId(null); setRole(''); setCampaigns([]); setActiveId(null);
       setError(me.error?.message ?? 'No hay una campaña disponible.'); setLoading(false);
       return;
@@ -52,6 +72,7 @@ export function CampaignProvider({ children }: { children: ReactNode }) {
         ? storedId
         : available[0]?.id ?? null;
     setOrganizationId(orgId); setRole(me.data.role ?? ''); setCampaigns(available); setActiveId(nextId);
+    localStorage.setItem(snapshotKey(user.uid), JSON.stringify({ organizationId: orgId, role: me.data.role ?? '', campaigns: available }));
     if (nextId) localStorage.setItem(storageKey(user.uid), nextId);
     setError(details.error?.message ?? ''); setLoading(false);
   }, [activeCampaignId, user]);

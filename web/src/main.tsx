@@ -8,6 +8,7 @@ import { configureStore } from '@reduxjs/toolkit';
 import { rootReducer } from './toolkit/index.ts';
 import { AuthProvider } from './context/AuthContext.tsx';
 import { CampaignProvider } from './context/CampaignContext.tsx';
+import { OfflineSyncProvider } from './context/OfflineSyncContext.tsx';
 
 
 const store = configureStore({ reducer: rootReducer, devTools: true });
@@ -17,7 +18,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <BrowserRouter>
       <Provider store={store}>
         <AuthProvider>
-          <CampaignProvider><App /></CampaignProvider>
+          <CampaignProvider><OfflineSyncProvider><App /></OfflineSyncProvider></CampaignProvider>
         </AuthProvider>
       </Provider>
     </BrowserRouter>
