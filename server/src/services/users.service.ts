@@ -3,6 +3,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { randomUUID } from 'node:crypto';
 import { adminAuth, db, storage } from '../config/firebase.js';
 import { ForbiddenError, ValidationError, campaignRef } from './access.service.js';
+import { sendWelcomeEmail } from './email.service.js';
 
 export type CreateOrganizationUserInput = {
   firstName?: string; lastName?: string; phone?: string; email?: string; password?: string;
@@ -110,7 +111,23 @@ export async function createOrganizationUser(user: DecodedIdToken, orgId: string
     }
     await batch.commit();
     await adminAuth.setCustomUserClaims(created.uid, { role: 'usuario', orgId, camps: data.campaignId ? { [data.campaignId]: true } : {} });
-    return { uid: created.uid, orgId, email: data.email, displayName: data.displayName, firstName: data.firstName, lastName: data.lastName, phone: data.phone, photoURL: avatarReference ? avatarDownloadUrl(storage.bucket().name, `avatars/${created.uid}.jpg`, avatarReference.downloadToken) : null, role: 'usuario', campaignId: data.campaignId, functionId: data.functionId, teamId: data.teamId };
+    let emailSent = false;
+    try {
+      const [organization, campaign] = await Promise.all([
+        db.collection('organizations').doc(orgId).get(),
+        data.campaignId ? campaignRef(orgId, data.campaignId).get() : Promise.resolve(null)
+      ]);
+      const email = await sendWelcomeEmail({
+        to: data.email,
+        name: data.displayName,
+        organizationName: String(organization.data()?.nombre ?? 'tu organización'),
+        campaignName: campaign?.exists ? String(campaign.data()?.nombre ?? '') : null
+      });
+      emailSent = email.sent;
+    } catch (error) {
+      console.error(`[CloudSuite] No se pudo enviar el email de bienvenida a ${data.email}:`, error);
+    }
+    return { uid: created.uid, orgId, email: data.email, displayName: data.displayName, firstName: data.firstName, lastName: data.lastName, phone: data.phone, photoURL: avatarReference ? avatarDownloadUrl(storage.bucket().name, `avatars/${created.uid}.jpg`, avatarReference.downloadToken) : null, role: 'usuario', campaignId: data.campaignId, functionId: data.functionId, teamId: data.teamId, emailSent };
   } catch (error) {
     await adminAuth.deleteUser(created.uid).catch(() => undefined);
     throw error;

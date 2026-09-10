@@ -11,7 +11,7 @@ import { Toast } from '../../../components/Toast';
 import CreateUserModal from '../../../components/Organization/CreateUserModal';
 import { useCampaign } from './useCampaign';
 
-type Member = { uid: string; displayName?: string; email: string; role: string; functionId?: string; teamId?: string };
+type Member = { uid: string; displayName?: string; email: string; role: string; functionId?: string; teamId?: string; emailSent?: boolean };
 type Item = { id: string; name: string };
 type OrgUser = { uid: string; firstName?: string; lastName?: string; displayName?: string; email: string; phone?: string; photoURL?: string; role: string; campaignId?: string; functionId?: string; teamId?: string };
 
@@ -79,7 +79,7 @@ export default function Users() {
     if (!user || !campaign) return;
     const created = await authenticatedFetch<Member>(user, `/api/organizations/${campaign.orgId}/users`, { method: 'POST', body: data });
     await reloadPeople(); setShowCreate(false);
-    setNotice({ message: `${created.displayName} fue creado correctamente.`, variant: 'success' });
+    setNotice({ message: created.emailSent ? `${created.displayName} fue creado correctamente. Le enviamos un email de bienvenida.` : `${created.displayName} fue creado correctamente, pero no pudimos enviarle el email de bienvenida.`, variant: created.emailSent ? 'success' : 'danger' });
   };
   const updateProfile = async (data: FormData) => {
     if (!user || !campaign || !editingUser) return;
