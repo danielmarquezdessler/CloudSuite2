@@ -7,7 +7,8 @@ export class NotFoundError extends Error {}
 
 export function assertCampaignAccess(user: DecodedIdToken, orgId: string, campId: string) {
   const camps = user.camps as Record<string, boolean> | undefined;
-  if (user.orgId !== orgId || !camps?.[campId]) throw new ForbiddenError('No tenés acceso a esta campaña.');
+  const allCampaigns = user.role === 'cliente' && user.allCamps === true;
+  if (user.orgId !== orgId || (!allCampaigns && !camps?.[campId])) throw new ForbiddenError('No tenés acceso a esta campaña.');
 }
 
 export function assertCampaignAdmin(user: DecodedIdToken, orgId: string, campId: string) {

@@ -2,6 +2,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { DecodedIdToken } from 'firebase-admin/auth';
 import { adminAuth, db } from '../config/firebase.js';
 import { createNotification } from './notifications.service.js';
+import { appendAudit } from './audit.service.js';
 
 export class ConflictError extends Error {}
 export class NotFoundError extends Error {}
@@ -28,8 +29,7 @@ export async function bootstrapOrganization(user: DecodedIdToken, input: Bootstr
     ]);
 
     if (existingOrg.exists && existingOrg.data()?.ownerUid === user.uid && !existingCampaigns.empty) {
-      const camps = Object.fromEntries(existingCampaigns.docs.map((campaign) => [campaign.id, true]));
-      await adminAuth.setCustomUserClaims(user.uid, { role: 'cliente', orgId: existingOrgId, camps });
+      await adminAuth.setCustomUserClaims(user.uid, { role: 'cliente', orgId: existingOrgId, allCamps: true });
       return { orgId: existingOrgId, campId: existingCampaigns.docs[0].id, recovered: true };
     }
 
@@ -89,7 +89,12 @@ export async function bootstrapOrganization(user: DecodedIdToken, input: Bootstr
   await adminAuth.setCustomUserClaims(user.uid, {
     role: 'cliente',
     orgId: orgRef.id,
-    camps: { [campaignRef.id]: true }
+    allCamps: true
+  });
+
+  await appendAudit(orgRef.id, campaignRef.id, user, {
+    action: 'CAMPAIGN_CREATED', resource: 'campaign', resourceId: campaignRef.id,
+    changes: { after: { nombre: campaignName, automatic: true } }
   });
 
   await Promise.all([
@@ -132,6 +137,7 @@ export async function getCurrentUserData(user: DecodedIdToken) {
   const organization = organizationSnapshot.data()!;
   const member = memberSnapshot.data() ?? {};
   const camps = typeof user.camps === 'object' && user.camps !== null ? user.camps as Record<string, boolean> : {};
+  const allCampaigns = user.role === 'cliente' && user.allCamps === true;
   const claimsArePending = !claimedOrgId;
   return {
     hasOrg: true,
@@ -141,7 +147,7 @@ export async function getCurrentUserData(user: DecodedIdToken) {
     },
     organization: { id: organizationSnapshot.id, nombre: organization.nombre },
     campaigns: campaignsSnapshot.docs
-      .filter((campaign) => claimsArePending || camps[campaign.id] === true)
+      .filter((campaign) => claimsArePending || allCampaigns || camps[campaign.id] === true)
       .map((campaign) => ({ id: campaign.id, nombre: campaign.data().nombre })),
     role: typeof user.role === 'string' ? user.role : member.role ?? 'sin-rol'
   };

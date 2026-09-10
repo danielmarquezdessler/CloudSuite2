@@ -91,6 +91,7 @@ async function resetVoters(orgId: string, campId: string) {
 export async function setPrincipal(user: DecodedIdToken, orgId: string, campId: string, candidateId: string, confirmReset: boolean) {
   assertCampaignManager(user, orgId, campId); const campaign = campaignRef(orgId, campId); const next = campaign.collection('candidates').doc(candidateId); const nextSnapshot = await next.get(); if (!nextSnapshot.exists) throw new NotFoundError('El candidato no existe.');
   const principals = await campaign.collection('candidates').where('isPrincipal', '==', true).get(); const previous = principals.docs.find((candidate) => candidate.id !== candidateId);
+  let metricsReset = false;
   if (previous) {
     const [voters, visits] = await Promise.all([campaign.collection('voters').get(), campaign.collection('visits').get()]);
     const affectedVoters = voters.docs.filter((voter) => voter.data().state !== 'unvisited' || Object.values(voter.data().conversions ?? {}).some((value) => typeof value === 'number' && value > 0)).length;
@@ -98,8 +99,9 @@ export async function setPrincipal(user: DecodedIdToken, orgId: string, campId: 
     if (affectedVoters || visits.size) {
       await resetVoters(orgId, campId);
       await campaign.set({ metricsResetAt: FieldValue.serverTimestamp() }, { merge: true });
+      metricsReset = true;
     }
   }
   const batch = campaign.firestore.batch(); principals.docs.filter((candidate) => candidate.id !== candidateId).forEach((candidate) => batch.update(candidate.ref, { isPrincipal: false, updatedAt: FieldValue.serverTimestamp() })); batch.set(next, { isPrincipal: true, principalSetAt: FieldValue.serverTimestamp(), principalSetBy: user.uid }, { merge: true }); await batch.commit();
-  return { id: candidateId, isPrincipal: true };
+  return { id: candidateId, name: String(nextSnapshot.data()?.name ?? ''), type: String(nextSnapshot.data()?.type ?? ''), isPrincipal: true, metricsReset };
 }

@@ -40,7 +40,8 @@
     "test:e2e:candidates": "node scripts/test-candidates-e2e-real.mjs",
     "test:e2e:campaign-compare": "node scripts/test-campaign-compare-e2e-real.mjs",
     "test:e2e:campaign-clone": "node scripts/test-campaign-clone-e2e-real.mjs",
-    "test:e2e:campaign-templates": "node scripts/test-campaign-templates-e2e-real.mjs"
+    "test:e2e:campaign-templates": "node scripts/test-campaign-templates-e2e-real.mjs",
+    "test:e2e:campaign-timeline": "node scripts/test-campaign-timeline-e2e-real.mjs"
   },
   "dependencies": {
     "@ckeditor/ckeditor5-build-balloon": "^41.3.1",

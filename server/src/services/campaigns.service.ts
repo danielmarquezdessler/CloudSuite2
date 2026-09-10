@@ -2,7 +2,7 @@ import { DecodedIdToken } from 'firebase-admin/auth';
 import { FieldValue } from 'firebase-admin/firestore';
 import { randomUUID } from 'node:crypto';
 import { adminAuth, db, storage } from '../config/firebase.js';
-import { ForbiddenError, NotFoundError, ValidationError } from './access.service.js';
+import { assertCampaignAccess, ForbiddenError, NotFoundError, ValidationError } from './access.service.js';
 
 type CampaignInput = { nombre?: string; templateId?: string };
 type CloneInput = CampaignInput & { copiar?: { equipos?: boolean; funciones?: boolean; preguntas?: boolean; candidatos?: boolean } };
@@ -70,7 +70,7 @@ export async function compareCampaigns(user: DecodedIdToken, orgId: string, requ
   if (ids.length < 2) throw new ValidationError('Elegí al menos dos campañas para comparar.');
   if (ids.length > 6) throw new ValidationError('Podés comparar hasta seis campañas a la vez.');
   const allowed = (user.camps as Record<string, boolean> | undefined) ?? {};
-  if (user.role !== 'cliente' && ids.some((id) => !allowed[id])) throw new ForbiddenError('No tenés acceso a una de las campañas seleccionadas.');
+  if (!(user.role === 'cliente' && user.allCamps === true) && ids.some((id) => !allowed[id])) throw new ForbiddenError('No tenés acceso a una de las campañas seleccionadas.');
   const organization = organizationRef(orgId);
   return Promise.all(ids.map(async (campId) => {
     const campaign = organization.collection('campaigns').doc(campId);
@@ -109,6 +109,33 @@ export async function compareCampaigns(user: DecodedIdToken, orgId: string, requ
   }));
 }
 
+const timelineDate = (value: unknown) => asDate(value)?.toISOString() ?? new Date().toISOString();
+
+export async function getCampaignTimeline(user: DecodedIdToken, orgId: string, campId: string) {
+  assertCampaignAccess(user, orgId, campId);
+  const campaign = organizationRef(orgId).collection('campaigns').doc(campId);
+  const [campaignSnapshot, audit, voters, visits] = await Promise.all([
+    campaign.get(), campaign.collection('auditLog').get(), campaign.collection('voters').get(), campaign.collection('visits').get()
+  ]);
+  if (!campaignSnapshot.exists) throw new NotFoundError('La campaña no existe.');
+  const interesting = new Set(['CAMPAIGN_CREATED', 'SET_PRINCIPAL_CANDIDATE', 'GOAL_COMPLETED', 'METRICS_RESET']);
+  const events = audit.docs.filter((item) => interesting.has(String(item.data().action))).map((item) => {
+    const data = item.data(); const after = data.changes?.after as Record<string, unknown> | undefined;
+    const action = String(data.action);
+    const title = action === 'CAMPAIGN_CREATED' ? 'Campaña creada'
+      : action === 'SET_PRINCIPAL_CANDIDATE' ? `Candidato principal: ${String(after?.name ?? 'actualizado')}`
+        : action === 'GOAL_COMPLETED' ? `Meta alcanzada: ${String(after?.description ?? 'objetivo de campaña')}`
+          : 'Métricas de campaña reiniciadas';
+    const type = action === 'CAMPAIGN_CREATED' ? 'campaign-created' : action === 'SET_PRINCIPAL_CANDIDATE' ? 'candidate' : action === 'GOAL_COMPLETED' ? 'goal' : 'reset';
+    return { id: item.id, title, date: timelineDate(data.timestamp), type, description: typeof after?.message === 'string' ? after.message : undefined };
+  });
+  const visited = voters.docs.filter((item) => item.data().state !== 'unvisited').length;
+  const lastVisit = visits.docs.map((item) => asDate(item.data().completedAt) ?? asDate(item.data().startedAt)).filter((value): value is Date => Boolean(value)).sort((left, right) => right.getTime() - left.getTime())[0];
+  if (visits.size >= 100) events.push({ id: 'milestone-visits-100', title: '100 visitas registradas', date: (lastVisit ?? new Date()).toISOString(), type: 'volume', description: `La campaña superó las 100 visitas (${visits.size} en total).` });
+  if (voters.size && visited / voters.size >= 0.5) events.push({ id: 'milestone-coverage-50', title: '50% de cobertura alcanzada', date: (lastVisit ?? new Date()).toISOString(), type: 'volume', description: `${visited} de ${voters.size} electores ya fueron visitados.` });
+  return events.sort((left, right) => new Date(left.date).getTime() - new Date(right.date).getTime());
+}
+
 export async function createCampaign(user: DecodedIdToken, orgId: string, input: CampaignInput) {
   assertOrganizationClient(user, orgId);
   const nombre = campaignName(input);
@@ -129,8 +156,8 @@ export async function createCampaign(user: DecodedIdToken, orgId: string, input:
 
   const authUser = await adminAuth.getUser(user.uid);
   const claims = { ...(authUser.customClaims ?? {}) } as Record<string, unknown>;
-  const camps = { ...((claims.camps as Record<string, boolean> | undefined) ?? {}), [campaign.id]: true };
-  await adminAuth.setCustomUserClaims(user.uid, { ...claims, role: 'cliente', orgId, camps });
+  delete claims.camps;
+  await adminAuth.setCustomUserClaims(user.uid, { ...claims, role: 'cliente', orgId, allCamps: true });
   return { id: campaign.id, nombre, memberCount: 1, voterCount: 0, createdAt: new Date().toISOString() };
 }
 
@@ -227,6 +254,7 @@ async function removeCampaignClaim(uid: string, orgId: string, campId: string) {
     const authUser = await adminAuth.getUser(uid);
     const claims = { ...(authUser.customClaims ?? {}) } as Record<string, unknown>;
     if (claims.orgId !== orgId) return;
+    if (claims.role === 'cliente' && claims.allCamps === true) return;
     const camps = { ...((claims.camps as Record<string, boolean> | undefined) ?? {}) };
     delete camps[campId];
     if (Object.keys(camps).length) {

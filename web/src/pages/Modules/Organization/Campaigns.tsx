@@ -11,6 +11,7 @@ import PageContainer from '../../../components/Shared/PageContainer';
 import Inline from '../../../components/Shared/Inline';
 import SelectControl from '../../../components/Shared/SelectControl';
 import Stack from '../../../components/Shared/Stack';
+import Timeline, { TimelineEvent } from '../../../components/Planning/Timeline';
 import { Toast } from '../../../components/Toast';
 import { useCampaign } from './useCampaign';
 import { useActiveCampaign } from '../../../context/CampaignContext';
@@ -18,6 +19,7 @@ import { useActiveCampaign } from '../../../context/CampaignContext';
 type Campaign = { id: string; nombre: string; createdAt: string | null; memberCount: number; voterCount: number };
 type CampaignTemplate = { id: string; nombre: string; createdAt: string | null; functionCount: number; teamCount: number; questionSetCount: number };
 type Comparison = Campaign & { totalVoters: number; totalVisits: number; coveragePercent: number; principal: { name: string; type: string } | null; conversion: { yes: { count: number; percent: number }; no: { count: number; percent: number }; undecided: { count: number; percent: number } } };
+type CampaignTimelineEvent = TimelineEvent;
 
 function dateLabel(value: string | null) {
   if (!value) return 'Recién creada';
@@ -38,14 +40,17 @@ function comparisonValue(item: Comparison, metric: 'principal' | 'voters' | 'vis
 
 export default function Campaigns() {
   const { user, campaign, error: campaignError, reload: reloadCampaign } = useCampaign();
-  const { activateCampaign } = useActiveCampaign();
+  const { activateCampaign, organizationId } = useActiveCampaign();
   const navigate = useNavigate();
-  const path = campaign ? `/api/organizations/${campaign.orgId}/campaigns` : null;
-  const templatePath = campaign ? `/api/organizations/${campaign.orgId}/campaign-templates` : null;
-  const campaignsQuery = useAuthenticatedQuery<Campaign[]>(user, path, [campaign?.orgId]);
-  const templatesQuery = useAuthenticatedQuery<CampaignTemplate[]>(user, templatePath, [campaign?.orgId]);
+  const orgId = campaign?.orgId ?? organizationId;
+  const path = orgId ? `/api/organizations/${orgId}/campaigns` : null;
+  const templatePath = orgId ? `/api/organizations/${orgId}/campaign-templates` : null;
+  const timelinePath = campaign ? `${path}/${campaign.campId}/timeline` : null;
+  const campaignsQuery = useAuthenticatedQuery<Campaign[]>(user, path, [orgId]);
+  const templatesQuery = useAuthenticatedQuery<CampaignTemplate[]>(user, templatePath, [orgId]);
+  const timelineQuery = useAuthenticatedQuery<CampaignTimelineEvent[]>(user, timelinePath, [orgId, campaign?.campId]);
   const campaigns = campaignsQuery.data ?? [];
-  const [view, setView] = useState<'campaigns' | 'compare' | 'templates'>('campaigns');
+  const [view, setView] = useState<'campaigns' | 'compare' | 'templates' | 'history'>('campaigns');
   const [selected, setSelected] = useState<string[]>([]);
   const [comparison, setComparison] = useState<Comparison[] | null>(null);
   const [comparing, setComparing] = useState(false);
@@ -87,8 +92,13 @@ export default function Campaigns() {
     setSaving(true);
     try {
       const item = await authenticatedFetch<Campaign>(user, editing ? `${path}/${editing.id}` : path, { method: editing ? 'PUT' : 'POST', body: JSON.stringify(editing ? { nombre: name } : { nombre: name, ...(templateId ? { templateId } : {}) }) });
-      if (!editing) { await user.getIdToken(true); activateCampaign(item); }
-      await Promise.all([campaignsQuery.reload(), reloadCampaign()]);
+      if (!editing) {
+        await user.getIdToken(true);
+        await Promise.all([campaignsQuery.reload(), reloadCampaign()]);
+        activateCampaign(item);
+      } else {
+        await Promise.all([campaignsQuery.reload(), reloadCampaign()]);
+      }
       setShowEditor(false);
       setNotice({ message: editing ? `La campaña “${item.nombre}” fue renombrada.` : `La campaña “${item.nombre}” fue creada.`, variant: 'success' });
     } catch (caught) {
@@ -148,8 +158,8 @@ export default function Campaigns() {
   };
 
   return <PageContainer><Stack gap="lg">
-    <HeroBanner icon={view === 'compare' ? 'bars' : view === 'templates' ? 'copy' : 'target'} title={view === 'compare' ? 'Comparador entre Campañas' : view === 'templates' ? 'Plantillas de Campaña' : 'Gestión de Campañas'} subtitle={view === 'compare' ? 'Contrastá resultados y cobertura de dos o más campañas.' : view === 'templates' ? 'Reutilizá estructuras de equipos, funciones y preguntas.' : 'Creá y organizá las campañas de tu organización.'} subtitleDetail={view === 'compare' ? 'Las métricas usan exclusivamente los datos vigentes de cada campaña.' : view === 'templates' ? 'Una plantilla nunca transporta personas, electores ni actividad operativa.' : 'Cada campaña mantiene sus equipos, electores, planificación y actividad completamente aislados.'} tags={view === 'compare' ? [{ icon: 'bars', label: 'Comparación real' }, { icon: 'target', label: 'Métricas vigentes' }] : view === 'templates' ? [{ icon: 'copy', label: 'Estructuras reutilizables' }, { icon: 'target', label: 'Datos aislados' }] : [{ icon: 'target', label: 'Datos aislados' }, { icon: 'users', label: 'Equipos por campaña' }, { icon: 'bars', label: 'Control centralizado' }]} ctaLabel={view === 'campaigns' ? 'Crear nueva campaña' : undefined} onCtaClick={openCreate} />
-    <Inline gap="sm" wrap><Button variant={view === 'campaigns' ? 'primary' : 'outline-primary'} onClick={() => setView('campaigns')}>Campañas</Button><Button variant={view === 'compare' ? 'primary' : 'outline-primary'} onClick={() => setView('compare')}>Comparar campañas</Button><Button variant={view === 'templates' ? 'primary' : 'outline-primary'} onClick={() => setView('templates')}>Plantillas</Button></Inline>
+    <HeroBanner icon={view === 'compare' ? 'bars' : view === 'templates' ? 'copy' : view === 'history' ? 'clock' : 'target'} title={view === 'compare' ? 'Comparador entre Campañas' : view === 'templates' ? 'Plantillas de Campaña' : view === 'history' ? 'Historial de Campaña' : 'Gestión de Campañas'} subtitle={view === 'compare' ? 'Contrastá resultados y cobertura de dos o más campañas.' : view === 'templates' ? 'Reutilizá estructuras de equipos, funciones y preguntas.' : view === 'history' ? 'Consultá los hitos principales de la campaña activa.' : 'Creá y organizá las campañas de tu organización.'} subtitleDetail={view === 'compare' ? 'Las métricas usan exclusivamente los datos vigentes de cada campaña.' : view === 'templates' ? 'Una plantilla nunca transporta personas, electores ni actividad operativa.' : view === 'history' ? 'Incluye creación, candidatura principal, metas, volumen y reinicios de métricas.' : 'Cada campaña mantiene sus equipos, electores, planificación y actividad completamente aislados.'} tags={view === 'compare' ? [{ icon: 'bars', label: 'Comparación real' }, { icon: 'target', label: 'Métricas vigentes' }] : view === 'templates' ? [{ icon: 'copy', label: 'Estructuras reutilizables' }, { icon: 'target', label: 'Datos aislados' }] : view === 'history' ? [{ icon: 'clock', label: 'Hitos cronológicos' }, { icon: 'target', label: 'Campaña activa' }] : [{ icon: 'target', label: 'Datos aislados' }, { icon: 'users', label: 'Equipos por campaña' }, { icon: 'bars', label: 'Control centralizado' }]} ctaLabel={view === 'campaigns' ? 'Crear nueva campaña' : undefined} onCtaClick={openCreate} />
+    <Inline gap="sm" wrap><Button variant={view === 'campaigns' ? 'primary' : 'outline-primary'} onClick={() => setView('campaigns')}>Campañas</Button><Button variant={view === 'compare' ? 'primary' : 'outline-primary'} onClick={() => setView('compare')}>Comparar campañas</Button><Button variant={view === 'templates' ? 'primary' : 'outline-primary'} onClick={() => setView('templates')}>Plantillas</Button><Button variant={view === 'history' ? 'primary' : 'outline-primary'} onClick={() => setView('history')}>Historial</Button></Inline>
     {view === 'compare' ? <Stack gap="lg">
       <ContentPanel icon="target" title="Elegí las campañas" subtitle="Seleccioná dos o más campañas de tu organización para contrastar resultados." headerAction={<Button size="sm" disabled={selected.length < 2 || comparing} onClick={() => void compare()}>{comparing ? 'Comparando…' : 'Comparar'}</Button>}>
         <Stack gap="md"><p className="mb-0 text-muted">{selected.length < 2 ? 'Elegí al menos dos campañas para habilitar el comparador.' : `${selected.length} campañas seleccionadas.`}</p><div className="row g-3">{campaigns.map((item) => <div className="col-md-6 col-xl-4" key={item.id}><label className="form-check border rounded p-3 h-100"><input className="form-check-input" type="checkbox" checked={selected.includes(item.id)} onChange={() => toggleSelected(item.id)} aria-label={`Comparar ${item.nombre}`} /><span className="form-check-label ms-2"><strong>{item.nombre}</strong><small className="d-block text-muted">{item.voterCount} electores · {item.memberCount} miembros</small></span></label></div>)}</div></Stack>
@@ -157,6 +167,8 @@ export default function Campaigns() {
       {comparison && comparisonChart && <ContentPanel icon="bars" title="Resultados comparados" subtitle="Cada columna representa una campaña y sus datos aislados."><Stack gap="lg"><div className="cd-table-scroll"><table className="cd-data-table"><thead><tr><th>MÉTRICA</th>{comparison.map((item) => <th key={item.id}>{item.nombre}</th>)}</tr></thead><tbody>{([['Candidato Principal', 'principal'], ['Electores', 'voters'], ['Visitas totales', 'visits'], ['Conversión SI', 'yes'], ['Conversión NO', 'no'], ['Indecisos', 'undecided'], ['Cobertura', 'coverage'], ['Miembros', 'members'], ['Fecha de creación', 'created']] as const).map(([label, metric]) => <tr key={metric}><th>{label}</th>{comparison.map((item) => <td key={item.id}>{comparisonValue(item, metric)}</td>)}</tr>)}</tbody></table></div><Chart type="bar" height={280} options={comparisonChart.options} series={comparisonChart.series} /></Stack></ContentPanel>}
     </Stack> : view === 'templates' ? <ContentPanel icon="copy" title="Plantillas guardadas" subtitle="Usalas al crear campañas para partir de una estructura que ya conocés.">
       {templatesQuery.loading ? <EmptyState icon="copy" title="Cargando plantillas" description="Estamos preparando las estructuras de tu organización." /> : templatesQuery.error ? <EmptyState icon="copy" title="No pudimos cargar las plantillas" description={templatesQuery.error.message} ctaLabel="Reintentar" onCtaClick={() => void templatesQuery.reload()} /> : templatesQuery.data?.length ? <div className="cd-table-scroll"><table className="cd-data-table"><thead><tr><th>PLANTILLA</th><th>FUNCIONES</th><th>EQUIPOS</th><th>PREGUNTAS</th><th>CREADA</th><th>ACCIONES</th></tr></thead><tbody>{templatesQuery.data.map((item) => <tr key={item.id}><td><strong>{item.nombre}</strong></td><td>{item.functionCount}</td><td>{item.teamCount}</td><td>{item.questionSetCount}</td><td>{dateLabel(item.createdAt)}</td><td><Button size="sm" variant="outline-danger" onClick={() => setDeletingTemplate(item)}>Eliminar</Button></td></tr>)}</tbody></table></div> : <EmptyState icon="copy" title="Todavía no hay plantillas" description="Guardá la estructura de una campaña desde la pestaña Campañas para reutilizarla después." />}
+    </ContentPanel> : view === 'history' ? <ContentPanel icon="clock" title="Línea de tiempo" subtitle="Eventos relevantes y hitos calculados de la campaña activa.">
+      {timelineQuery.loading ? <EmptyState icon="clock" title="Cargando historial" description="Estamos reuniendo los hitos de la campaña." /> : timelineQuery.error ? <EmptyState icon="clock" title="No pudimos cargar el historial" description={timelineQuery.error.message} ctaLabel="Reintentar" onCtaClick={() => void timelineQuery.reload()} /> : <Timeline events={timelineQuery.data ?? []} />}
     </ContentPanel> : <Stack gap="lg">
       <div className="cd-dashboard__kpis"><KpiCard icon="target" value={campaigns.length} label="Total de campañas" caption={campaigns.length === 1 ? 'Una campaña activa' : 'Campañas de la organización'} /><KpiCard icon="people" iconColor="green" value={totalMembers} label="Miembros asignados" caption="Vínculos entre todas las campañas" /><KpiCard icon="people" iconColor="purple" value={totalVoters} label="Electores registrados" caption="Bases de electores aisladas" /><KpiCard icon="trend" iconColor="orange" value={busiest?.nombre ?? '—'} label="Campaña más activa" caption={busiest ? `${busiest.voterCount} electores · ${busiest.memberCount} miembros` : 'Sin actividad todavía'} /></div>
       <ContentPanel icon="target" title="Campañas de la organización" subtitle="Administrá cada campaña sin mezclar sus equipos, electores ni planificación." headerAction={<Button size="sm" onClick={openCreate}>Crear nueva campaña</Button>}>
