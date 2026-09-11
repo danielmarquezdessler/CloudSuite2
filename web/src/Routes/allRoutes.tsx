@@ -6,6 +6,7 @@ import Campaigns from '../pages/Modules/Organization/Campaigns';
 import Candidates from '../pages/Modules/Organization/Candidates';
 import JoinInvitation from '../pages/JoinInvitation';
 import VotersList from '../pages/Modules/ElectoralConversion/VotersList';
+import VoterProfile from '../pages/Modules/ElectoralConversion/VoterProfile';
 import VisitScreen from '../pages/Modules/ElectoralConversion/VisitScreen';
 import VotersMap from '../pages/Modules/Execution/VotersMap';
 import AuditLog from '../pages/Modules/System/AuditLog';
@@ -197,6 +198,8 @@ const routes = [
     { path: "/organization/campaigns", component: <Campaigns /> },
     { path: "/organization/candidates", component: <Candidates /> },
     { path: "/electoral-conversion/voters", component: <VotersList /> },
+    { path: "/electoral-conversion/voters/:voterId", component: <VoterProfile /> },
+    { path: "/electoral-conversion/electores/:voterId", component: <VoterProfile /> },
     { path: "/electoral-conversion/map", component: <VotersMap /> },
     { path: "/electoral-conversion/mapa", component: <VotersMap /> },
     { path: "/visit/:voterId", component: <VisitScreen /> },
