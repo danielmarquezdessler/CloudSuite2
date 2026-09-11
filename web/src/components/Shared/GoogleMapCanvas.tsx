@@ -72,10 +72,23 @@ function markerColor(state?: string) {
   return '#94a3b8';
 }
 
+function markerIcon(maps: any, color: string) {
+  return {
+    path: "M12 0C5.37 0 0 5.37 0 12c0 9 12 20 12 20s12-11 12-20C24 5.37 18.63 0 12 0z",
+    fillColor: color,
+    fillOpacity: 1,
+    strokeColor: "#ffffff",
+    strokeWeight: 2.5,
+    scale: 1.25,
+    anchor: new maps.Point(12, 32),
+  };
+}
+
 export default function GoogleMapCanvas({ points, mode = 'markers', compact = false, ariaLabel = 'Mapa de electores' }: GoogleMapCanvasProps) {
   const element = useRef<HTMLDivElement>(null);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error' | 'missing'>('loading');
   const [error, setError] = useState('');
+  const [renderedMarkerCount, setRenderedMarkerCount] = useState(0);
   const dataKey = useMemo(() => points.map((point) => `${point.id}:${point.lat}:${point.lng}:${point.state ?? ''}`).join('|'), [points]);
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined;
 
@@ -90,6 +103,7 @@ export default function GoogleMapCanvas({ points, mode = 'markers', compact = fa
     let tilesListener: any;
     setStatus('loading');
     setError('');
+    setRenderedMarkerCount(0);
 
     void loadGoogleMaps(apiKey).then((maps) => {
       if (cancelled || !element.current || !maps) return;
@@ -130,15 +144,10 @@ export default function GoogleMapCanvas({ points, mode = 'markers', compact = fa
           map,
           position: { lat: point.lat, lng: point.lng },
           title: point.name ?? 'Elector',
-          icon: {
-            path: maps.SymbolPath.CIRCLE,
-            fillColor: markerColor(point.state),
-            fillOpacity: 1,
-            strokeColor: '#ffffff',
-            strokeWeight: 2,
-            scale: 8
-          }
+          icon: markerIcon(maps, markerColor(point.state)),
+          zIndex: 1000
         }));
+        setRenderedMarkerCount(overlayInstances.length);
       }
 
       if (validPoints.length > 1) map.fitBounds(bounds, 32);
@@ -153,6 +162,7 @@ export default function GoogleMapCanvas({ points, mode = 'markers', compact = fa
       cancelled = true;
       tilesListener?.remove?.();
       overlayInstances.forEach((overlay) => overlay.setMap(null));
+      setRenderedMarkerCount(0);
     };
   }, [apiKey, dataKey, mode]);
 
@@ -161,7 +171,7 @@ export default function GoogleMapCanvas({ points, mode = 'markers', compact = fa
     : status === 'error' ? error : status === 'loading' ? 'Cargando Google Maps…' : '';
 
   return <div className={`cs-google-map-shell${compact ? ' cs-google-map-shell--compact' : ''}`}>
-    <div ref={element} className="cs-google-map" aria-label={ariaLabel} data-google-map-status={status} />
+    <div ref={element} className="cs-google-map" aria-label={ariaLabel} data-google-map-status={status} data-google-map-marker-count={mode === 'markers' ? renderedMarkerCount : undefined} />
     {message && <div className="cs-google-map__state" role={status === 'error' ? 'alert' : 'status'}>{message}</div>}
   </div>;
 }

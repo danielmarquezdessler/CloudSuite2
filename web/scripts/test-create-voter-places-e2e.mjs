@@ -69,9 +69,31 @@ try {
     observe.observe(node, { attributes: true, attributeFilter: ['data-google-map-status'] });
     if (node.getAttribute('data-google-map-status') === 'ready') { clearTimeout(deadline); observe.disconnect(); resolveReady(undefined); }
   }));
+  await page.getByLabel('Buscar una ubicación').fill(voterName);
+  await page.locator('[data-google-map-status="ready"]').waitFor();
+  const renderedCount = page.locator('[data-google-map-marker-count="1"]');
+  await renderedCount.waitFor();
+  const marker = page.locator(`[title="${voterName}"]`);
+  await marker.waitFor({ state: 'attached' });
+  await page.getByLabel('Capa Electores').uncheck();
+  await page.locator('[data-google-map-marker-count="0"]').waitFor();
+  await marker.waitFor({ state: 'detached' });
+  await page.getByLabel('Capa Electores').check();
+  await renderedCount.waitFor();
+  await marker.waitFor({ state: 'attached' });
+  for (const layer of ['Capa Zonas y Barrios', 'Capa Territorios', 'Capa Rutas de visita']) {
+    const control = page.getByLabel(layer);
+    await control.check();
+    if (!await control.isChecked()) throw new Error(`${layer} no se activó.`);
+    await control.uncheck();
+    if (await control.isChecked()) throw new Error(`${layer} no se desactivó.`);
+  }
+  await page.waitForTimeout(500);
+  await page.locator('[data-google-map-status="ready"]').waitFor();
+  await page.locator('.cs-google-map__state').waitFor({ state: 'hidden' });
   await mkdir(screenshots, { recursive: true });
   await page.screenshot({ path: resolve(screenshots, 'voter-places-e2e-real.png'), fullPage: true });
-  console.log(`Creación manual E2E real OK: ${voterName}; coordenadas ${created.lat},${created.lng}; Google Places y el mapa real quedaron confirmados.`);
+  console.log(`Creación manual E2E real OK: ${voterName}; coordenadas ${created.lat},${created.lng}; marker real creado y capa Electores oculta/restaurada.`);
 } finally {
   await browser.close();
 }
