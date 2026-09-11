@@ -172,7 +172,10 @@ $shadow-sm: 0 1px 2px rgba(16, 24, 40, .08); $shadow-md: 0 4px 10px rgba(16, 24,
 .cd-question-card { margin-top:12px; padding:16px; border:1px solid #e6eefb; border-radius:12px; background:#fbfdff; }
 
 // Authenticated pages get their rhythm from PageContainer, never from template sections.
-.pc-container .pc-content { padding:0 !important; }
+// LightAble's optional `layout-nested` mode adds a second sidebar offset to
+// `.pc-content`. CloudSuite already offsets `.pc-container`, so that legacy
+// rule can slide page content underneath the fixed sidebar on some routes.
+.pc-container .pc-content { margin-left:0 !important; padding:0 !important; }
 .cs-page-container { padding:20px 40px 24px; color:var(--cd-title); }
 @media (max-width:1024px) { .cs-page-container { padding:20px 15px 24px; } }
 @media (max-width:575.98px) { .cs-page-container { padding:15px; } }
