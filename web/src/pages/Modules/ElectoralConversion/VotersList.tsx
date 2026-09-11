@@ -1,88 +1,544 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuthenticatedQuery } from '../../../lib/api';
-import { authenticatedFetch } from '../../../lib/api';
-import { useCampaign } from '../Organization/useCampaign';
-import ImportVoters from '../Organization/Voters/ImportVoters';
-import ContentPanel from '../../../components/Shared/ContentPanel';
-import EmptyState from '../../../components/Shared/EmptyState';
-import HeroBanner from '../../../components/Shared/HeroBanner';
-import SearchInput from '../../../components/Shared/SearchInput';
-import SelectControl from '../../../components/Shared/SelectControl';
-import StatCard from '../../../components/Shared/StatCard';
-import PageContainer from '../../../components/Shared/PageContainer';
-import Inline from '../../../components/Shared/Inline';
-import MultiSelectControl from '../../../components/Shared/MultiSelectControl';
-import Stack from '../../../components/Shared/Stack';
-import { cacheVoters, cachedVoters } from '../../../lib/offlineVisits';
-import { useOfflineSync } from '../../../context/OfflineSyncContext';
-import CreateVoterModal, { ManualVoterInput } from './CreateVoterModal';
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { useAuthenticatedQuery } from "../../../lib/api";
+import { authenticatedFetch } from "../../../lib/api";
+import { useCampaign } from "../Organization/useCampaign";
+import ImportVoters from "../Organization/Voters/ImportVoters";
+import ContentPanel from "../../../components/Shared/ContentPanel";
+import EmptyState from "../../../components/Shared/EmptyState";
+import HeroBanner from "../../../components/Shared/HeroBanner";
+import SearchInput from "../../../components/Shared/SearchInput";
+import SelectControl from "../../../components/Shared/SelectControl";
+import StatCard from "../../../components/Shared/StatCard";
+import PageContainer from "../../../components/Shared/PageContainer";
+import Inline from "../../../components/Shared/Inline";
+import MultiSelectControl from "../../../components/Shared/MultiSelectControl";
+import Stack from "../../../components/Shared/Stack";
+import { cacheVoters, cachedVoters } from "../../../lib/offlineVisits";
+import { useOfflineSync } from "../../../context/OfflineSyncContext";
+import CreateVoterModal, { ManualVoterInput } from "./CreateVoterModal";
+import DuplicateVotersPanel from "./DuplicateVotersPanel";
 
-type Voter = { id: string; name: string; phone?: string; email?: string; address?: string; lat?: number | null; lng?: number | null; dni?: string; sexo?: string; fechaNacimiento?: string; edadAproximada?: number; barrio?: string; observaciones?: string; tags?: string[]; householdId?: string | null; section?: string; state: string; teamName?: string; lastVisitAt?: string };
-const labels: Record<string, string> = { unvisited: 'Listo para visitar', converted_yes: 'Favorable', converted_no: 'No favorable', undecided: 'Indeciso' };
-const voterAge = (date?: string) => { if (!date) return null; const birth = new Date(`${date}T00:00:00`); if (Number.isNaN(birth.getTime())) return null; const today = new Date(); let age = today.getFullYear() - birth.getFullYear(); if (today.getMonth() < birth.getMonth() || (today.getMonth() === birth.getMonth() && today.getDate() < birth.getDate())) age -= 1; return age >= 0 ? age : null; };
+type Voter = {
+  id: string;
+  name: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  lat?: number | null;
+  lng?: number | null;
+  dni?: string;
+  sexo?: string;
+  fechaNacimiento?: string;
+  edadAproximada?: number;
+  barrio?: string;
+  observaciones?: string;
+  tags?: string[];
+  householdId?: string | null;
+  section?: string;
+  state: string;
+  teamName?: string;
+  lastVisitAt?: string;
+};
+const labels: Record<string, string> = {
+  unvisited: "Listo para visitar",
+  converted_yes: "Favorable",
+  converted_no: "No favorable",
+  undecided: "Indeciso",
+};
+const voterAge = (date?: string) => {
+  if (!date) return null;
+  const birth = new Date(`${date}T00:00:00`);
+  if (Number.isNaN(birth.getTime())) return null;
+  const today = new Date();
+  let age = today.getFullYear() - birth.getFullYear();
+  if (
+    today.getMonth() < birth.getMonth() ||
+    (today.getMonth() === birth.getMonth() && today.getDate() < birth.getDate())
+  )
+    age -= 1;
+  return age >= 0 ? age : null;
+};
 
 export default function VotersList() {
-  const { user, campaign, error: campaignError, reload: reloadCampaign } = useCampaign();
+  const {
+    user,
+    campaign,
+    error: campaignError,
+    reload: reloadCampaign,
+  } = useCampaign();
   const navigate = useNavigate();
-  const [search, setSearch] = useState('');
-  const [state, setState] = useState('');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [search, setSearch] = useState("");
+  const [state, setState] = useState("");
   const [importOpen, setImportOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [editingVoter, setEditingVoter] = useState<Voter | null>(null);
+  const [duplicatesVersion, setDuplicatesVersion] = useState(0);
   const [tagFilter, setTagFilter] = useState<string[]>([]);
   const [groupByHousehold, setGroupByHousehold] = useState(false);
   const [offlineVoters, setOfflineVoters] = useState<Voter[]>([]);
   const { online } = useOfflineSync();
-  const path = campaign ? `/api/organizations/${campaign.orgId}/campaigns/${campaign.campId}/voters` : null;
-  const { data, error, loading, reload: reloadVoters } = useAuthenticatedQuery<Voter[]>(user, path, [campaign?.orgId, campaign?.campId]);
-  useEffect(() => { if (campaign) void cachedVoters(campaign.orgId, campaign.campId).then(setOfflineVoters); }, [campaign?.campId, campaign?.orgId]);
-  useEffect(() => { if (campaign && data) void cacheVoters(campaign.orgId, campaign.campId, data).then(() => setOfflineVoters(data)); }, [campaign?.campId, campaign?.orgId, data]);
+  const path = campaign
+    ? `/api/organizations/${campaign.orgId}/campaigns/${campaign.campId}/voters`
+    : null;
+  const {
+    data,
+    error,
+    loading,
+    reload: reloadVoters,
+  } = useAuthenticatedQuery<Voter[]>(user, path, [
+    campaign?.orgId,
+    campaign?.campId,
+  ]);
+  useEffect(() => {
+    if (campaign)
+      void cachedVoters(campaign.orgId, campaign.campId).then(setOfflineVoters);
+  }, [campaign?.campId, campaign?.orgId]);
+  useEffect(() => {
+    if (campaign && data)
+      void cacheVoters(campaign.orgId, campaign.campId, data).then(() =>
+        setOfflineVoters(data),
+      );
+  }, [campaign?.campId, campaign?.orgId, data]);
   const voters = (online ? data : offlineVoters) ?? data ?? offlineVoters;
-  const tagSuggestions = useMemo(() => [...new Map(voters.flatMap((voter) => voter.tags ?? []).map((tag) => [tag.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(), tag])).values()].sort((a, b) => a.localeCompare(b, 'es')), [voters]);
-  const visible = useMemo(() => voters.filter(voter => `${voter.name} ${voter.phone ?? ''} ${voter.address ?? ''}`.toLowerCase().includes(search.toLowerCase()) && (!state || voter.state === state) && (!tagFilter.length || tagFilter.every((tag) => (voter.tags ?? []).some((voterTag) => voterTag.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase() === tag.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase())))), [voters, search, state, tagFilter]);
-  const count = (value: string) => voters.filter(voter => voter.state === value).length;
-  const households = useMemo(() => Object.values(visible.reduce<Record<string, { id: string; address: string; members: Voter[] }>>((groups, voter) => {
-    const id = voter.householdId || `individual-${voter.id}`;
-    const group = groups[id] ?? { id, address: voter.address || 'Sin dirección', members: [] }; group.members.push(voter); groups[id] = group; return groups;
-  }, {})), [visible]);
-  const percent = (value: string) => voters.length ? Math.round(count(value) / voters.length * 100) : 0;
-  const loadError = online ? campaignError || error?.message : '';
+  useEffect(() => {
+    const voterId = searchParams.get("edit");
+    const voter = voterId ? voters.find((item) => item.id === voterId) : null;
+    if (voter) {
+      setEditingVoter(voter);
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, setSearchParams, voters]);
+  const tagSuggestions = useMemo(
+    () =>
+      [
+        ...new Map(
+          voters
+            .flatMap((voter) => voter.tags ?? [])
+            .map((tag) => [
+              tag
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "")
+                .toLowerCase(),
+              tag,
+            ]),
+        ).values(),
+      ].sort((a, b) => a.localeCompare(b, "es")),
+    [voters],
+  );
+  const visible = useMemo(
+    () =>
+      voters.filter(
+        (voter) =>
+          `${voter.name} ${voter.phone ?? ""} ${voter.address ?? ""}`
+            .toLowerCase()
+            .includes(search.toLowerCase()) &&
+          (!state || voter.state === state) &&
+          (!tagFilter.length ||
+            tagFilter.every((tag) =>
+              (voter.tags ?? []).some(
+                (voterTag) =>
+                  voterTag
+                    .normalize("NFD")
+                    .replace(/[\u0300-\u036f]/g, "")
+                    .toLowerCase() ===
+                  tag
+                    .normalize("NFD")
+                    .replace(/[\u0300-\u036f]/g, "")
+                    .toLowerCase(),
+              ),
+            )),
+      ),
+    [voters, search, state, tagFilter],
+  );
+  const count = (value: string) =>
+    voters.filter((voter) => voter.state === value).length;
+  const households = useMemo(
+    () =>
+      Object.values(
+        visible.reduce<
+          Record<string, { id: string; address: string; members: Voter[] }>
+        >((groups, voter) => {
+          const id = voter.householdId || `individual-${voter.id}`;
+          const group = groups[id] ?? {
+            id,
+            address: voter.address || "Sin dirección",
+            members: [],
+          };
+          group.members.push(voter);
+          groups[id] = group;
+          return groups;
+        }, {}),
+      ),
+    [visible],
+  );
+  const percent = (value: string) =>
+    voters.length ? Math.round((count(value) / voters.length) * 100) : 0;
+  const loadError = online ? campaignError || error?.message : "";
   const createVoter = async (values: ManualVoterInput) => {
-    if (!user || !campaign) throw new Error('No pudimos identificar la campaña activa.');
-    await authenticatedFetch(user, `/api/organizations/${campaign.orgId}/campaigns/${campaign.campId}/voters`, { method: 'POST', body: JSON.stringify(values) });
+    if (!user || !campaign)
+      throw new Error("No pudimos identificar la campaña activa.");
+    await authenticatedFetch(
+      user,
+      `/api/organizations/${campaign.orgId}/campaigns/${campaign.campId}/voters`,
+      { method: "POST", body: JSON.stringify(values) },
+    );
     await reloadVoters();
+    setDuplicatesVersion((version) => version + 1);
   };
   const updateVoter = async (voterId: string, values: ManualVoterInput) => {
-    if (!user || !campaign) throw new Error('No pudimos identificar la campaña activa.');
-    await authenticatedFetch(user, `/api/organizations/${campaign.orgId}/campaigns/${campaign.campId}/voters/${voterId}`, { method: 'PUT', body: JSON.stringify(values) });
+    if (!user || !campaign)
+      throw new Error("No pudimos identificar la campaña activa.");
+    await authenticatedFetch(
+      user,
+      `/api/organizations/${campaign.orgId}/campaigns/${campaign.campId}/voters/${voterId}`,
+      { method: "PUT", body: JSON.stringify(values) },
+    );
     await reloadVoters();
+    setDuplicatesVersion((version) => version + 1);
   };
 
-  return <PageContainer>
-    <HeroBanner icon="users" title="Electores" subtitle="Importa y prepara tu lista de electores para planificar y realizar visitas de campaña." subtitleDetail="Convierte datos en oportunidades. Organiza, segmenta y asigna electores a tu equipo." tags={[{ icon:'file', label:'Importa desde Excel o CSV' }, { icon:'users', label:'Segmenta y organiza' }, { icon:'user-check', label:'Asigna a tus equipos' }]} secondaryCtaLabel="Crear elector" secondaryCtaIcon="plus" onSecondaryCtaClick={() => setCreateOpen(true)} ctaLabel="Importar electores" ctaIcon="upload-cloud" onCtaClick={() => setImportOpen(true)} />
-    <ImportVoters open={importOpen} onOpenChange={setImportOpen} showTrigger={false} onImported={() => void reloadVoters()} />
-    <CreateVoterModal show={createOpen || Boolean(editingVoter)} onHide={() => { setCreateOpen(false); setEditingVoter(null); }} onCreate={createVoter} onUpdate={updateVoter} voter={editingVoter} existingVoters={voters} tagSuggestions={tagSuggestions} />
+  return (
+    <PageContainer>
+      <HeroBanner
+        icon="users"
+        title="Electores"
+        subtitle="Importa y prepara tu lista de electores para planificar y realizar visitas de campaña."
+        subtitleDetail="Convierte datos en oportunidades. Organiza, segmenta y asigna electores a tu equipo."
+        tags={[
+          { icon: "file", label: "Importa desde Excel o CSV" },
+          { icon: "users", label: "Segmenta y organiza" },
+          { icon: "user-check", label: "Asigna a tus equipos" },
+        ]}
+        secondaryCtaLabel="Crear elector"
+        secondaryCtaIcon="plus"
+        onSecondaryCtaClick={() => setCreateOpen(true)}
+        ctaLabel="Importar electores"
+        ctaIcon="upload-cloud"
+        onCtaClick={() => setImportOpen(true)}
+      />
+      <ImportVoters
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        showTrigger={false}
+        onImported={() => void reloadVoters()}
+      />
+      <CreateVoterModal
+        show={createOpen || Boolean(editingVoter)}
+        onHide={() => {
+          setCreateOpen(false);
+          setEditingVoter(null);
+        }}
+        onCreate={createVoter}
+        onUpdate={updateVoter}
+        voter={editingVoter}
+        existingVoters={voters}
+        tagSuggestions={tagSuggestions}
+      />
 
-    <div className="cd-dashboard__kpis">
-      <StatCard icon="users" value={voters.length} label="Total de electores" caption={voters.length ? `${voters.length} registros cargados` : 'Sin registros aún'} />
-      <StatCard icon="check-circle" iconColor="green" value={count('unvisited')} label="Listos para visitar" caption={`${percent('unvisited')}% del total`} progress={percent('unvisited')} />
-      <StatCard icon="help-circle" iconColor="orange" value={count('undecided')} label="Indecisos" caption={`${percent('undecided')}% del total`} progress={percent('undecided')} />
-      <StatCard icon="user-x" iconColor="red" value={count('converted_no')} label="No favorables" caption={`${percent('converted_no')}% del total`} progress={percent('converted_no')} />
-    </div>
+      <div className="cd-dashboard__kpis">
+        <StatCard
+          icon="users"
+          value={voters.length}
+          label="Total de electores"
+          caption={
+            voters.length
+              ? `${voters.length} registros cargados`
+              : "Sin registros aún"
+          }
+        />
+        <StatCard
+          icon="check-circle"
+          iconColor="green"
+          value={count("unvisited")}
+          label="Listos para visitar"
+          caption={`${percent("unvisited")}% del total`}
+          progress={percent("unvisited")}
+        />
+        <StatCard
+          icon="help-circle"
+          iconColor="orange"
+          value={count("undecided")}
+          label="Indecisos"
+          caption={`${percent("undecided")}% del total`}
+          progress={percent("undecided")}
+        />
+        <StatCard
+          icon="user-x"
+          iconColor="red"
+          value={count("converted_no")}
+          label="No favorables"
+          caption={`${percent("converted_no")}% del total`}
+          progress={percent("converted_no")}
+        />
+      </div>
 
-    <div className="cd-page-controls" aria-label="Filtros de electores">
-      <SearchInput value={search} onChange={event => setSearch(event.target.value)} placeholder="Buscar elector por nombre, teléfono, dirección o sección…" aria-label="Buscar elector" />
-      <SelectControl ariaLabel="Estado" label={labels[state] ?? 'Todos los estados'} options={[{ value:'', label:'Todos los estados' }, ...Object.entries(labels).map(([value, label]) => ({ value, label }))]} value={state} onChange={setState} />
-      <MultiSelectControl ariaLabel="Filtrar por tags" label="Todos los tags" value={tagFilter} onChange={setTagFilter} options={tagSuggestions.map((tag) => ({ value: tag, label: tag }))} />
-      <SelectControl icon="people" label="Todos los equipos" />
-      <SelectControl icon="map" label="Todas las secciones" />
-      <button className="cd-filter-more" type="button">Más filtros</button>
-    </div>
+      <div className="cd-page-controls" aria-label="Filtros de electores">
+        <SearchInput
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder="Buscar elector por nombre, teléfono, dirección o sección…"
+          aria-label="Buscar elector"
+        />
+        <SelectControl
+          className="cd-voter-filter-select"
+          ariaLabel="Estado"
+          label={labels[state] ?? "Todos los estados"}
+          options={[
+            { value: "", label: "Todos los estados" },
+            ...Object.entries(labels).map(([value, label]) => ({
+              value,
+              label,
+            })),
+          ]}
+          value={state}
+          onChange={setState}
+        />
+        <MultiSelectControl
+          className="cd-voter-filter-select"
+          ariaLabel="Filtrar por tags"
+          label="Todas las tags"
+          value={tagFilter}
+          onChange={setTagFilter}
+          options={tagSuggestions.map((tag) => ({ value: tag, label: tag }))}
+        />
+        <SelectControl
+          className="cd-voter-filter-select"
+          icon="people"
+          label="Todos los equipos"
+        />
+        <SelectControl
+          className="cd-voter-filter-select"
+          icon="map"
+          label="Todas las secciones"
+        />
+        <button className="cd-filter-more" type="button">
+          Más filtros
+        </button>
+      </div>
 
-    <ContentPanel icon="users" title="Lista de electores" subtitle="Gestiona tu base de electores, asigna segmentos y prepara tus visitas." headerAction={<Inline gap="sm"><span className="cd-panel-count">{voters.length} electores</span><button type="button" className="btn btn-sm btn-outline-primary" onClick={() => setGroupByHousehold((current) => !current)}>{groupByHousehold ? 'Vista individual' : 'Agrupar por hogar'}</button></Inline>}>
-      {loadError ? <EmptyState icon="users" title="No pudimos cargar los electores" description={loadError} ctaLabel="Reintentar" onCtaClick={() => void (campaignError ? reloadCampaign() : reloadVoters())} /> : loading && online ? <EmptyState icon="users" title="Cargando electores" description="Estamos preparando la lista de tu campaña." /> : visible.length ? groupByHousehold ? <Stack gap="sm">{households.map((household) => <details className="cs-household" key={household.id} open={household.members.length > 1}><summary><strong>{household.address}</strong><span>{household.members.length} {household.members.length === 1 ? 'elector' : 'electores'}</span></summary><div className="cd-table-scroll"><table className="cd-data-table"><tbody>{household.members.map((voter) => <tr key={voter.id}><td>{voter.name}</td><td><Inline gap="xs" wrap>{voter.tags?.length ? voter.tags.map((tag) => <span className="cd-voter-tag" key={tag}>{tag}</span>) : <span>—</span>}</Inline></td><td><span className="cd-state-pill">{labels[voter.state] ?? voter.state}</span></td><td><Inline gap="xs" wrap><button className="btn btn-sm btn-outline-primary" onClick={() => setEditingVoter(voter)}>Editar</button><button className="btn btn-sm btn-primary" onClick={() => navigate(`/visit/${voter.id}`)}>Visitar</button></Inline></td></tr>)}</tbody></table></div></details>)}</Stack> : <div className="cd-table-scroll"><table className="cd-data-table"><thead><tr><th>NOMBRE</th><th>TELÉFONO</th><th>DIRECCIÓN</th><th>TAGS</th><th>SECCIÓN</th><th>ESTADO</th><th>EQUIPO</th><th>ÚLTIMA VISITA</th><th>MÁS DATOS</th><th>ACCIONES</th></tr></thead><tbody>{visible.map(voter => <tr key={voter.id}><td>{voter.name}</td><td>{voter.phone || '—'}</td><td>{voter.address || '—'}</td><td><Inline gap="xs" wrap>{voter.tags?.length ? voter.tags.map((tag) => <span className="cd-voter-tag" key={tag}>{tag}</span>) : <span>—</span>}</Inline></td><td>{voter.section || '—'}</td><td><span className="cd-state-pill">{labels[voter.state] ?? voter.state}</span></td><td>{voter.teamName || '—'}</td><td>{voter.lastVisitAt ? new Date(voter.lastVisitAt).toLocaleDateString('es-AR') : '—'}</td><td><details className="cd-voter-more"><summary>Ver más</summary><Stack gap="xs"><span>DNI: {voter.dni || '—'}</span><span>Sexo: {voter.sexo || '—'}</span><span>Edad: {voterAge(voter.fechaNacimiento) ?? voter.edadAproximada ?? '—'}</span><span>Barrio: {voter.barrio || '—'}</span><span>Observaciones: {voter.observaciones || '—'}</span></Stack></details></td><td><Inline gap="xs" wrap><button className="btn btn-sm btn-outline-primary" onClick={() => setEditingVoter(voter)}>Editar</button><button className="btn btn-sm btn-primary" onClick={() => navigate(`/visit/${voter.id}`)}>Visitar</button></Inline></td></tr>)}</tbody></table></div> : <EmptyState icon="users" title="Aún no hay electores para mostrar" description="Importa tu lista de electores desde un archivo Excel o CSV para comenzar a organizar y planificar tus visitas de campaña." ctaLabel="Importar electores" onCtaClick={() => setImportOpen(true)} />}
-      <footer className="cd-table-footer"><span>Mostrando {visible.length} de {voters.length} electores</span><span>Filas por página&nbsp;&nbsp; 10</span></footer>
-    </ContentPanel>
-  </PageContainer>;
+      <ContentPanel
+        icon="users"
+        title="Lista de electores"
+        subtitle="Gestiona tu base de electores, asigna segmentos y prepara tus visitas."
+        headerAction={
+          <Inline gap="sm">
+            <span className="cd-panel-count">{voters.length} electores</span>
+            <button
+              type="button"
+              className="btn btn-sm btn-outline-primary"
+              onClick={() => setGroupByHousehold((current) => !current)}
+            >
+              {groupByHousehold ? "Vista individual" : "Agrupar por hogar"}
+            </button>
+          </Inline>
+        }
+      >
+        {loadError ? (
+          <EmptyState
+            icon="users"
+            title="No pudimos cargar los electores"
+            description={loadError}
+            ctaLabel="Reintentar"
+            onCtaClick={() =>
+              void (campaignError ? reloadCampaign() : reloadVoters())
+            }
+          />
+        ) : loading && online ? (
+          <EmptyState
+            icon="users"
+            title="Cargando electores"
+            description="Estamos preparando la lista de tu campaña."
+          />
+        ) : visible.length ? (
+          groupByHousehold ? (
+            <Stack gap="sm">
+              {households.map((household) => (
+                <details
+                  className="cs-household"
+                  key={household.id}
+                  open={household.members.length > 1}
+                >
+                  <summary>
+                    <strong>{household.address}</strong>
+                    <span>
+                      {household.members.length}{" "}
+                      {household.members.length === 1 ? "elector" : "electores"}
+                    </span>
+                  </summary>
+                  <div className="cd-table-scroll">
+                    <table className="cd-data-table">
+                      <tbody>
+                        {household.members.map((voter) => (
+                          <tr key={voter.id}>
+                            <td>
+                              <button type="button" className="btn btn-link p-0" onClick={() => navigate(`/electoral-conversion/electores/${voter.id}`)}>
+                                {voter.name}
+                              </button>
+                            </td>
+                            <td>
+                              <Inline gap="xs" wrap>
+                                {voter.tags?.length ? (
+                                  voter.tags.map((tag) => (
+                                    <span className="cd-voter-tag" key={tag}>
+                                      {tag}
+                                    </span>
+                                  ))
+                                ) : (
+                                  <span>—</span>
+                                )}
+                              </Inline>
+                            </td>
+                            <td>
+                              <span className="cd-state-pill">
+                                {labels[voter.state] ?? voter.state}
+                              </span>
+                            </td>
+                            <td>
+                              <Inline gap="xs" wrap>
+                                <button
+                                  className="btn btn-sm btn-outline-primary"
+                                  onClick={() => setEditingVoter(voter)}
+                                >
+                                  Editar
+                                </button>
+                                <button
+                                  className="btn btn-sm btn-primary"
+                                  onClick={() => navigate(`/visit/${voter.id}`)}
+                                >
+                                  Visitar
+                                </button>
+                              </Inline>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </details>
+              ))}
+            </Stack>
+          ) : (
+            <div className="cd-table-scroll">
+              <table className="cd-data-table">
+                <thead>
+                  <tr>
+                    <th>NOMBRE</th>
+                    <th>TELÉFONO</th>
+                    <th>DIRECCIÓN</th>
+                    <th>TAGS</th>
+                    <th>SECCIÓN</th>
+                    <th>ESTADO</th>
+                    <th>EQUIPO</th>
+                    <th>ÚLTIMA VISITA</th>
+                    <th>MÁS DATOS</th>
+                    <th>ACCIONES</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visible.map((voter) => (
+                    <tr key={voter.id}>
+                      <td>
+                        <button type="button" className="btn btn-link p-0" onClick={() => navigate(`/electoral-conversion/electores/${voter.id}`)}>
+                          {voter.name}
+                        </button>
+                      </td>
+                      <td>{voter.phone || "—"}</td>
+                      <td>{voter.address || "—"}</td>
+                      <td>
+                        <Inline gap="xs" wrap>
+                          {voter.tags?.length ? (
+                            voter.tags.map((tag) => (
+                              <span className="cd-voter-tag" key={tag}>
+                                {tag}
+                              </span>
+                            ))
+                          ) : (
+                            <span>—</span>
+                          )}
+                        </Inline>
+                      </td>
+                      <td>{voter.section || "—"}</td>
+                      <td>
+                        <span className="cd-state-pill">
+                          {labels[voter.state] ?? voter.state}
+                        </span>
+                      </td>
+                      <td>{voter.teamName || "—"}</td>
+                      <td>
+                        {voter.lastVisitAt
+                          ? new Date(voter.lastVisitAt).toLocaleDateString(
+                              "es-AR",
+                            )
+                          : "—"}
+                      </td>
+                      <td>
+                        <details className="cd-voter-more">
+                          <summary>Ver más</summary>
+                          <Stack gap="xs">
+                            <span>DNI: {voter.dni || "—"}</span>
+                            <span>Sexo: {voter.sexo || "—"}</span>
+                            <span>
+                              Edad:{" "}
+                              {voterAge(voter.fechaNacimiento) ??
+                                voter.edadAproximada ??
+                                "—"}
+                            </span>
+                            <span>Barrio: {voter.barrio || "—"}</span>
+                            <span>
+                              Observaciones: {voter.observaciones || "—"}
+                            </span>
+                          </Stack>
+                        </details>
+                      </td>
+                      <td>
+                        <Inline gap="xs" wrap>
+                          <button
+                            className="btn btn-sm btn-outline-primary"
+                            onClick={() => setEditingVoter(voter)}
+                          >
+                            Editar
+                          </button>
+                          <button
+                            className="btn btn-sm btn-primary"
+                            onClick={() => navigate(`/visit/${voter.id}`)}
+                          >
+                            Visitar
+                          </button>
+                        </Inline>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
+        ) : (
+          <EmptyState
+            icon="users"
+            title="Aún no hay electores para mostrar"
+            description="Importa tu lista de electores desde un archivo Excel o CSV para comenzar a organizar y planificar tus visitas de campaña."
+            ctaLabel="Importar electores"
+            onCtaClick={() => setImportOpen(true)}
+          />
+        )}
+        <footer className="cd-table-footer">
+          <span>
+            Mostrando {visible.length} de {voters.length} electores
+          </span>
+          <span>Filas por página&nbsp;&nbsp; 10</span>
+        </footer>
+      </ContentPanel>
+      <DuplicateVotersPanel
+        key={`${campaign?.campId ?? "none"}-${duplicatesVersion}`}
+        user={user}
+        campaign={campaign}
+        onMerged={async () => {
+          await reloadVoters();
+          setDuplicatesVersion((version) => version + 1);
+        }}
+      />
+    </PageContainer>
+  );
 }
