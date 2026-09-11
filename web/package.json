@@ -49,6 +49,7 @@
     "test:e2e:voter-profile": "node scripts/test-voter-profile-e2e.mjs",
     "test:e2e:voter-issues": "node scripts/test-voter-issues-e2e.mjs",
     "test:e2e:sidebar-layout": "node scripts/test-sidebar-layout-e2e.mjs",
+    "test:e2e:voters-map-ui": "node scripts/test-voters-map-ui-e2e.mjs",
     "test:e2e:campaign-compare": "node scripts/test-campaign-compare-e2e-real.mjs",
     "test:e2e:campaign-clone": "node scripts/test-campaign-clone-e2e-real.mjs",
     "test:e2e:campaign-templates": "node scripts/test-campaign-templates-e2e-real.mjs",

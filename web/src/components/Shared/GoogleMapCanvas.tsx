@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 
 export type GoogleMapPoint = {
   id: string;
@@ -13,6 +13,7 @@ type GoogleMapCanvasProps = {
   mode?: 'markers' | 'heatmap';
   compact?: boolean;
   ariaLabel?: string;
+  overlay?: ReactNode;
 };
 
 type MapsWindow = Window & {
@@ -84,7 +85,7 @@ function markerIcon(maps: any, color: string) {
   };
 }
 
-export default function GoogleMapCanvas({ points, mode = 'markers', compact = false, ariaLabel = 'Mapa de electores' }: GoogleMapCanvasProps) {
+export default function GoogleMapCanvas({ points, mode = 'markers', compact = false, ariaLabel = 'Mapa de electores', overlay }: GoogleMapCanvasProps) {
   const element = useRef<HTMLDivElement>(null);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error' | 'missing'>('loading');
   const [error, setError] = useState('');
@@ -172,6 +173,7 @@ export default function GoogleMapCanvas({ points, mode = 'markers', compact = fa
 
   return <div className={`cs-google-map-shell${compact ? ' cs-google-map-shell--compact' : ''}`}>
     <div ref={element} className="cs-google-map" aria-label={ariaLabel} data-google-map-status={status} data-google-map-marker-count={mode === 'markers' ? renderedMarkerCount : undefined} />
+    {overlay && <div className="cs-google-map__overlay">{overlay}</div>}
     {message && <div className="cs-google-map__state" role={status === 'error' ? 'alert' : 'status'}>{message}</div>}
   </div>;
 }
