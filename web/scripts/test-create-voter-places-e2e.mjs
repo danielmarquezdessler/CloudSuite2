@@ -69,19 +69,23 @@ try {
     observe.observe(node, { attributes: true, attributeFilter: ['data-google-map-status'] });
     if (node.getAttribute('data-google-map-status') === 'ready') { clearTimeout(deadline); observe.disconnect(); resolveReady(undefined); }
   }));
-  await page.getByLabel('Buscar una ubicación').fill(voterName);
+  await page.getByLabel('Buscar elector en el mapa').fill(voterName);
   await page.locator('[data-google-map-status="ready"]').waitFor();
   const renderedCount = page.locator('[data-google-map-marker-count="1"]');
   await renderedCount.waitFor();
   const marker = page.locator(`[title="${voterName}"]`);
   await marker.waitFor({ state: 'attached' });
+  await marker.click();
+  const tooltip = page.locator('.cs-map-elector-tooltip');
+  await tooltip.getByText(voterName, { exact: true }).waitFor();
+  await tooltip.getByText(created.address, { exact: true }).waitFor();
   await page.getByLabel('Capa Electores').uncheck();
   await page.locator('[data-google-map-marker-count="0"]').waitFor();
   await marker.waitFor({ state: 'detached' });
   await page.getByLabel('Capa Electores').check();
   await renderedCount.waitFor();
   await marker.waitFor({ state: 'attached' });
-  for (const layer of ['Capa Zonas y Barrios', 'Capa Territorios', 'Capa Rutas de visita']) {
+  for (const layer of ['Capa Zonas y Grupos', 'Capa Territorios', 'Capa Rutas de visita']) {
     const control = page.getByLabel(layer);
     await control.check();
     if (!await control.isChecked()) throw new Error(`${layer} no se activó.`);

@@ -1,64 +1,42 @@
 import { ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import { TerraDraw, TerraDrawPolygonMode } from 'terra-draw';
+import { TerraDrawGoogleMapsAdapter } from 'terra-draw-google-maps-adapter';
 
-export type GoogleMapPoint = {
-  id: string;
-  lat: number;
-  lng: number;
-  name?: string;
-  state?: string;
-};
-
+export type GoogleMapPoint = { id: string; lat: number; lng: number; name?: string; address?: string; state?: string };
+export type GoogleMapPolygon = { id: string; name: string; polygon: Array<{ lat: number; lng: number }>; highlighted?: boolean };
 type GoogleMapCanvasProps = {
   points: GoogleMapPoint[];
+  polygons?: GoogleMapPolygon[];
+  focusPolygonId?: string | null;
   mode?: 'markers' | 'heatmap';
   compact?: boolean;
   ariaLabel?: string;
   overlay?: ReactNode;
+  drawing?: { enabled: boolean; onPolygonComplete: (polygon: Array<{ lat: number; lng: number }>) => void };
 };
-
-type MapsWindow = Window & {
-  google?: any;
-  gm_authFailure?: () => void;
-  __cloudSuiteGoogleMapsReady?: () => void;
-};
-
+type MapsWindow = Window & { google?: any; gm_authFailure?: () => void; __cloudSuiteGoogleMapsReady?: () => void };
 let mapsPromise: Promise<any> | null = null;
 
 function loadGoogleMaps(apiKey: string) {
   const mapsWindow = window as MapsWindow;
   if (mapsWindow.google?.maps) return Promise.resolve(mapsWindow.google.maps);
   if (mapsPromise) return mapsPromise;
-
   mapsPromise = new Promise((resolve, reject) => {
     const callbackName = '__cloudSuiteGoogleMapsReady';
     const timeout = window.setTimeout(() => reject(new Error('Google Maps tardó demasiado en responder.')), 15000);
     const previousAuthFailure = mapsWindow.gm_authFailure;
-    (mapsWindow as any)[callbackName] = () => {
-      window.clearTimeout(timeout);
-      resolve(mapsWindow.google?.maps);
-    };
-    mapsWindow.gm_authFailure = () => {
-      window.clearTimeout(timeout);
-      reject(new Error('Google Maps rechazó la clave o su restricción de origen.'));
-      previousAuthFailure?.();
-    };
-
+    (mapsWindow as any)[callbackName] = () => { window.clearTimeout(timeout); resolve(mapsWindow.google?.maps); };
+    mapsWindow.gm_authFailure = () => { window.clearTimeout(timeout); reject(new Error('Google Maps rechazó la clave o su restricción de origen.')); previousAuthFailure?.(); };
     const script = document.createElement('script');
-    script.id = 'cloudsuite-google-maps';
-    script.async = true;
-    script.defer = true;
+    script.id = 'cloudsuite-google-maps'; script.async = true; script.defer = true;
     script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&libraries=places&callback=${callbackName}`;
-    script.onerror = () => {
-      window.clearTimeout(timeout);
-      reject(new Error('No se pudo descargar Google Maps. Revisá la red o la configuración de la API.'));
-    };
+    script.onerror = () => { window.clearTimeout(timeout); reject(new Error('No se pudo descargar Google Maps. Revisá la red o la configuración de la API.')); };
     document.head.appendChild(script);
   });
-
   return mapsPromise;
 }
 
-/** Loads the same Maps JavaScript API used by the map widgets, including Places. */
+/** Loads the Maps JavaScript API used by the map widgets, including Places. */
 export function loadGoogleMapsApi() {
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined;
   if (!apiKey) return Promise.reject(new Error('Configurá VITE_GOOGLE_MAPS_API_KEY para usar Google Places.'));
@@ -73,106 +51,90 @@ function markerColor(state?: string) {
   return '#94a3b8';
 }
 
-function markerIcon(maps: any, color: string) {
-  return {
-    path: "M12 0C5.37 0 0 5.37 0 12c0 9 12 20 12 20s12-11 12-20C24 5.37 18.63 0 12 0z",
-    fillColor: color,
-    fillOpacity: 1,
-    strokeColor: "#ffffff",
-    strokeWeight: 2.5,
-    scale: 1.25,
-    anchor: new maps.Point(12, 32),
-  };
-}
-
-export default function GoogleMapCanvas({ points, mode = 'markers', compact = false, ariaLabel = 'Mapa de electores', overlay }: GoogleMapCanvasProps) {
+export default function GoogleMapCanvas({ points, polygons = [], focusPolygonId, mode = 'markers', compact = false, ariaLabel = 'Mapa de electores', overlay, drawing }: GoogleMapCanvasProps) {
   const element = useRef<HTMLDivElement>(null);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error' | 'missing'>('loading');
   const [error, setError] = useState('');
   const [renderedMarkerCount, setRenderedMarkerCount] = useState(0);
-  const dataKey = useMemo(() => points.map((point) => `${point.id}:${point.lat}:${point.lng}:${point.state ?? ''}`).join('|'), [points]);
+  const dataKey = useMemo(() => points.map(point => `${point.id}:${point.lat}:${point.lng}:${point.name ?? ''}:${point.address ?? ''}:${point.state ?? ''}`).join('|'), [points]);
+  const polygonKey = useMemo(() => polygons.map(polygon => `${polygon.id}:${polygon.highlighted}:${polygon.polygon.map(point => `${point.lat},${point.lng}`).join(';')}`).join('|'), [polygons]);
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined;
 
   useEffect(() => {
-    if (!apiKey) {
-      setStatus('missing');
-      return;
-    }
-
+    if (!apiKey) { setStatus('missing'); return; }
     let cancelled = false;
-    let overlayInstances: any[] = [];
+    let overlays: any[] = [];
     let tilesListener: any;
-    setStatus('loading');
-    setError('');
-    setRenderedMarkerCount(0);
+    let idleListener: any;
+    let projectionListener: any;
+    let terraDraw: TerraDraw | null = null;
+    setStatus('loading'); setError(''); setRenderedMarkerCount(0);
 
     void loadGoogleMaps(apiKey).then((maps) => {
       if (cancelled || !element.current || !maps) return;
-      const validPoints = points.filter((point) => Number.isFinite(point.lat) && Number.isFinite(point.lng));
-      const fallbackCenter = { lat: -31.4167, lng: -64.1833 };
-      const map = new maps.Map(element.current, {
-        center: validPoints[0] ? { lat: validPoints[0].lat, lng: validPoints[0].lng } : fallbackCenter,
-        zoom: validPoints.length === 1 ? 14 : 12,
-        mapTypeControl: false,
-        streetViewControl: false,
-        fullscreenControl: true
-      });
-      tilesListener = maps.event.addListenerOnce(map, 'tilesloaded', () => {
-        if (!cancelled) setStatus('ready');
-      });
+      const validPoints = points.filter(point => Number.isFinite(point.lat) && Number.isFinite(point.lng));
+      const map = new maps.Map(element.current, { center: validPoints[0] ? { lat: validPoints[0].lat, lng: validPoints[0].lng } : { lat: -31.4167, lng: -64.1833 }, zoom: validPoints.length === 1 ? 14 : 12, mapTypeControl: false, streetViewControl: false, fullscreenControl: true });
+      // `tilesloaded` does not fire consistently when tiles are restored from the browser cache.
+      // `idle` is emitted when the map has finished its initial render in both cached and cold loads.
+      const markReady = () => { if (!cancelled) setStatus('ready'); };
+      tilesListener = maps.event.addListenerOnce(map, 'tilesloaded', markReady);
+      idleListener = maps.event.addListenerOnce(map, 'idle', markReady);
       const bounds = new maps.LatLngBounds();
-      validPoints.forEach((point) => bounds.extend({ lat: point.lat, lng: point.lng }));
+      validPoints.forEach(point => bounds.extend({ lat: point.lat, lng: point.lng }));
 
       if (mode === 'heatmap') {
-        // Google retiró HeatmapLayer en Maps JavaScript API v3.65. Estas capas
-        // nativas de círculos preservan una lectura de densidad sobre datos reales
-        // sin depender de una API eliminada: puntos cercanos se superponen e
-        // intensifican visualmente la zona con mayor actividad.
-        overlayInstances = validPoints.flatMap((point) => {
-          const color = markerColor(point.state);
-          return [420, 250, 120].map((radius, index) => new maps.Circle({
-            map,
-            center: { lat: point.lat, lng: point.lng },
-            radius,
-            fillColor: color,
-            fillOpacity: [0.08, 0.14, 0.24][index],
-            strokeOpacity: 0,
-            clickable: false
-          }));
-        });
+        // HeatmapLayer fue retirado por Google; círculos concéntricos conservan una lectura de densidad sin una dependencia pesada.
+        overlays = validPoints.flatMap(point => [420, 250, 120].map((radius, index) => new maps.Circle({ map, center: { lat: point.lat, lng: point.lng }, radius, fillColor: markerColor(point.state), fillOpacity: [0.08, 0.14, 0.24][index], strokeOpacity: 0, clickable: false })));
       } else {
-        overlayInstances = validPoints.map((point) => new maps.Marker({
-          map,
-          position: { lat: point.lat, lng: point.lng },
-          title: point.name ?? 'Elector',
-          icon: markerIcon(maps, markerColor(point.state)),
-          zIndex: 1000
-        }));
-        setRenderedMarkerCount(overlayInstances.length);
+        const infoWindow = new maps.InfoWindow();
+        overlays = validPoints.map(point => {
+          const marker = new maps.Marker({ map, position: { lat: point.lat, lng: point.lng }, title: point.name ?? 'Elector', icon: { url: '/img/pin.webp', scaledSize: new maps.Size(48, 48), anchor: new maps.Point(24, 47) }, animation: maps.Animation?.DROP, zIndex: 1000 });
+          const content = document.createElement('div'); content.className = 'cs-map-elector-tooltip';
+          const name = document.createElement('strong'); name.textContent = point.name ?? 'Elector';
+          const address = document.createElement('span'); address.textContent = point.address ?? 'Dirección no informada';
+          content.append(name, address);
+          marker.addListener('click', () => { infoWindow.setContent(content); infoWindow.open(map, marker); });
+          return marker;
+        });
+        setRenderedMarkerCount(overlays.length);
       }
 
-      if (validPoints.length > 1) map.fitBounds(bounds, 32);
-    }).catch((reason: unknown) => {
-      if (!cancelled) {
-        setStatus('error');
-        setError(reason instanceof Error ? reason.message : 'No se pudo iniciar Google Maps.');
+      polygons.forEach(item => {
+        if (item.polygon.length < 3) return;
+        const polygon = new maps.Polygon({ map, paths: item.polygon, fillColor: item.highlighted ? '#0060f0' : '#4b83e6', fillOpacity: item.highlighted ? 0.26 : 0.14, strokeColor: item.highlighted ? '#0049bd' : '#4b83e6', strokeOpacity: 0.95, strokeWeight: item.highlighted ? 3 : 2, clickable: false, zIndex: item.highlighted ? 600 : 400 });
+        overlays.push(polygon);
+      });
+      const focused = polygons.find(item => item.id === focusPolygonId);
+      if (focused?.polygon.length) focused.polygon.forEach(point => bounds.extend(point));
+      if (!bounds.isEmpty()) map.fitBounds(bounds, 32);
+
+      if (drawing?.enabled) {
+        const startTerraDraw = () => {
+          if (cancelled) return;
+          terraDraw = new TerraDraw({
+            adapter: new TerraDrawGoogleMapsAdapter({ lib: maps, map, coordinatePrecision: 8 }),
+            modes: [new TerraDrawPolygonMode({ styles: { fillColor: '#0060f0', fillOpacity: 0.14, outlineColor: '#0060f0', outlineWidth: 3 } })]
+          });
+          terraDraw.start();
+          terraDraw.on('ready', () => { if (!cancelled) terraDraw?.setMode('polygon'); });
+          terraDraw.on('finish', (id) => {
+            const feature = terraDraw?.getSnapshotFeature(id);
+            if (cancelled || feature?.geometry.type !== 'Polygon') return;
+            const ring = feature.geometry.coordinates[0] ?? [];
+            const coordinates = ring.slice(0, -1).map((position: number[]) => ({ lat: position[1], lng: position[0] }));
+            if (coordinates.length >= 3) drawing.onPolygonComplete(coordinates);
+          });
+        };
+        projectionListener = maps.event.addListenerOnce(map, 'projection_changed', startTerraDraw);
       }
-    });
+    }).catch((reason: unknown) => { if (!cancelled) { setStatus('error'); setError(reason instanceof Error ? reason.message : 'No se pudo iniciar Google Maps.'); } });
 
-    return () => {
-      cancelled = true;
-      tilesListener?.remove?.();
-      overlayInstances.forEach((overlay) => overlay.setMap(null));
-      setRenderedMarkerCount(0);
-    };
-  }, [apiKey, dataKey, mode]);
+    return () => { cancelled = true; tilesListener?.remove?.(); idleListener?.remove?.(); projectionListener?.remove?.(); terraDraw?.stop(); overlays.forEach(overlay => overlay.setMap?.(null)); setRenderedMarkerCount(0); };
+  }, [apiKey, dataKey, polygonKey, focusPolygonId, mode, drawing?.enabled]);
 
-  const message = status === 'missing'
-    ? 'Configurá VITE_GOOGLE_MAPS_API_KEY para visualizar el mapa.'
-    : status === 'error' ? error : status === 'loading' ? 'Cargando Google Maps…' : '';
-
+  const message = status === 'missing' ? 'Configurá VITE_GOOGLE_MAPS_API_KEY para visualizar el mapa.' : status === 'error' ? error : status === 'loading' ? 'Cargando Google Maps…' : '';
   return <div className={`cs-google-map-shell${compact ? ' cs-google-map-shell--compact' : ''}`}>
-    <div ref={element} className="cs-google-map" aria-label={ariaLabel} data-google-map-status={status} data-google-map-marker-count={mode === 'markers' ? renderedMarkerCount : undefined} />
+    <div id="cloudsuite-google-map" ref={element} className="cs-google-map" aria-label={ariaLabel} data-google-map-status={status} data-google-map-marker-count={mode === 'markers' ? renderedMarkerCount : undefined} data-google-map-polygon-count={polygons.length} />
     {overlay && <div className="cs-google-map__overlay">{overlay}</div>}
     {message && <div className="cs-google-map__state" role={status === 'error' ? 'alert' : 'status'}>{message}</div>}
   </div>;

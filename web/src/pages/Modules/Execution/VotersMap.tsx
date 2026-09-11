@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useAuthenticatedQuery } from '../../../lib/api';
+import { authenticatedFetch, useAuthenticatedQuery } from '../../../lib/api';
 import { useCampaign } from '../Organization/useCampaign';
 import ContentPanel from '../../../components/Shared/ContentPanel';
 import EmptyState from '../../../components/Shared/EmptyState';
@@ -11,89 +11,64 @@ import MapContainer from '../../../components/Planning/MapContainer';
 import GoogleMapCanvas from '../../../components/Shared/GoogleMapCanvas';
 import Inline from '../../../components/Shared/Inline';
 import Stack from '../../../components/Shared/Stack';
+import SelectControl from '../../../components/Shared/SelectControl';
 
-type Voter = {
-  id: string;
-  name: string;
-  address?: string;
-  section?: string;
-  lat?: number | null;
-  lng?: number | null;
-  state: string;
-  createdAt?: string | { _seconds?: number; seconds?: number };
-};
+type Voter = { id: string; name: string; address?: string; lat?: number | null; lng?: number | null; state: string; createdAt?: string | { _seconds?: number; seconds?: number } };
+type Zone = { id: string; name: string; polygon: Array<{ lat: number; lng: number }>; source?: string };
+type Team = { id: string; name: string };
 type LayerName = 'electors' | 'zones' | 'territories' | 'routes';
-
-const timestamp = (value: Voter['createdAt']) => {
-  if (typeof value === 'string') return new Date(value).getTime();
-  if (value && typeof value === 'object') return Number(value._seconds ?? value.seconds ?? 0) * 1000;
-  return 0;
-};
-
-const weeklyTrend = (voters: Voter[], metric: (item: Voter) => boolean) => {
-  const now = Date.now();
-  const week = 7 * 24 * 60 * 60 * 1000;
-  const current = voters.filter((item) => metric(item) && timestamp(item.createdAt) >= now - week).length;
-  const previous = voters.filter((item) => metric(item) && timestamp(item.createdAt) >= now - 2 * week && timestamp(item.createdAt) < now - week).length;
-  if (!current && !previous) return 'Sin variación semanal';
-  if (!previous) return `+${current} esta semana`;
-  const change = Math.round(((current - previous) / previous) * 100);
-  return `${change >= 0 ? '+' : ''}${change}% vs. semana anterior`;
-};
+const timestamp = (value: Voter['createdAt']) => typeof value === 'string' ? new Date(value).getTime() : Number(value?._seconds ?? value?.seconds ?? 0) * 1000;
+const searchable = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase().trim();
+const weeklyTrend = (voters: Voter[], metric: (item: Voter) => boolean) => { const now = Date.now(); const week = 7 * 86400000; const current = voters.filter(item => metric(item) && timestamp(item.createdAt) >= now - week).length; const previous = voters.filter(item => metric(item) && timestamp(item.createdAt) >= now - 2 * week && timestamp(item.createdAt) < now - week).length; if (!current && !previous) return 'Sin variación semanal'; if (!previous) return `+${current} esta semana`; const change = Math.round(((current - previous) / previous) * 100); return `${change >= 0 ? '+' : ''}${change}% vs. semana anterior`; };
+const pointInside = (point: { lat: number; lng: number }, polygon: Array<{ lat: number; lng: number }>) => { let inside = false; for (let index = 0, previous = polygon.length - 1; index < polygon.length; previous = index++) { const current = polygon[index]; const before = polygon[previous]; if ((current.lng > point.lng) !== (before.lng > point.lng) && point.lat < ((before.lat - current.lat) * (point.lng - current.lng)) / (before.lng - current.lng) + current.lat) inside = !inside; } return inside; };
 
 export default function VotersMap() {
   const { user, campaign, error: campaignError, reload: reloadCampaign } = useCampaign();
-  const [search, setSearch] = useState('');
-  const [layers, setLayers] = useState<Record<LayerName, boolean>>({ electors: true, zones: false, territories: false, routes: false });
-  const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
-  const path = campaign ? `/api/organizations/${campaign.orgId}/campaigns/${campaign.campId}/voters` : null;
-  const { data, error, loading, reload } = useAuthenticatedQuery<Voter[]>(user, path, [campaign?.orgId, campaign?.campId]);
-  const voters = data ?? [];
-
-  useEffect(() => {
-    if (data) setUpdatedAt(new Date());
-  }, [data]);
-
-  const points = useMemo(() => voters.filter((voter): voter is Voter & { lat: number; lng: number } => typeof voter.lat === 'number' && typeof voter.lng === 'number' && voter.name.toLowerCase().includes(search.toLowerCase())), [voters, search]);
-  const zones = new Set(voters.map(voter => voter.section).filter(Boolean)).size;
-  const coverage = voters.length ? Math.round(points.length / voters.length * 100) : 0;
-  const activeLayers = Object.values(layers).filter(Boolean).length;
-  const loadError = campaignError || error?.message;
-  const mapPoints = layers.electors ? points : [];
-  const toggleLayer = (layer: LayerName) => setLayers((current) => ({ ...current, [layer]: !current[layer] }));
-  const summary = coverage >= 80
-    ? 'Excelente cobertura territorial en la zona seleccionada.'
-    : coverage >= 50
-      ? 'La cobertura es buena; completá las direcciones pendientes para mejorarla.'
-      : 'Cobertura territorial inicial: priorizá geolocalizar las direcciones pendientes.';
-  const summaryTone = coverage >= 80 ? 'is-success' : coverage >= 50 ? 'is-neutral' : 'is-warning';
+  const [search, setSearch] = useState(''); const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
+  const [layers, setLayers] = useState<Record<LayerName, boolean>>({ electors: true, zones: true, territories: false, routes: false });
+  const [drawing, setDrawing] = useState(false); const [polygon, setPolygon] = useState<Array<{ lat: number; lng: number }>>([]);
+  const [tag, setTag] = useState(''); const [teamId, setTeamId] = useState(''); const [groupName, setGroupName] = useState(''); const [selectionMessage, setSelectionMessage] = useState('');
+  const [panel, setPanel] = useState<'layers' | 'groups'>('layers'); const [focusedGroupId, setFocusedGroupId] = useState<string | null>(null); const [editingGroupId, setEditingGroupId] = useState<string | null>(null); const [editingName, setEditingName] = useState('');
+  const base = campaign ? `/api/organizations/${campaign.orgId}/campaigns/${campaign.campId}` : null;
+  const { data, error, loading, reload } = useAuthenticatedQuery<Voter[]>(user, base ? `${base}/voters` : null, [campaign?.orgId, campaign?.campId]);
+  const groups = useAuthenticatedQuery<Zone[]>(user, base ? `${base}/zones` : null, [campaign?.orgId, campaign?.campId]);
+  const teams = useAuthenticatedQuery<Team[]>(user, base ? `${base}/teams` : null, [campaign?.orgId, campaign?.campId]);
+  const voters = data ?? []; const zones = groups.data ?? [];
+  useEffect(() => { if (data) setUpdatedAt(new Date()); }, [data]);
+  const points = useMemo(() => { const query = searchable(search); return voters.filter((voter): voter is Voter & { lat: number; lng: number } => typeof voter.lat === 'number' && typeof voter.lng === 'number' && (!query || searchable(voter.name).includes(query))); }, [voters, search]);
+  const geolocated = useMemo(() => voters.filter((voter): voter is Voter & { lat: number; lng: number } => typeof voter.lat === 'number' && typeof voter.lng === 'number'), [voters]);
+  const coverage = voters.length ? Math.round(geolocated.length / voters.length * 100) : 0; const activeLayers = Object.values(layers).filter(Boolean).length;
+  const selectedPoints = useMemo(() => polygon.length >= 3 ? points.filter(point => pointInside(point, polygon)) : [], [points, polygon]);
+  const selectedStates = selectedPoints.reduce<Record<string, number>>((counts, point) => ({ ...counts, [point.state]: (counts[point.state] ?? 0) + 1 }), {});
+  const mapGroups = layers.zones ? zones.map(group => ({ ...group, highlighted: group.id === focusedGroupId })) : [];
+  const toggleLayer = (layer: LayerName) => setLayers(current => ({ ...current, [layer]: !current[layer] }));
   const lastUpdated = updatedAt ? `Hoy, ${updatedAt.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}` : 'Actualizando…';
+  const summary = coverage >= 80 ? 'Excelente cobertura territorial en la zona seleccionada.' : coverage >= 50 ? 'La cobertura es buena; completá las direcciones pendientes para mejorarla.' : 'Cobertura territorial inicial: priorizá geolocalizar las direcciones pendientes.';
+  const summaryTone = coverage >= 80 ? 'is-success' : coverage >= 50 ? 'is-neutral' : 'is-warning';
+  const selectedStateSummary = Object.entries(selectedStates).map(([state, count]) => `${count} ${state === 'unvisited' ? 'sin visitar' : state === 'undecided' ? 'indecisos' : state}`).join(' · ');
 
-  const mapChips = <Inline gap="sm" className="cs-map-quick-stats" role="region" aria-label="Resumen del mapa">
-    <span><b>{points.length}</b> electores</span>
-    <span><b>{coverage}%</b> geolocalizados</span>
-    <span><b>{activeLayers}</b> capa{activeLayers === 1 ? '' : 's'} activa{activeLayers === 1 ? '' : 's'}</span>
-  </Inline>;
-
-  return <PageContainer>
-    <Stack gap="lg" className="cs-voters-map">
-      <HeroBanner
-        eyebrow="INTELIGENCIA TERRITORIAL"
-        icon="map"
-        title="Mapa de electores"
-        subtitle="Visualizá la distribución territorial de tus electores en Córdoba, Argentina."
-        subtitleDetail="Identificá zonas de mayor oportunidad, planificá recorridos y tomá mejores decisiones en territorio."
-        tags={[{ icon:'map-pin', label:'Córdoba, Argentina' }, { icon:'calendar', label:'Últimos 30 días' }, { icon:'users', label:'Todos los electores' }]}
-        ctaLabel="Exportar mapa"
-        ctaIcon="download"
-      />
-      <div className="cd-dashboard__kpis">
-        <StatCard icon="users" value={voters.length} label="Total de electores" caption={weeklyTrend(voters, () => true)} captionColor="#16a34a" />
-        <StatCard icon="map-pin" iconColor="green" value={points.length} label="Puntos en el mapa" caption={weeklyTrend(voters, item => typeof item.lat === 'number' && typeof item.lng === 'number')} captionColor="#16a34a" />
-        <StatCard icon="map" iconColor="purple" value={zones} label="Zonas con electores" caption={zones ? `${zones} secciones activas` : 'Sin datos aún'} />
-        <StatCard icon="target" iconColor="orange" value={`${coverage}%`} label="Cobertura territorial" caption={coverage ? 'Electores geolocalizados' : 'Sin información'} progress={coverage} />
-      </div>
-      {loadError ? <ContentPanel icon="map" title="Mapa de electores" subtitle="Distribución territorial de la campaña"><EmptyState icon="map" title="No pudimos cargar el mapa" description={loadError} ctaLabel="Reintentar" onCtaClick={() => void (campaignError ? reloadCampaign() : reload())} /></ContentPanel> : <ContentPanel icon="map" title="Mapa de electores" subtitle="Distribución territorial de la campaña" headerAction={<Inline gap="xs" className="cs-map-live"><i aria-hidden="true" />Última actualización: {lastUpdated}</Inline>}><MapContainer floating={<SearchInput className="cs-map-stage__search" value={search} onChange={event => setSearch(event.target.value)} placeholder="Buscar en el mapa…" aria-label="Buscar una ubicación" />} sidebar={<Stack gap="md"><Stack gap="sm"><Inline gap="sm" className="cs-map-sidebar-title"><strong>Capas del mapa</strong><span>{activeLayers} activa{activeLayers === 1 ? '' : 's'}</span></Inline><div className="cd-map-layers"><label><input aria-label="Capa Electores" type="checkbox" checked={layers.electors} onChange={() => toggleLayer('electors')} />Electores <span>{points.length}</span></label><label><input aria-label="Capa Zonas y Barrios" type="checkbox" checked={layers.zones} onChange={() => toggleLayer('zones')} />Zonas / Barrios <span>{zones}</span></label><label><input aria-label="Capa Territorios" type="checkbox" checked={layers.territories} onChange={() => toggleLayer('territories')} />Territorios <span>0</span></label><label><input aria-label="Capa Rutas de visita" type="checkbox" checked={layers.routes} onChange={() => toggleLayer('routes')} />Rutas de visita <span>0</span></label></div></Stack><div className="cd-map-notice"><Stack gap="sm"><strong>Leyenda de estados</strong><p>Gris: sin visita · Azul: visitado · Verde: SI · Rojo: NO · Amarillo: indeciso.</p></Stack></div><section className="cs-territorial-summary" role="region" aria-label="Resumen territorial"><Stack gap="sm"><strong>Resumen territorial</strong><Inline gap="sm" className="cs-territorial-summary__metrics"><span><b>{zones}</b><small>secciones</small></span><span><b>{coverage}%</b><small>cobertura</small></span><span><b>{voters.length - points.length}</b><small>sin ubicar</small></span></Inline><p className={summaryTone}>{summary}</p></Stack></section></Stack>}>{loading ? <EmptyState icon="map" title="Cargando mapa" description="Estamos ubicando los electores de tu campaña." /> : points.length ? <GoogleMapCanvas points={mapPoints} overlay={mapChips} /> : <EmptyState icon="map" title="No hay puntos geolocalizados" description="Importá electores con direcciones válidas para ubicarlos en el mapa." />}</MapContainer></ContentPanel>}
-    </Stack>
-  </PageContainer>;
+  const bulk = async (body: { tag?: string; assignedTeamId?: string }) => {
+    if (!user || !selectedPoints.length || !base) return; setSelectionMessage('Aplicando cambios…');
+    try { const result = await authenticatedFetch(user, `${base}/voters/selection/bulk`, { method: 'POST', body: JSON.stringify({ voterIds: selectedPoints.map(point => point.id), ...body }) }); setSelectionMessage(`${result.updatedCount} electores actualizados.`); await reload(); }
+    catch (caught) { setSelectionMessage(caught instanceof Error ? caught.message : 'No pudimos actualizar la selección.'); }
+  };
+  const createGroup = async () => {
+    if (!user || !base || !groupName.trim() || polygon.length < 3) return; setSelectionMessage('Creando grupo…');
+    try { const created = await authenticatedFetch(user, `${base}/zones`, { method: 'POST', body: JSON.stringify({ name: groupName.trim(), polygon, source: 'map_group' }) }); setFocusedGroupId(created.zoneId); setLayers(current => ({ ...current, zones: true })); setPanel('groups'); setGroupName(''); setSelectionMessage('Grupo creado y visible en el mapa.'); await groups.reload(); }
+    catch (caught) { setSelectionMessage(caught instanceof Error ? caught.message : 'No pudimos crear el grupo.'); }
+  };
+  const renameGroup = async (group: Zone) => {
+    if (!user || !base || !editingName.trim()) return; try { await authenticatedFetch(user, `${base}/zones/${group.id}`, { method: 'PUT', body: JSON.stringify({ name: editingName.trim() }) }); setEditingGroupId(null); await groups.reload(); } catch (caught) { setSelectionMessage(caught instanceof Error ? caught.message : 'No pudimos renombrar el grupo.'); }
+  };
+  const deleteGroup = async (group: Zone) => {
+    if (!user || !base || !window.confirm(`¿Borrar el grupo ${group.name}?`)) return; try { await authenticatedFetch(user, `${base}/zones/${group.id}`, { method: 'DELETE' }); if (focusedGroupId === group.id) setFocusedGroupId(null); await groups.reload(); } catch (caught) { setSelectionMessage(caught instanceof Error ? caught.message : 'No pudimos borrar el grupo.'); }
+  };
+  const exportSelection = () => { const csv = ['Nombre,Dirección,Estado', ...selectedPoints.map(point => `"${point.name.replace(/"/g, '""')}","${(point.address ?? '').replace(/"/g, '""')}",${point.state}`)].join('\n'); const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' })); const link = document.createElement('a'); link.href = url; link.download = 'electores-seleccionados.csv'; link.click(); URL.revokeObjectURL(url); };
+  const mapChips = <Inline gap="sm" className="cs-map-quick-stats" role="region" aria-label="Resumen del mapa"><span><b>{points.length}</b> electores</span><span><b>{coverage}%</b> geolocalizados</span><span><b>{activeLayers}</b> capa{activeLayers === 1 ? '' : 's'} activa{activeLayers === 1 ? '' : 's'}</span></Inline>;
+  const selectionPanel = polygon.length >= 3 && <section className="cs-map-selection" aria-label="Resultado de selección"><Stack gap="sm"><strong>{selectedPoints.length} electores encontrados</strong><small>{selectedStateSummary || 'Sin electores dentro del polígono.'}</small><input aria-label="Etiqueta en bloque" value={tag} onChange={event => setTag(event.target.value)} placeholder="Nueva etiqueta" /><button type="button" className="btn btn-outline-primary btn-sm" disabled={!tag.trim() || !selectedPoints.length} onClick={() => void bulk({ tag: tag.trim() })}>Etiquetar en bloque</button><SelectControl label="Asignar a equipo" value={teamId} onChange={setTeamId} options={[{ value:'', label:'Elegí un equipo' }, ...(teams.data ?? []).map(team => ({ value:team.id, label:team.name }))]} /><button type="button" className="btn btn-outline-primary btn-sm" disabled={!teamId || !selectedPoints.length} onClick={() => void bulk({ assignedTeamId: teamId })}>Asignar a equipo</button><input aria-label="Nombre del grupo" value={groupName} onChange={event => setGroupName(event.target.value)} placeholder="Nombre del grupo" /><button type="button" className="btn btn-primary btn-sm" disabled={!groupName.trim() || !selectedPoints.length} onClick={() => void createGroup()}>Crear grupo desde esta selección</button><button type="button" className="btn btn-light btn-sm" disabled={!selectedPoints.length} onClick={exportSelection}>Exportar esta selección</button>{selectionMessage && <small role="status">{selectionMessage}</small>}</Stack></section>;
+  const layersPanel = <Stack gap="md"><SearchInput className="cs-map-sidebar-search" value={search} onChange={event => setSearch(event.target.value)} placeholder="Buscar elector…" aria-label="Buscar elector en el mapa" /><Stack gap="sm"><Inline gap="sm" className="cs-map-sidebar-title"><strong>Capas del mapa</strong><span>{activeLayers} activa{activeLayers === 1 ? '' : 's'}</span></Inline><div className="cd-map-layers"><label><input aria-label="Capa Electores" type="checkbox" checked={layers.electors} onChange={() => toggleLayer('electors')} />Electores <span>{points.length}</span></label><label><input aria-label="Capa Zonas y Grupos" type="checkbox" checked={layers.zones} onChange={() => toggleLayer('zones')} />Zonas / Grupos <span>{zones.length}</span></label><label><input aria-label="Capa Territorios" type="checkbox" checked={layers.territories} onChange={() => toggleLayer('territories')} />Territorios <span>0</span></label><label><input aria-label="Capa Rutas de visita" type="checkbox" checked={layers.routes} onChange={() => toggleLayer('routes')} />Rutas de visita <span>0</span></label></div></Stack><div className="cd-map-notice"><Stack gap="sm"><strong>Leyenda de estados</strong><p>Gris: sin visita · Azul: visitado · Verde: SI · Rojo: NO · Amarillo: indeciso.</p></Stack></div><section className="cs-territorial-summary" role="region" aria-label="Resumen territorial"><Stack gap="sm"><strong>Resumen territorial</strong><Inline gap="sm" className="cs-territorial-summary__metrics"><span><b>{zones.length}</b><small>grupos</small></span><span><b>{coverage}%</b><small>cobertura</small></span><span><b>{voters.length - geolocated.length}</b><small>sin ubicar</small></span></Inline><p className={summaryTone}>{summary}</p></Stack></section>{selectionPanel}</Stack>;
+  const groupsPanel = <Stack gap="sm" className="cs-map-groups">{zones.length ? zones.map(group => <section key={group.id}><Stack gap="xs">{editingGroupId === group.id ? <><input aria-label={`Renombrar ${group.name}`} value={editingName} onChange={event => setEditingName(event.target.value)} /><Inline gap="sm"><button type="button" className="btn btn-primary btn-sm" onClick={() => void renameGroup(group)}>Guardar</button><button type="button" className="btn btn-light btn-sm" onClick={() => setEditingGroupId(null)}>Cancelar</button></Inline></> : <><strong>{group.name}</strong><small>{geolocated.filter(point => pointInside(point, group.polygon)).length} electores</small><Inline gap="sm" wrap><button type="button" className="btn btn-outline-primary btn-sm" onClick={() => { setFocusedGroupId(group.id); setLayers(current => ({ ...current, zones: true })); }}>Ver en el mapa</button><button type="button" className="btn btn-light btn-sm" onClick={() => { setEditingGroupId(group.id); setEditingName(group.name); }}>Editar</button><button type="button" className="btn btn-outline-danger btn-sm" onClick={() => void deleteGroup(group)}>Borrar</button></Inline></>}</Stack></section>) : <EmptyState icon="map" title="Sin grupos todavía" description="Dibujá una selección y guardala como grupo para verla aquí." />}</Stack>;
+  const mapSidebar = <Stack gap="md"><Inline gap="sm" className="cs-map-tabs" role="tablist"><button type="button" role="tab" aria-selected={panel === 'layers'} className={panel === 'layers' ? 'is-active' : ''} onClick={() => setPanel('layers')}>Capas</button><button type="button" role="tab" aria-selected={panel === 'groups'} className={panel === 'groups' ? 'is-active' : ''} onClick={() => setPanel('groups')}>Grupos <span>{zones.length}</span></button></Inline>{panel === 'layers' ? layersPanel : groupsPanel}</Stack>;
+  const loadError = campaignError || error?.message;
+  return <PageContainer><Stack gap="lg" className="cs-voters-map"><HeroBanner eyebrow="INTELIGENCIA TERRITORIAL" icon="map" title="Mapa de electores" subtitle="Visualizá la distribución territorial de tus electores en Córdoba, Argentina." subtitleDetail="Identificá zonas de mayor oportunidad, planificá recorridos y tomá mejores decisiones en territorio." tags={[{ icon:'map-pin', label:'Córdoba, Argentina' }, { icon:'calendar', label:'Últimos 30 días' }, { icon:'users', label:'Todos los electores' }]} ctaLabel="Exportar mapa" ctaIcon="download" /><div className="cd-dashboard__kpis"><StatCard icon="users" value={voters.length} label="Total de electores" caption={weeklyTrend(voters, () => true)} captionColor="#16a34a" /><StatCard icon="map-pin" iconColor="green" value={geolocated.length} label="Puntos en el mapa" caption={weeklyTrend(voters, item => typeof item.lat === 'number' && typeof item.lng === 'number')} captionColor="#16a34a" /><StatCard icon="map" iconColor="purple" value={zones.length} label="Grupos geográficos" caption={zones.length ? `${zones.length} zonas activas` : 'Sin grupos aún'} /><StatCard icon="target" iconColor="orange" value={`${coverage}%`} label="Cobertura territorial" caption={coverage ? 'Electores geolocalizados' : 'Sin información'} progress={coverage} /></div>{loadError ? <ContentPanel icon="map" title="Mapa de electores" subtitle="Distribución territorial de la campaña"><EmptyState icon="map" title="No pudimos cargar el mapa" description={loadError} ctaLabel="Reintentar" onCtaClick={() => void (campaignError ? reloadCampaign() : reload())} /></ContentPanel> : <ContentPanel icon="map" title="Mapa de electores" subtitle="Distribución territorial de la campaña" headerAction={<Inline gap="xs" className="cs-map-live"><i aria-hidden="true" />Última actualización: {lastUpdated}</Inline>}><MapContainer floating={<button type="button" className="btn btn-primary btn-sm cs-map-draw-button" onClick={() => setDrawing(value => !value)}>{drawing ? 'Cancelar dibujo' : 'Dibujar selección'}</button>} sidebar={mapSidebar}>{loading ? <EmptyState icon="map" title="Cargando mapa" description="Estamos ubicando los electores de tu campaña." /> : points.length ? <GoogleMapCanvas points={layers.electors ? points : []} polygons={mapGroups} focusPolygonId={focusedGroupId} overlay={mapChips} drawing={{ enabled:drawing, onPolygonComplete: path => { setPolygon(path); setDrawing(false); setSelectionMessage('Selección lista para operar.'); } }} /> : <EmptyState icon="map" title="No hay puntos geolocalizados" description="Importá electores con direcciones válidas para ubicarlos en el mapa." />}</MapContainer></ContentPanel>}</Stack></PageContainer>;
 }

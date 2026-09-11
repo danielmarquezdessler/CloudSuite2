@@ -17,6 +17,7 @@ votersRouter.post(
 );
 votersRouter.get(`${base}/voters`, requireAuth, controller.getVoters);
 votersRouter.post(`${base}/voters`, requireAuth, controller.createVoter);
+votersRouter.post(`${base}/voters/selection/bulk`, requireAuth, controller.bulkUpdate);
 votersRouter.put(
   `${base}/voters/:voterId`,
   requireAuth,

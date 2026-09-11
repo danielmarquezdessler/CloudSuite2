@@ -804,3 +804,39 @@ export async function listVoters(
   const snap = await campaignRef(orgId, campId).collection("voters").get();
   return snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
 }
+
+/** Applies a tag and/or a campaign team to an explicit map selection. */
+export async function bulkUpdateVoters(
+  user: DecodedIdToken,
+  orgId: string,
+  campId: string,
+  input: { voterIds?: unknown; tag?: unknown; assignedTeamId?: unknown },
+) {
+  assertCampaignManager(user, orgId, campId);
+  const voterIds = Array.isArray(input.voterIds)
+    ? [...new Set(input.voterIds.filter((id): id is string => typeof id === "string" && Boolean(id.trim())).map((id) => id.trim()))]
+    : [];
+  if (!voterIds.length || voterIds.length > 450) throw new ValidationError("Seleccioná entre 1 y 450 electores.");
+  const tag = typeof input.tag === "string" ? input.tag.trim().slice(0, 50) : "";
+  const assignedTeamId = typeof input.assignedTeamId === "string" ? input.assignedTeamId.trim() : "";
+  if (!tag && !assignedTeamId) throw new ValidationError("Elegí una etiqueta o un equipo para aplicar.");
+  const campaign = campaignRef(orgId, campId);
+  if (assignedTeamId) {
+    const team = await campaign.collection("teams").doc(assignedTeamId).get();
+    if (!team.exists || team.data()?.deleted) throw new ValidationError("El equipo seleccionado no existe en esta campaña.");
+  }
+  const docs = await Promise.all(voterIds.map((id) => campaign.collection("voters").doc(id).get()));
+  if (docs.some((doc) => !doc.exists)) throw new ValidationError("Uno o más electores ya no existen.");
+  const batch = campaign.firestore.batch();
+  docs.forEach((doc) => {
+    const currentTags = normalizeTags(doc.data()?.tags);
+    const tags = tag && !currentTags.some((item) => norm(item) === norm(tag)) ? [...currentTags, tag] : currentTags;
+    batch.update(doc.ref, {
+      ...(tag ? { tags } : {}),
+      ...(assignedTeamId ? { assignedTeamId } : {}),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+  });
+  await batch.commit();
+  return { updatedCount: docs.length, voterIds, tag: tag || null, assignedTeamId: assignedTeamId || null };
+}

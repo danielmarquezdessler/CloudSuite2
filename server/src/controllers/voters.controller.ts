@@ -125,6 +125,22 @@ export const mergeVoters = async (r: Request, s: Response) => {
     fail(s, e);
   }
 };
+export const bulkUpdate = async (r: Request, s: Response) => {
+  try {
+    const [orgId, campId] = ids(r);
+    const result = await voters.bulkUpdateVoters(r.user!, orgId, campId, r.body ?? {});
+    void appendAudit(orgId, campId, r.user!, {
+      action: "BULK_UPDATE_VOTERS",
+      resource: "voters",
+      changes: { after: result },
+      ...auditMeta(r),
+    }).catch(console.error);
+    invalidateAnalytics(orgId, campId);
+    s.json(result);
+  } catch (e) {
+    fail(s, e);
+  }
+};
 export const profile = async (r: Request, s: Response) => {
   try {
     s.json(
