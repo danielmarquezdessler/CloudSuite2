@@ -42,7 +42,7 @@ async function createAndRead(name, expectCoordinates) {
   if (expectCoordinates && (!Number.isFinite(body.lat) || !Number.isFinite(body.lng))) throw new Error(`El elector geocodificado no devolvió coordenadas: ${JSON.stringify(body)}`);
   if (!expectCoordinates && (body.lat !== null || body.lng !== null)) throw new Error(`La dirección manual debería conservarse sin coordenadas: ${JSON.stringify(body)}`);
   await page.getByRole('dialog').waitFor({ state: 'hidden' });
-  await page.getByText(name, { exact: true }).waitFor();
+  await page.getByRole('button', { name, exact: true }).waitFor();
   return body;
 }
 
