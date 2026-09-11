@@ -27,6 +27,7 @@ import Tasks from '../pages/Modules/Execution/Tasks';
 import Productivity from '../pages/Modules/Execution/Productivity';
 import Incidents from '../pages/Modules/Execution/Incidents';
 import DailySummary from '../pages/Modules/Execution/DailySummary';
+import Issues from '../pages/Modules/Execution/Issues';
 // import AffiliateDashboard from "../pages/AffiliateDashboard";
 // import InvoiceDashboard from "../pages/InvoiceDashboard";
 // import FinaceDashboard from "../pages/FinaceDashboard";
@@ -222,6 +223,7 @@ const routes = [
     { path: "/execution/productivity", component: <Productivity /> },
     { path: "/execution/incidents", component: <Incidents /> },
     { path: "/execution/daily-summary", component: <DailySummary /> },
+    { path: "/execution/issues", component: <Issues /> },
     // { path: "/affiliate-dashboard", component: <AffiliateDashboard /> },
     // { path: "/invoice-dashboard", component: <InvoiceDashboard /> },
     // { path: "/finance-dashboard", component: <FinaceDashboard /> },

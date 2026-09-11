@@ -14,6 +14,7 @@ export type VisitDraft = {
   step: number;
   answers: Record<string, string | string[]>;
   notes: string;
+  issues: string[];
   questions: OfflineQuestion[];
   decision?: string;
   updatedAt: number;
@@ -54,6 +55,7 @@ export function feedbackPayload(draft: VisitDraft) {
   return {
     responses: draft.questions.map(question => ({ questionId: question.id, question: question.text, answer: draft.answers[question.id] ?? null })),
     notes: draft.notes,
+    issues: draft.issues,
     timestamp: new Date().toISOString()
   };
 }
@@ -77,7 +79,7 @@ export async function ensureVisitDraft(orgId: string, campId: string, voterId: s
   const existing = await offlineDb.visitDrafts.get(key);
   if (existing) return existing;
   const visitId = randomId();
-  const draft: VisitDraft = { key, campaignKey: campaignKey(orgId, campId), orgId, campId, voterId, visitId, step: 0, answers: {}, notes: '', questions, updatedAt: Date.now() };
+  const draft: VisitDraft = { key, campaignKey: campaignKey(orgId, campId), orgId, campId, voterId, visitId, step: 0, answers: {}, notes: '', issues: [], questions, updatedAt: Date.now() };
   const path = `/api/organizations/${orgId}/campaigns/${campId}/voters/${voterId}/visits`;
   await offlineDb.transaction('rw', offlineDb.visitDrafts, offlineDb.visitQueue, async () => {
     await offlineDb.visitDrafts.put(draft);
@@ -86,7 +88,7 @@ export async function ensureVisitDraft(orgId: string, campId: string, voterId: s
   return draft;
 }
 
-export async function saveVisitProgress(key: string, changes: Pick<VisitDraft, 'step' | 'answers' | 'notes' | 'questions'>) {
+export async function saveVisitProgress(key: string, changes: Pick<VisitDraft, 'step' | 'answers' | 'notes' | 'issues' | 'questions'>) {
   await offlineDb.visitDrafts.update(key, { ...changes, updatedAt: Date.now() });
 }
 

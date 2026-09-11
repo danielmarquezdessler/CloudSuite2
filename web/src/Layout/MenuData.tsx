@@ -432,7 +432,8 @@ const menuItems = [
             { id: 'execution-tasks', label: 'Tareas', icon: 'ph-duotone ph-clipboard-text', link: '/execution/tasks', dataPage: 'execution-tasks' },
             { id: 'execution-productivity', label: 'Productividad', icon: 'ph-duotone ph-chart-bar', link: '/execution/productivity', dataPage: 'execution-productivity' },
             { id: 'execution-incidents', label: 'Incidencias', icon: 'ph-duotone ph-warning-circle', link: '/execution/incidents', dataPage: 'execution-incidents' },
-            { id: 'execution-daily-summary', label: 'Resumen de jornada', icon: 'ph-duotone ph-chart-line-up', link: '/execution/daily-summary', dataPage: 'execution-daily-summary' }
+            { id: 'execution-daily-summary', label: 'Resumen de jornada', icon: 'ph-duotone ph-chart-line-up', link: '/execution/daily-summary', dataPage: 'execution-daily-summary' },
+            { id: 'execution-issues', label: 'Temas', icon: 'ph-duotone ph-chat-circle-text', link: '/execution/issues', dataPage: 'execution-issues' }
         ]
     },
     { label: 'Sistema', type: 'HEADER' },

@@ -16,7 +16,7 @@ const pages = [
   ['Territorio', '/planning/territory'], ['Metas', '/planning/goals'], ['Rutas', '/planning/routes'],
   ['Encuestas', '/planning/surveys'], ['Presupuesto', '/planning/budget'], ['Asesor', '/planning/advisor'],
   ['Visitas en vivo', '/execution/live'], ['Mapa de calor', '/execution/heatmap'], ['Indecisos', '/execution/undecided']
-  ,['Tareas', '/execution/tasks'], ['Productividad', '/execution/productivity'], ['Incidencias', '/execution/incidents'], ['Resumen de jornada', '/execution/daily-summary']
+  ,['Tareas', '/execution/tasks'], ['Productividad', '/execution/productivity'], ['Incidencias', '/execution/incidents'], ['Resumen de jornada', '/execution/daily-summary'], ['Temas', '/execution/issues']
 ];
 const minimumPadding = 12;
 const minimumHeaderGap = 16;
@@ -88,6 +88,7 @@ try {
     for (const header of audit.headers) {
       if (header.failed) headerFailures.push(`${name} (${route}) — ${header.selector} — gap:${header.gap.toFixed(1)}px`);
     }
+    for (const header of audit.headers.filter((item) => item.failed)) console.error(`[${name}] HEADER GAP: ${header.selector} = ${header.gap.toFixed(1)}px`);
     console.log(`[${name}] cards=${audit.cards.length}, paddingFailures=${audit.cards.filter((card) => card.failed).length}, headers=${audit.headers.length}, headerGapFailures=${audit.headers.filter((header) => header.failed).length}, ghostWarnings=${audit.ghosts.length}`);
   }
 
