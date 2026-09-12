@@ -4,10 +4,13 @@ import { TerraDrawGoogleMapsAdapter } from 'terra-draw-google-maps-adapter';
 
 export type GoogleMapPoint = { id: string; lat: number; lng: number; name?: string; address?: string; state?: string };
 export type GoogleMapPolygon = { id: string; name: string; polygon: Array<{ lat: number; lng: number }>; highlighted?: boolean };
+export type GoogleMapOpportunity = { id: string; lat: number; lng: number; radiusMeters: number; total: number; score: number; highlighted?: boolean };
 type GoogleMapCanvasProps = {
   points: GoogleMapPoint[];
   polygons?: GoogleMapPolygon[];
+  opportunities?: GoogleMapOpportunity[];
   focusPolygonId?: string | null;
+  focusOpportunityId?: string | null;
   mode?: 'markers' | 'heatmap';
   compact?: boolean;
   ariaLabel?: string;
@@ -51,13 +54,15 @@ function markerColor(state?: string) {
   return '#94a3b8';
 }
 
-export default function GoogleMapCanvas({ points, polygons = [], focusPolygonId, mode = 'markers', compact = false, ariaLabel = 'Mapa de electores', overlay, drawing }: GoogleMapCanvasProps) {
+export default function GoogleMapCanvas({ points, polygons = [], opportunities = [], focusPolygonId, focusOpportunityId, mode = 'markers', compact = false, ariaLabel = 'Mapa de electores', overlay, drawing }: GoogleMapCanvasProps) {
   const element = useRef<HTMLDivElement>(null);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error' | 'missing'>('loading');
   const [error, setError] = useState('');
   const [renderedMarkerCount, setRenderedMarkerCount] = useState(0);
   const dataKey = useMemo(() => points.map(point => `${point.id}:${point.lat}:${point.lng}:${point.name ?? ''}:${point.address ?? ''}:${point.state ?? ''}`).join('|'), [points]);
   const polygonKey = useMemo(() => polygons.map(polygon => `${polygon.id}:${polygon.highlighted}:${polygon.polygon.map(point => `${point.lat},${point.lng}`).join(';')}`).join('|'), [polygons]);
+  const opportunityKey = useMemo(() => opportunities.map(opportunity => `${opportunity.id}:${opportunity.lat}:${opportunity.lng}:${opportunity.radiusMeters}:${opportunity.highlighted}`).join('|'), [opportunities]);
+  const stateSummary = useMemo(() => Object.entries(points.reduce<Record<string, number>>((states, point) => ({ ...states, [point.state ?? 'unvisited']: (states[point.state ?? 'unvisited'] ?? 0) + 1 }), {})).map(([state, count]) => `${state}:${count}`).join(','), [points]);
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined;
 
   useEffect(() => {
@@ -87,16 +92,17 @@ export default function GoogleMapCanvas({ points, polygons = [], focusPolygonId,
         overlays = validPoints.flatMap(point => [420, 250, 120].map((radius, index) => new maps.Circle({ map, center: { lat: point.lat, lng: point.lng }, radius, fillColor: markerColor(point.state), fillOpacity: [0.08, 0.14, 0.24][index], strokeOpacity: 0, clickable: false })));
       } else {
         const infoWindow = new maps.InfoWindow();
-        overlays = validPoints.map(point => {
+        overlays = validPoints.flatMap(point => {
           const marker = new maps.Marker({ map, position: { lat: point.lat, lng: point.lng }, title: point.name ?? 'Elector', icon: { url: '/img/pin.webp', scaledSize: new maps.Size(48, 48), anchor: new maps.Point(24, 47) }, animation: maps.Animation?.DROP, zIndex: 1000 });
+          const stateBadge = new maps.Marker({ map, position: { lat: point.lat, lng: point.lng }, clickable: false, icon: { path: maps.SymbolPath.CIRCLE, fillColor: markerColor(point.state), fillOpacity: 1, strokeColor: '#ffffff', strokeOpacity: 1, strokeWeight: 2, scale: 7, anchor: new maps.Point(0, 28) }, zIndex: 1001 });
           const content = document.createElement('div'); content.className = 'cs-map-elector-tooltip';
           const name = document.createElement('strong'); name.textContent = point.name ?? 'Elector';
           const address = document.createElement('span'); address.textContent = point.address ?? 'Dirección no informada';
           content.append(name, address);
           marker.addListener('click', () => { infoWindow.setContent(content); infoWindow.open(map, marker); });
-          return marker;
+          return [marker, stateBadge];
         });
-        setRenderedMarkerCount(overlays.length);
+        setRenderedMarkerCount(validPoints.length);
       }
 
       polygons.forEach(item => {
@@ -104,9 +110,15 @@ export default function GoogleMapCanvas({ points, polygons = [], focusPolygonId,
         const polygon = new maps.Polygon({ map, paths: item.polygon, fillColor: item.highlighted ? '#0060f0' : '#4b83e6', fillOpacity: item.highlighted ? 0.26 : 0.14, strokeColor: item.highlighted ? '#0049bd' : '#4b83e6', strokeOpacity: 0.95, strokeWeight: item.highlighted ? 3 : 2, clickable: false, zIndex: item.highlighted ? 600 : 400 });
         overlays.push(polygon);
       });
+      opportunities.forEach((item) => {
+        const circle = new maps.Circle({ map, center: { lat: item.lat, lng: item.lng }, radius: item.radiusMeters, fillColor: item.highlighted ? '#f97316' : '#ef4444', fillOpacity: item.highlighted ? 0.28 : 0.16, strokeColor: item.highlighted ? '#c2410c' : '#dc2626', strokeOpacity: 0.9, strokeWeight: item.highlighted ? 3 : 2, clickable: false, zIndex: item.highlighted ? 650 : 450 });
+        overlays.push(circle);
+      });
       const focused = polygons.find(item => item.id === focusPolygonId);
       if (focused?.polygon.length) focused.polygon.forEach(point => bounds.extend(point));
       if (!bounds.isEmpty()) map.fitBounds(bounds, 32);
+      const focusedOpportunity = opportunities.find(item => item.id === focusOpportunityId);
+      if (focusedOpportunity) { map.panTo({ lat: focusedOpportunity.lat, lng: focusedOpportunity.lng }); map.setZoom(15); }
 
       if (drawing?.enabled) {
         const startTerraDraw = () => {
@@ -130,11 +142,11 @@ export default function GoogleMapCanvas({ points, polygons = [], focusPolygonId,
     }).catch((reason: unknown) => { if (!cancelled) { setStatus('error'); setError(reason instanceof Error ? reason.message : 'No se pudo iniciar Google Maps.'); } });
 
     return () => { cancelled = true; tilesListener?.remove?.(); idleListener?.remove?.(); projectionListener?.remove?.(); terraDraw?.stop(); overlays.forEach(overlay => overlay.setMap?.(null)); setRenderedMarkerCount(0); };
-  }, [apiKey, dataKey, polygonKey, focusPolygonId, mode, drawing?.enabled]);
+  }, [apiKey, dataKey, polygonKey, opportunityKey, focusPolygonId, focusOpportunityId, mode, drawing?.enabled]);
 
   const message = status === 'missing' ? 'Configurá VITE_GOOGLE_MAPS_API_KEY para visualizar el mapa.' : status === 'error' ? error : status === 'loading' ? 'Cargando Google Maps…' : '';
   return <div className={`cs-google-map-shell${compact ? ' cs-google-map-shell--compact' : ''}`}>
-    <div id="cloudsuite-google-map" ref={element} className="cs-google-map" aria-label={ariaLabel} data-google-map-status={status} data-google-map-marker-count={mode === 'markers' ? renderedMarkerCount : undefined} data-google-map-polygon-count={polygons.length} />
+    <div id="cloudsuite-google-map" ref={element} className="cs-google-map" aria-label={ariaLabel} data-google-map-status={status} data-google-map-marker-count={mode === 'markers' ? renderedMarkerCount : undefined} data-google-map-polygon-count={polygons.length} data-google-map-opportunity-count={opportunities.length} data-google-map-states={stateSummary} />
     {overlay && <div className="cs-google-map__overlay">{overlay}</div>}
     {message && <div className="cs-google-map__state" role={status === 'error' ? 'alert' : 'status'}>{message}</div>}
   </div>;
