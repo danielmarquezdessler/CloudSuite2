@@ -1,0 +1,13 @@
+import { Request, Response } from 'express';
+import * as service from '../services/smartplannerFinance.service.js';
+import { ForbiddenError, NotFoundError, ValidationError } from '../services/access.service.js';
+const ids = (request: Request) => [String(request.params.orgId), String(request.params.campId)] as const;
+const fail = (response: Response, error: unknown) => response.status(error instanceof ForbiddenError ? 403 : error instanceof NotFoundError ? 404 : error instanceof ValidationError || error instanceof Error ? 400 : 500).json({ message: error instanceof Error ? error.message : 'No pudimos completar la operación.' });
+export const invoices = async (r: Request, p: Response) => { try { p.json(await service.listInvoices(r.user!, ...ids(r))); } catch (e) { fail(p, e); } };
+export const saveInvoice = async (r: Request, p: Response) => { try { p.status(r.params.invoiceId ? 200 : 201).json(await service.saveInvoice(r.user!, ...ids(r), r.params.invoiceId ? String(r.params.invoiceId) : null, r.body)); } catch (e) { fail(p, e); } };
+export const creditNote = async (r: Request, p: Response) => { try { p.status(201).json(await service.createCreditNote(r.user!, ...ids(r), String(r.params.invoiceId), r.body)); } catch (e) { fail(p, e); } };
+export const removeInvoice = async (r: Request, p: Response) => { try { await service.removeInvoice(r.user!, ...ids(r), String(r.params.invoiceId)); p.status(204).end(); } catch (e) { fail(p, e); } };
+export const contracts = async (r: Request, p: Response) => { try { p.json(await service.listContracts(r.user!, ...ids(r))); } catch (e) { fail(p, e); } };
+export const saveContract = async (r: Request, p: Response) => { try { p.status(r.params.contractId ? 200 : 201).json(await service.saveContract(r.user!, ...ids(r), r.params.contractId ? String(r.params.contractId) : null, r.body)); } catch (e) { fail(p, e); } };
+export const sign = async (r: Request, p: Response) => { try { p.json(await service.signContract(r.user!, ...ids(r), String(r.params.contractId), r.file)); } catch (e) { fail(p, e); } };
+export const removeContract = async (r: Request, p: Response) => { try { await service.removeContract(r.user!, ...ids(r), String(r.params.contractId)); p.status(204).end(); } catch (e) { fail(p, e); } };
