@@ -130,7 +130,10 @@ export default function GoogleMapCanvas({ points, polygons = [], opportunities =
           if (cancelled || drawingStarted) return;
           drawingStarted = true;
           terraDraw = new TerraDraw({
-            adapter: new TerraDrawGoogleMapsAdapter({ lib: maps, map, coordinatePrecision: 8 }),
+            // Google Maps only emits Data-layer clicks when an existing feature was
+            // hit.  A fresh selection starts on the empty canvas, so forward the
+            // map element pointer events to Terra Draw as required by its adapter.
+            adapter: new TerraDrawGoogleMapsAdapter({ lib: maps, map, coordinatePrecision: 8, forwardMapElementEvents: true }),
             modes: [new TerraDrawPolygonMode({ styles: { fillColor: '#0060f0', fillOpacity: 0.14, outlineColor: '#0060f0', outlineWidth: 3 } })]
           });
           terraDraw.on('finish', (id) => {
