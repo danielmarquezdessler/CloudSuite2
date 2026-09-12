@@ -15,8 +15,8 @@ import PrimaryButton from '../../../components/Shared/PrimaryButton';
 
 type Material = { id: string; name: string; category: string; stock: number; minimumStock: number; unitCost: number; providerId: string };
 type Provider = { id: string; name: string };
-const labels: Record<string, string> = { impresos: 'Impresos', merchandising: 'Merchandising', tecnología: 'Tecnología', logística: 'Logística', otro: 'Otro' };
-const blank = () => ({ name: '', category: 'impresos', stock: 0, minimumStock: 10, unitCost: 0, providerId: '' });
+const labels: Record<string, string> = { remeras: 'Remeras', folletos: 'Folletos', carteles: 'Carteles', merchandising: 'Merchandising', otro: 'Otro' };
+const blank = () => ({ name: '', category: 'folletos', stock: 0, minimumStock: 10, unitCost: 0, providerId: '' });
 
 export default function Materials() {
   const { user } = useAuth(); const { campaign } = useCampaign(); const { enabledAddons } = useActiveCampaign();
