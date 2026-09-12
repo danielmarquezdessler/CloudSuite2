@@ -133,8 +133,6 @@ export default function GoogleMapCanvas({ points, polygons = [], opportunities =
             adapter: new TerraDrawGoogleMapsAdapter({ lib: maps, map, coordinatePrecision: 8 }),
             modes: [new TerraDrawPolygonMode({ styles: { fillColor: '#0060f0', fillOpacity: 0.14, outlineColor: '#0060f0', outlineWidth: 3 } })]
           });
-          terraDraw.start();
-          terraDraw.on('ready', () => { if (!cancelled) terraDraw?.setMode('polygon'); });
           terraDraw.on('finish', (id) => {
             const feature = terraDraw?.getSnapshotFeature(id);
             if (cancelled || feature?.geometry.type !== 'Polygon') return;
@@ -142,6 +140,12 @@ export default function GoogleMapCanvas({ points, polygons = [], opportunities =
             const coordinates = ring.slice(0, -1).map((position: number[]) => ({ lat: position[1], lng: position[0] }));
             if (coordinates.length >= 3) drawing.onPolygonComplete(coordinates);
           });
+          terraDraw.start();
+          // `ready` may be emitted synchronously by the adapter, before a listener
+          // registered after `start()` can observe it.  Selecting the polygon mode
+          // immediately after start is supported by Terra Draw and makes the control
+          // usable on both cached and cold Google Maps loads.
+          terraDraw.setMode('polygon');
         };
         projectionListener = maps.event.addListenerOnce(map, 'projection_changed', startTerraDraw);
         maps.event.addListenerOnce(map, 'idle', startTerraDraw);
