@@ -15,7 +15,7 @@ const pages = [
   ['Preguntas de visita', '/planning/questions'], ['Control de Revisión', '/control-de-revision'], ['Calendario', '/planning/calendar'],
   ['Territorio', '/planning/territory'], ['Metas', '/planning/goals'], ['Rutas', '/planning/routes'],
   ['Encuestas', '/planning/surveys'], ['Presupuesto', '/planning/budget'], ['Asesor', '/planning/advisor'],
-  ['Visitas en vivo', '/execution/live'], ['Mapa de calor', '/execution/heatmap'], ['Indecisos', '/execution/undecided'], ['SmartPlanner', '/smartplanner'], ['Aportantes SmartPlanner', '/smartplanner/contributors'], ['Proveedores SmartPlanner', '/smartplanner/providers'], ['Facturación SmartPlanner', '/smartplanner/invoices'], ['Contratos SmartPlanner', '/smartplanner/contracts']
+  ['Visitas en vivo', '/execution/live'], ['Mapa de calor', '/execution/heatmap'], ['Indecisos', '/execution/undecided'], ['SmartPlanner', '/smartplanner'], ['Aportantes SmartPlanner', '/smartplanner/contributors'], ['Proveedores SmartPlanner', '/smartplanner/providers'], ['Facturación SmartPlanner', '/smartplanner/invoices'], ['Contratos SmartPlanner', '/smartplanner/contracts'], ['Materiales SmartPlanner', '/smartplanner/materials']
   ,['Tareas', '/execution/tasks'], ['Productividad', '/execution/productivity'], ['Incidencias', '/execution/incidents'], ['Resumen de jornada', '/execution/daily-summary'], ['Temas', '/execution/issues'], ['Administración de add-ons', '/system/addons']
 ];
 const minimumPadding = 12;
