@@ -32,13 +32,7 @@ Ningún componente puede renderizar dos o más elementos hermanos (bloques de te
 
 - El usuario persistente de pruebas es `e2e-test@cloudsuite.local`. Sus credenciales y los IDs de su organización/campaña viven exclusivamente en `web/.env.test`, un archivo ignorado por Git; nunca se copian al código ni a la documentación versionada.
 - `npm run test:e2e` desde `web/` ejecuta `scripts/test-e2e-real.mjs`: usa Firebase Auth, la API Node y Firestore reales, inicia Vite en el puerto 5188 y levanta la API en 8080 únicamente si no hay una API sana. No intercepta ni simula HTTP.
-- Para regenerar el entorno, eliminá solo el usuario E2E en Firebase Authentication y su organización de prueba indicada por `web/.env.test` en Firestore; luego eliminá o vaciá ese archivo local y ejecutá `npm run test:e2e`. Usá la cuenta de servicio local documentada abajo; ADC queda únicamente como alternativa temporal cuando esa credencial todavía no fue configurada.
-
-## Credencial de desarrollo local
-
-- La credencial local preferida es la cuenta de servicio `cloudsuite-local-dev@politicfy-cloudsuite.iam.gserviceaccount.com`. Tiene únicamente `roles/datastore.user` en el proyecto y `roles/storage.objectAdmin` sobre el bucket `politicfy-cloudsuite.firebasestorage.app`; Cloud Run conserva su identidad de producción.
-- Para crear o regenerar la clave, con una cuenta que tenga permisos IAM sobre `politicfy-cloudsuite`, ejecutar `node scripts/setup-local-dev-service-account.mjs` desde la raíz. El script genera `server/.secrets/local-dev-key.json` (ignorado por Git) y añade `GOOGLE_APPLICATION_CREDENTIALS=./.secrets/local-dev-key.json` a `server/.env`, sin imprimir secretos.
-- Después reiniciar el backend y comprobar `GET http://127.0.0.1:8080/health`. Si hay que revocar una clave, borrarla desde IAM/Service Accounts y volver a ejecutar el script para generar otra.
+- Para regenerar el entorno, eliminá solo el usuario E2E en Firebase Authentication y su organización de prueba indicada por `web/.env.test` en Firestore; luego eliminá o vaciá ese archivo local y ejecutá `npm run test:e2e`. Cuando el ADC local venza, ejecutar `gcloud auth application-default login`, reiniciar el backend y comprobar `GET http://127.0.0.1:8080/health`.
 
 ## Cómo desplegar a producción
 
