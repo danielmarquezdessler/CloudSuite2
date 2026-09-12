@@ -6,51 +6,129 @@ import { chromium } from 'playwright';
 
 const webDir = fileURLToPath(new URL('../', import.meta.url));
 const envPath = fileURLToPath(new URL('../.env.test', import.meta.url));
-const webUrl = 'http://127.0.0.1:5192';
+const url = 'http://127.0.0.1:5192';
 const chromiumPath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE ?? 'C:/Users/Admin/AppData/Local/ms-playwright/chromium-1234/chrome-win64/chrome.exe';
-const parseEnv = (source) => Object.fromEntries(source.split(/\r?\n/).map((line) => line.trim()).filter((line) => line && !line.startsWith('#')).map((line) => { const separator = line.indexOf('='); return [line.slice(0, separator), line.slice(separator + 1)]; }));
-const wait = (milliseconds) => new Promise((done) => setTimeout(done, milliseconds));
-let vite; let browser; let restore;
+const wait = (milliseconds) => new Promise((resolveWait) => setTimeout(resolveWait, milliseconds));
+const env = Object.fromEntries((await readFile(envPath, 'utf8')).split(/\r?\n/).map((line) => line.trim()).filter((line) => line && !line.startsWith('#')).map((line) => { const index = line.indexOf('='); return [line.slice(0, index), line.slice(index + 1)]; }));
+let browser; let vite; let cleanup = async () => {};
 
-async function waitForWeb() { for (let attempt = 0; attempt < 70; attempt += 1) { try { if ((await fetch(webUrl)).ok) return; } catch { /* Vite starting. */ } await wait(350); } throw new Error('Vite no respondió para el E2E financiero.'); }
+async function waitForVite() {
+  for (let attempt = 0; attempt < 70; attempt += 1) {
+    try { if ((await fetch(url)).ok) return; } catch { /* Vite todavía inicia. */ }
+    await wait(300);
+  }
+  throw new Error('Vite no respondió para el E2E financiero.');
+}
 
 try {
-  const env = parseEnv(await readFile(envPath, 'utf8'));
   const { adminAuth, db } = await import('../../server/dist/config/firebase.js');
   const authUser = await adminAuth.getUserByEmail(env.E2E_EMAIL);
   const profile = await db.collection('users').doc(authUser.uid).get();
   const orgId = env.E2E_ORG_ID || profile.data()?.orgIds?.[0];
   const campId = env.E2E_CAMPAIGN_ID || (await db.collection('organizations').doc(orgId).collection('campaigns').limit(1).get()).docs[0]?.id;
   if (!orgId || !campId) throw new Error('No se pudo resolver la campaña E2E financiera.');
-  const orgRef = db.collection('organizations').doc(orgId); const campRef = orgRef.collection('campaigns').doc(campId);
-  const originalAddons = (await orgRef.get()).data()?.enabledAddons; const originalLimit = (await campRef.get()).data()?.legalSpendingLimit;
-  const providerIds = []; const projectIds = []; const contributorIds = []; const invoiceIds = []; const contractIds = []; const materialIds = [];
-  restore = async () => { await Promise.all(materialIds.map((id) => campRef.collection('spMaterials').doc(id).delete())); await Promise.all(contributorIds.map((id) => campRef.collection('spContributors').doc(id).delete())); await Promise.all(invoiceIds.map((id) => campRef.collection('spInvoices').doc(id).delete())); await Promise.all(contractIds.map((id) => campRef.collection('spContracts').doc(id).delete())); await Promise.all(projectIds.map((id) => campRef.collection('spProviderProjects').doc(id).delete())); await Promise.all(providerIds.map((id) => campRef.collection('spProviders').doc(id).delete())); await campRef.set({ legalSpendingLimit: originalLimit ?? 0 }, { merge: true }); await orgRef.set({ enabledAddons: originalAddons ?? { smartPlanner: false } }, { merge: true }); };
+  const orgRef = db.collection('organizations').doc(orgId);
+  const campRef = orgRef.collection('campaigns').doc(campId);
+  const originalAddons = (await orgRef.get()).data()?.enabledAddons;
+  const originalLimit = (await campRef.get()).data()?.legalSpendingLimit;
+  const ids = { contributors: [], providers: [], projects: [], invoices: [], contracts: [] };
+  cleanup = async () => {
+    await Promise.all(ids.contributors.map((id) => campRef.collection('spContributors').doc(id).delete()));
+    await Promise.all(ids.projects.map((id) => campRef.collection('spProviderProjects').doc(id).delete()));
+    await Promise.all(ids.providers.map((id) => campRef.collection('spProviders').doc(id).delete()));
+    await Promise.all(ids.invoices.map((id) => campRef.collection('spInvoices').doc(id).delete()));
+    await Promise.all(ids.contracts.map((id) => campRef.collection('spContracts').doc(id).delete()));
+    await campRef.set({ legalSpendingLimit: originalLimit ?? 0 }, { merge: true });
+    await orgRef.set({ enabledAddons: originalAddons ?? { smartPlanner: false } }, { merge: true });
+  };
   await orgRef.set({ enabledAddons: { ...(originalAddons ?? {}), smartPlanner: true } }, { merge: true });
-  vite = spawn(process.execPath, [resolve(webDir, 'node_modules', 'vite', 'bin', 'vite.js'), '--host', '127.0.0.1', '--port', '5192'], { cwd: webDir, stdio: ['ignore', 'pipe', 'pipe'] });
-  await waitForWeb(); browser = await chromium.launch({ headless: true, executablePath: chromiumPath });
-  const page = await browser.newPage({ viewport: { width: 1440, height: 980 } }); page.setDefaultTimeout(25_000);
-  await page.goto(webUrl); await page.getByLabel('Email').fill(env.E2E_EMAIL); await page.getByLabel('Contraseña').fill(env.E2E_PASSWORD); await page.getByRole('button', { name: 'Ingresar', exact: true }).click(); await page.waitForURL(/dashboard/);
+  vite = spawn(process.execPath, [resolve(webDir, 'node_modules/vite/bin/vite.js'), '--host', '127.0.0.1', '--port', '5192'], { cwd: webDir, stdio: 'ignore' });
+  await waitForVite();
+  browser = await chromium.launch({ headless: true, executablePath: chromiumPath });
+  const page = await browser.newPage({ viewport: { width: 1440, height: 980 } });
+  page.setDefaultTimeout(25_000);
+  await page.goto(url);
+  await page.getByLabel('Email').fill(env.E2E_EMAIL);
+  await page.getByLabel('Contraseña').fill(env.E2E_PASSWORD);
+  await page.getByRole('button', { name: 'Ingresar', exact: true }).click();
+  await page.waitForURL(/dashboard/);
+
   const contributorName = `Aportante E2E ${Date.now()}`;
-  await page.goto(`${webUrl}/smartplanner/contributors`, { waitUntil: 'domcontentloaded' }); await page.getByRole('heading', { name: 'Aportantes y Sponsors', exact: true }).waitFor(); await page.getByRole('button', { name: 'Nuevo aportante', exact: true }).click(); await page.getByLabel('Nombre').fill(contributorName); await page.getByLabel('Monto').fill('75000');
-  const contributorResponse = page.waitForResponse((response) => response.request().method() === 'POST' && /\/smartplanner\/contributors$/.test(new URL(response.url()).pathname)); await page.getByRole('button', { name: 'Guardar', exact: true }).click(); const contributorCreated = await contributorResponse;
-  if (contributorCreated.status() !== 201) throw new Error('La API no creó el aportante.'); const contributor = await contributorCreated.json(); contributorIds.push(contributor.id);
-  if ((await campRef.collection('spContributors').doc(contributor.id).get()).data()?.stage !== 'prospecto') throw new Error('El aportante inicial no se persistió en Firestore.'); await page.getByLabel(`Mover ${contributorName}`).click(); const stageResponse = page.waitForResponse((response) => response.request().method() === 'PUT' && response.url().includes(`/smartplanner/contributors/${contributor.id}`)); await page.locator('.dropdown-menu.show .dropdown-item').filter({ hasText: 'Confirmado' }).click(); if (!(await stageResponse).ok()) throw new Error('No se pudo mover el aportante en el pipeline.');
-  if ((await campRef.collection('spContributors').doc(contributor.id).get()).data()?.stage !== 'confirmado') throw new Error('La etapa confirmada no se persistió en Firestore.'); console.log(`Aportantes E2E OK: ${contributorName} creado y movido a Confirmado con persistencia real.`);
-  await page.goto(`${webUrl}/smartplanner/providers`, { waitUntil: 'domcontentloaded' }); await page.getByRole('heading', { name: 'Proveedores y contrataciones', exact: true }).waitFor();
-  const providerName = `Imprenta Sur E2E ${Date.now()}`; await page.getByRole('button', { name: 'Nuevo proveedor', exact: true }).click(); await page.getByLabel('Nombre del proveedor').fill(providerName);
-  const providerResponse = page.waitForResponse((response) => response.request().method() === 'POST' && /\/smartplanner\/providers$/.test(new URL(response.url()).pathname)); await page.getByRole('button', { name: 'Guardar proveedor', exact: true }).click(); const providerCreated = await providerResponse;
-  if (providerCreated.status() !== 201) throw new Error('La API no creó el proveedor.'); const provider = await providerCreated.json(); providerIds.push(provider.id);
-  if ((await campRef.collection('spProviders').doc(provider.id).get()).data()?.name !== providerName) throw new Error('El proveedor no se persistió en Firestore.'); await page.getByText(providerName, { exact: true }).click();
-  const projectName = `Folletos E2E ${Date.now()}`; await page.getByRole('button', { name: 'Nuevo proyecto', exact: true }).click(); await page.getByLabel('Título del proyecto').fill(projectName); await page.getByLabel('Presupuesto').fill('100000'); await page.getByLabel('Gasto informado').fill('25000');
-  const projectResponse = page.waitForResponse((response) => response.request().method() === 'POST' && /\/smartplanner\/provider-projects$/.test(new URL(response.url()).pathname)); await page.getByRole('button', { name: 'Guardar proyecto', exact: true }).click(); const projectCreated = await projectResponse;
-  if (projectCreated.status() !== 201) throw new Error('La API no creó el proyecto del proveedor.'); const project = await projectCreated.json(); projectIds.push(project.id);
-  const projectDoc = await campRef.collection('spProviderProjects').doc(project.id).get(); if (projectDoc.data()?.budget !== 100000 || projectDoc.data()?.spent !== 25000) throw new Error('Presupuesto o gasto inicial no se guardaron en Firestore.');
-  await page.getByRole('button', { name: 'Editar', exact: true }).click(); await page.getByLabel('Gasto informado').fill('58000'); const updateResponse = page.waitForResponse((response) => response.request().method() === 'PUT' && response.url().includes(`/smartplanner/provider-projects/${project.id}`)); await page.getByRole('button', { name: 'Guardar proyecto', exact: true }).click(); if (!(await updateResponse).ok()) throw new Error('La actualización del gasto falló.');
-  if ((await projectDoc.ref.get()).data()?.spent !== 58000) throw new Error('El gasto actualizado no se persistió en Firestore.');
-  console.log(`Proveedores E2E OK: ${providerName}, proyecto ${projectName}, gasto actualizado a $58.000 y verificado en Firestore.`);
-  await page.goto(`${webUrl}/smartplanner`, { waitUntil: 'domcontentloaded' }); await page.getByRole('button', { name: 'Definir tope', exact: true }).waitFor(); page.once('dialog', (dialog) => dialog.accept('100')); await page.getByRole('button', { name: 'Definir tope', exact: true }).click(); await page.getByText('Alerta: el gasto supera el tope legal.', { exact: true }).waitFor(); if ((await campRef.get()).data()?.legalSpendingLimit !== 100) throw new Error('El tope legal no se persistió en Firestore.'); await page.goto(`${webUrl}/planning/budget`, { waitUntil: 'domcontentloaded' }); await page.getByText('Alerta legal:', { exact: false }).waitFor(); console.log('Techo legal E2E OK: el gasto superó un límite bajo y la alerta apareció en SmartPlanner y Presupuesto.');
-  await page.goto(`${webUrl}/smartplanner/invoices`, { waitUntil: 'domcontentloaded' }); await page.getByRole('heading', { name: 'Facturación', exact: true }).waitFor(); const invoiceName = `Factura E2E ${Date.now()}`; await page.getByRole('button', { name: 'Nueva factura', exact: true }).click(); await page.getByLabel('Descripción de comprobante').fill(invoiceName); await page.getByLabel('Monto de comprobante').fill('34000'); const invoiceResponse = page.waitForResponse((response) => response.request().method() === 'POST' && /\/smartplanner\/invoices$/.test(new URL(response.url()).pathname)); await page.getByRole('button', { name: 'Guardar comprobante', exact: true }).click(); const invoiceCreated = await invoiceResponse; if (invoiceCreated.status() !== 201) throw new Error('La factura no se creó.'); const invoice = await invoiceCreated.json(); invoiceIds.push(invoice.id); if ((await campRef.collection('spInvoices').doc(invoice.id).get()).data()?.amount !== 34000) throw new Error('La factura no llegó a Firestore.'); const creditResponse = page.waitForResponse((response) => response.request().method() === 'POST' && response.url().includes(`/smartplanner/invoices/${invoice.id}/credit-note`)); await page.getByRole('button', { name: 'Nota de crédito', exact: true }).click(); const creditCreated = await creditResponse; if (creditCreated.status() !== 201) throw new Error('La nota de crédito no se creó.'); const credit = await creditCreated.json(); invoiceIds.push(credit.id); if ((await campRef.collection('spInvoices').doc(credit.id).get()).data()?.baseInvoiceId !== invoice.id) throw new Error('La nota de crédito no quedó vinculada a la factura.'); console.log('Facturación E2E OK: factura y nota de crédito vinculada confirmadas en Firestore.');
-  await page.goto(`${webUrl}/smartplanner/contracts`, { waitUntil: 'domcontentloaded' }); await page.getByRole('heading', { name: 'Contratos y firma electrónica', exact: true }).waitFor(); const contractName = `Contrato E2E ${Date.now()}`; await page.getByRole('button', { name: 'Nuevo contrato', exact: true }).click(); await page.getByLabel('Título de contrato').fill(contractName); await page.getByLabel('Monto de contrato').fill('120000'); const contractResponse = page.waitForResponse((response) => response.request().method() === 'POST' && /\/smartplanner\/contracts$/.test(new URL(response.url()).pathname)); await page.getByRole('button', { name: 'Guardar contrato', exact: true }).click(); const contractCreated = await contractResponse; if (contractCreated.status() !== 201) throw new Error('El contrato no se creó.'); const contract = await contractCreated.json(); contractIds.push(contract.id); await page.getByRole('button', { name: 'Firmar', exact: true }).click(); const pad = page.locator('canvas.sp-signature-pad'); await pad.dispatchEvent('pointerdown', { clientX: 40, clientY: 60 }); await pad.dispatchEvent('pointermove', { clientX: 180, clientY: 95 }); await pad.dispatchEvent('pointerup', { clientX: 180, clientY: 95 }); const signResponse = page.waitForResponse((response) => response.request().method() === 'POST' && response.url().includes(`/smartplanner/contracts/${contract.id}/sign`)); await page.getByRole('button', { name: 'Confirmar firma', exact: true }).click(); if (!(await signResponse).ok()) throw new Error('La firma electrónica no se subió.'); const signed = await campRef.collection('spContracts').doc(contract.id).get(); if (signed.data()?.status !== 'firmado' || !String(signed.data()?.signatureUrl ?? '').startsWith('gs://')) throw new Error('La firma no quedó registrada en Firestore/Storage.'); console.log('Contratos E2E OK: contrato firmado y referencia de imagen almacenada por Firebase Storage.');
-  await page.goto(`${webUrl}/smartplanner/materials`, { waitUntil: 'domcontentloaded' }); await page.getByRole('heading', { name: 'Materiales e inventario', exact: true }).waitFor(); const materialName = `Folletos E2E ${Date.now()}`; await page.getByRole('button', { name: 'Nuevo material', exact: true }).click(); await page.getByLabel('Nombre de material').fill(materialName); await page.getByLabel('Stock').fill('3'); await page.getByLabel('Stock mínimo').fill('10'); const materialResponse = page.waitForResponse((response) => response.request().method() === 'POST' && /\/smartplanner\/materials$/.test(new URL(response.url()).pathname)); await page.getByRole('button', { name: 'Guardar material', exact: true }).click(); const materialCreated = await materialResponse; if (materialCreated.status() !== 201) throw new Error('El material no se creó.'); const material = await materialCreated.json(); materialIds.push(material.id); const materialDoc = await campRef.collection('spMaterials').doc(material.id).get(); if (materialDoc.data()?.name !== materialName || materialDoc.data()?.stock !== 3) throw new Error('El material no se persistió en Firestore.'); await page.getByText('Stock bajo', { exact: false }).waitFor(); console.log('Materiales E2E OK: material de stock bajo creado y confirmado en Firestore.');
-} finally { await browser?.close(); await restore?.(); vite?.kill(); }
+  await page.goto(`${url}/smartplanner/contributors`);
+  await page.getByRole('button', { name: 'Nuevo aportante', exact: true }).click();
+  await page.getByLabel('Nombre').fill(contributorName);
+  await page.getByLabel('Monto').fill('75000');
+  const contributorResponse = page.waitForResponse((response) => response.request().method() === 'POST' && /\/contributors$/.test(new URL(response.url()).pathname));
+  await page.getByRole('button', { name: 'Guardar', exact: true }).click();
+  const contributor = await (await contributorResponse).json(); ids.contributors.push(contributor.id);
+  await page.getByLabel(`Mover ${contributorName}`).click();
+  await page.locator('.dropdown-menu.show .dropdown-item').filter({ hasText: 'Confirmado' }).click();
+  if ((await campRef.collection('spContributors').doc(contributor.id).get()).data()?.stage !== 'confirmado') throw new Error('El aportante no quedó confirmado en Firestore.');
+  console.log('Aportantes E2E OK: creación y movimiento prospecto → confirmado persistidos en Firestore.');
+
+  const providerName = `Imprenta Sur E2E ${Date.now()}`;
+  await page.goto(`${url}/smartplanner/providers`);
+  await page.getByRole('button', { name: 'Nuevo proveedor', exact: true }).click();
+  await page.getByLabel('Nombre del proveedor').fill(providerName);
+  const providerResponse = page.waitForResponse((response) => response.request().method() === 'POST' && /\/providers$/.test(new URL(response.url()).pathname));
+  await page.getByRole('button', { name: 'Guardar proveedor', exact: true }).click();
+  const provider = await (await providerResponse).json(); ids.providers.push(provider.id);
+  await page.getByText(providerName, { exact: true }).click();
+  const projectName = `Folletos E2E ${Date.now()}`;
+  await page.getByRole('button', { name: 'Nuevo proyecto', exact: true }).click();
+  await page.getByLabel('Título del proyecto').fill(projectName);
+  await page.getByLabel('Presupuesto').fill('100000');
+  await page.getByLabel('Gasto informado').fill('58000');
+  const projectResponse = page.waitForResponse((response) => response.request().method() === 'POST' && /\/provider-projects$/.test(new URL(response.url()).pathname));
+  await page.getByRole('button', { name: 'Guardar proyecto', exact: true }).click();
+  const project = await (await projectResponse).json(); ids.projects.push(project.id);
+  if ((await campRef.collection('spProviderProjects').doc(project.id).get()).data()?.spent !== 58000) throw new Error('El gasto del proyecto no llegó a Firestore.');
+  console.log('Proveedores E2E OK: Imprenta Sur y su proyecto con presupuesto/gasto real están en Firestore.');
+
+  await page.goto(`${url}/smartplanner`);
+  page.once('dialog', (dialog) => dialog.accept('100'));
+  await page.getByRole('button', { name: 'Definir tope', exact: true }).click();
+  await page.getByText('Alerta: el gasto supera el tope legal.', { exact: true }).waitFor();
+  await page.goto(`${url}/planning/budget`);
+  await page.getByText('Alerta legal:', { exact: false }).waitFor();
+  console.log('Tope legal E2E OK: alerta visible tanto en SmartPlanner como en Presupuesto.');
+
+  await page.goto(`${url}/smartplanner/invoices`);
+  const invoiceName = `Factura E2E ${Date.now()}`;
+  await page.getByRole('button', { name: 'Nueva factura', exact: true }).click();
+  await page.getByLabel('Descripción de comprobante').fill(invoiceName);
+  await page.getByLabel('Monto de comprobante').fill('34000');
+  const invoiceResponse = page.waitForResponse((response) => response.request().method() === 'POST' && /\/invoices$/.test(new URL(response.url()).pathname));
+  await page.getByRole('button', { name: 'Guardar comprobante', exact: true }).click();
+  const invoice = await (await invoiceResponse).json(); ids.invoices.push(invoice.id);
+  await page.getByLabel('Filtrar comprobantes por estado').click();
+  await page.locator('.dropdown-menu.show .dropdown-item').filter({ hasText: 'Emitida' }).click();
+  await page.getByText(invoiceName, { exact: false }).waitFor();
+  const creditResponse = page.waitForResponse((response) => response.request().method() === 'POST' && response.url().includes(`/smartplanner/invoices/${invoice.id}/credit-note`));
+  await page.getByRole('button', { name: 'Nota de crédito', exact: true }).click();
+  const credit = await (await creditResponse).json(); ids.invoices.push(credit.id);
+  if ((await campRef.collection('spInvoices').doc(credit.id).get()).data()?.relatedInvoiceId !== invoice.id) throw new Error('La nota de crédito no quedó vinculada a la factura.');
+  console.log('Facturación E2E OK: filtro de estado, factura emitida y nota de crédito vinculada confirmados.');
+
+  await page.goto(`${url}/smartplanner/contracts`);
+  const contractName = `Contrato E2E ${Date.now()}`;
+  await page.getByRole('button', { name: 'Nuevo contrato', exact: true }).click();
+  await page.getByLabel('Título de contrato').fill(contractName);
+  await page.getByLabel('Contenido de contrato').fill('Servicio de impresión de folletos.');
+  await page.getByLabel('Monto de contrato').fill('120000');
+  const contractResponse = page.waitForResponse((response) => response.request().method() === 'POST' && /\/contracts$/.test(new URL(response.url()).pathname));
+  await page.getByRole('button', { name: 'Guardar contrato', exact: true }).click();
+  const contract = await (await contractResponse).json(); ids.contracts.push(contract.id);
+  await page.getByRole('button', { name: 'Firmar', exact: true }).click();
+  const pad = page.locator('canvas.sp-signature-pad');
+  await pad.dispatchEvent('pointerdown', { clientX: 40, clientY: 60 }); await pad.dispatchEvent('pointermove', { clientX: 180, clientY: 95 }); await pad.dispatchEvent('pointerup', { clientX: 180, clientY: 95 });
+  const signingResponse = page.waitForResponse((response) => response.request().method() === 'POST' && response.url().includes(`/smartplanner/contracts/${contract.id}/sign`));
+  await page.getByRole('button', { name: 'Confirmar firma', exact: true }).click(); await signingResponse;
+  const signed = (await campRef.collection('spContracts').doc(contract.id).get()).data();
+  if (signed?.status !== 'firmado' || signed?.type !== 'proveedor' || signed?.content !== 'Servicio de impresión de folletos.' || !String(signed?.signatureUrl ?? '').startsWith('gs://')) throw new Error('El contrato o su firma no se registraron como corresponde.');
+  console.log('Contratos E2E OK: tipo/contenido, firma y referencia de Firebase Storage persistidos.');
+} finally {
+  await browser?.close();
+  await cleanup();
+  vite?.kill();
+}
