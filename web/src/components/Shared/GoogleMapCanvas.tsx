@@ -121,8 +121,14 @@ export default function GoogleMapCanvas({ points, polygons = [], opportunities =
       if (focusedOpportunity) { map.panTo({ lat: focusedOpportunity.lat, lng: focusedOpportunity.lng }); map.setZoom(15); }
 
       if (drawing?.enabled) {
+        let drawingStarted = false;
         const startTerraDraw = () => {
-          if (cancelled) return;
+          // Depending on whether Maps restored its tiles from cache, `projection_changed`
+          // can happen before this listener is registered.  `idle` is the reliable
+          // fallback after a map is interactive; keep the guard because either event
+          // may win on a cold load.
+          if (cancelled || drawingStarted) return;
+          drawingStarted = true;
           terraDraw = new TerraDraw({
             adapter: new TerraDrawGoogleMapsAdapter({ lib: maps, map, coordinatePrecision: 8 }),
             modes: [new TerraDrawPolygonMode({ styles: { fillColor: '#0060f0', fillOpacity: 0.14, outlineColor: '#0060f0', outlineWidth: 3 } })]
@@ -138,6 +144,7 @@ export default function GoogleMapCanvas({ points, polygons = [], opportunities =
           });
         };
         projectionListener = maps.event.addListenerOnce(map, 'projection_changed', startTerraDraw);
+        maps.event.addListenerOnce(map, 'idle', startTerraDraw);
       }
     }).catch((reason: unknown) => { if (!cancelled) { setStatus('error'); setError(reason instanceof Error ? reason.message : 'No se pudo iniciar Google Maps.'); } });
 
