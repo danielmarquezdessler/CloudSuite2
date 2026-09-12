@@ -11,9 +11,12 @@ const repository = `${region}-docker.pkg.dev/${project}/cloudsuite/cloudsuite-ap
 const service = 'cloudsuite-api';
 const serviceAccount = `cloudsuite-api@${project}.iam.gserviceaccount.com`;
 const executable = (name) => process.platform === 'win32' ? `${name}.cmd` : name;
+// execFileSync con shell:true no entrecomilla los argumentos para cmd.exe.
+// Esto protege paths como --env-vars-file=C:\...\CloudSuite 2\... .
+const shellArgs = (args) => process.platform === 'win32' ? args.map((argument) => /[\s"]/u.test(argument) ? `"${argument.replace(/"/gu, '""')}"` : argument) : args;
 
 function run(command, args, options = {}) {
-  execFileSync(executable(command), args, { cwd: root, stdio: 'inherit', shell: process.platform === 'win32', ...options });
+  execFileSync(executable(command), shellArgs(args), { cwd: root, stdio: 'inherit', shell: process.platform === 'win32', ...options });
 }
 
 run('gcloud', ['builds', 'submit', 'server', `--project=${project}`, `--tag=${repository}`]);
@@ -45,7 +48,7 @@ try {
   rmSync(temporaryDirectory, { recursive: true, force: true });
 }
 
-const apiUrl = execFileSync(executable('gcloud'), ['run', 'services', 'describe', service, `--project=${project}`, `--region=${region}`, '--format=value(status.url)'], { cwd: root, encoding: 'utf8', shell: process.platform === 'win32' }).trim();
+const apiUrl = execFileSync(executable('gcloud'), shellArgs(['run', 'services', 'describe', service, `--project=${project}`, `--region=${region}`, '--format=value(status.url)']), { cwd: root, encoding: 'utf8', shell: process.platform === 'win32' }).trim();
 run('npm', ['run', 'build'], { cwd: resolve(root, 'web'), env: { ...process.env, VITE_FIREBASE_API_URL: apiUrl } });
 run('firebase', ['deploy', '--only', 'hosting', `--project=${project}`]);
 console.log(`CloudSuite desplegado. API: ${apiUrl}`);

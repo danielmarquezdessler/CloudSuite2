@@ -14,7 +14,11 @@ const envPath = resolve(root, 'server', '.env');
 const gcloud = process.platform === 'win32' ? 'gcloud.cmd' : 'gcloud';
 const commandOptions = { shell: process.platform === 'win32', stdio: 'inherit' };
 
-const run = (args) => execFileSync(gcloud, args, commandOptions);
+// Con shell:true, Node concatena los argumentos para cmd.exe sin escaparlos.
+// Las rutas del workspace contienen "CloudSuite 2", por eso cada argumento
+// que contenga espacios se protege explícitamente antes de invocar gcloud.cmd.
+const shellArgs = (args) => process.platform === 'win32' ? args.map((argument) => /[\s"]/u.test(argument) ? `"${argument.replace(/"/gu, '""')}"` : argument) : args;
+const run = (args) => execFileSync(gcloud, shellArgs(args), commandOptions);
 const upsertEnv = (source, key, value) => {
   const line = `${key}=${value}`;
   const expression = new RegExp(`^${key}=.*$`, 'm');

@@ -6,6 +6,7 @@ const project = 'politicfy-cloudsuite';
 const secret = 'RESEND_API_KEY';
 const gcloud = process.platform === 'win32' ? 'gcloud.cmd' : 'gcloud';
 const commandOptions = { shell: process.platform === 'win32' };
+const shellArgs = (args) => process.platform === 'win32' ? args.map((argument) => /[\s"]/u.test(argument) ? `"${argument.replace(/"/gu, '""')}"` : argument) : args;
 const prompt = readline.createInterface({ input, output });
 
 try {
@@ -13,12 +14,12 @@ try {
   if (!key) throw new Error('La clave de Resend es obligatoria. No se realizó ningún cambio.');
 
   try {
-    execFileSync(gcloud, ['secrets', 'describe', secret, `--project=${project}`], { stdio: 'ignore', ...commandOptions });
+    execFileSync(gcloud, shellArgs(['secrets', 'describe', secret, `--project=${project}`]), { stdio: 'ignore', ...commandOptions });
   } catch {
-    execFileSync(gcloud, ['secrets', 'create', secret, `--project=${project}`, '--replication-policy=automatic'], { stdio: 'ignore', ...commandOptions });
+    execFileSync(gcloud, shellArgs(['secrets', 'create', secret, `--project=${project}`, '--replication-policy=automatic']), { stdio: 'ignore', ...commandOptions });
   }
 
-  execFileSync(gcloud, ['secrets', 'versions', 'add', secret, `--project=${project}`, '--data-file=-'], {
+  execFileSync(gcloud, shellArgs(['secrets', 'versions', 'add', secret, `--project=${project}`, '--data-file=-']), {
     input: key,
     stdio: ['pipe', 'ignore', 'inherit'],
     ...commandOptions
