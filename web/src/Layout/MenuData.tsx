@@ -400,15 +400,17 @@ const menuItems = [
             { id: 'organization-candidates', label: 'Candidatos', icon: 'ph-duotone ph-user-focus', link: '/organization/candidates', dataPage: 'candidates' },
             { id: 'organization-functions', label: 'Funciones', icon: 'ph-duotone ph-identification-badge', link: '/organization/functions', dataPage: 'functions' },
             { id: 'organization-teams', label: 'Equipos', icon: 'ph-duotone ph-users-three', link: '/organization/teams', dataPage: 'teams' },
+            { id: 'organization-productivity', label: 'Productividad de equipo', icon: 'ph-duotone ph-chart-bar', link: '/execution/productivity', dataPage: 'execution-productivity' },
             { id: 'organization-users', label: 'Usuarios', icon: 'ph-duotone ph-user-plus', link: '/organization/users', dataPage: 'users' }
         ]
     },
     { id: 'smart-planner', label: 'SmartPlanner', icon: 'ph-duotone ph-sparkle', addon: 'smartPlanner', link: '/smartplanner' },
     {
-        type: 'HASHMENU', id: 'electoral-conversion', label: 'Conversión electoral',
+        type: 'HASHMENU', id: 'electoral-conversion', label: 'Electores',
         submenu: [
             { id: 'voters', label: 'Electores', icon: 'ph-duotone ph-users', link: '/electoral-conversion/voters', dataPage: 'voters' },
-            { id: 'voters-map', label: 'Mapa', icon: 'ph-duotone ph-map-trifold', link: '/electoral-conversion/map', dataPage: 'map' },
+            { id: 'voters-undecided', label: 'Indecisos', icon: 'ph-duotone ph-question', link: '/execution/undecided', dataPage: 'execution-undecided' },
+            { id: 'voters-map', label: 'Mapas', icon: 'ph-duotone ph-map-trifold', link: '/electoral-conversion/map', dataPage: 'map' },
             { id: 'planning-questions', label: 'Preguntas de visita', icon: 'ph-duotone ph-question', link: '/planning/questions', dataPage: 'questions' }
         ]
     },
@@ -417,6 +419,7 @@ const menuItems = [
         submenu: [
             { id: 'planning-calendar', label: 'Calendario', icon: 'ph-duotone ph-calendar', link: '/planning/calendar', dataPage: 'calendar' },
             { id: 'planning-territory', label: 'Territorio', icon: 'ph-duotone ph-map-trifold', link: '/planning/territory', dataPage: 'territory' },
+            { id: 'planning-tasks', label: 'Tareas', icon: 'ph-duotone ph-clipboard-text', link: '/execution/tasks', dataPage: 'execution-tasks' },
             { id: 'planning-goals', label: 'Metas', icon: 'ph-duotone ph-target', link: '/planning/goals', dataPage: 'goals' },
             { id: 'planning-routes', label: 'Rutas', icon: 'ph-duotone ph-route', link: '/planning/routes', dataPage: 'routes' },
             { id: 'planning-surveys', label: 'Encuestas', icon: 'ph-duotone ph-clipboard-text', link: '/planning/surveys', dataPage: 'surveys' },
@@ -425,18 +428,19 @@ const menuItems = [
         ]
     },
     {
-        type: 'HASHMENU', id: 'execution', label: 'Ejecución',
+        type: 'HASHMENU', id: 'execution', label: 'Ejecución y Conversión',
         submenu: [
             { id: 'execution-live', label: 'Visitas en vivo', icon: 'ph-duotone ph-broadcast', link: '/execution/live', dataPage: 'execution-live' },
-            { id: 'execution-heatmap', label: 'Mapa de calor', icon: 'ph-duotone ph-fire', link: '/execution/heatmap', dataPage: 'execution-heatmap' },
-            { id: 'execution-undecided', label: 'Indecisos', icon: 'ph-duotone ph-question', link: '/execution/undecided', dataPage: 'execution-undecided' },
-            { id: 'execution-tasks', label: 'Tareas', icon: 'ph-duotone ph-clipboard-text', link: '/execution/tasks', dataPage: 'execution-tasks' },
-            { id: 'execution-productivity', label: 'Productividad', icon: 'ph-duotone ph-chart-bar', link: '/execution/productivity', dataPage: 'execution-productivity' },
-            { id: 'execution-incidents', label: 'Incidencias', icon: 'ph-duotone ph-warning-circle', link: '/execution/incidents', dataPage: 'execution-incidents' },
-            { id: 'execution-daily-summary', label: 'Resumen de jornada', icon: 'ph-duotone ph-chart-line-up', link: '/execution/daily-summary', dataPage: 'execution-daily-summary' },
-            { id: 'execution-issues', label: 'Temas', icon: 'ph-duotone ph-chat-circle-text', link: '/execution/issues', dataPage: 'execution-issues' }
+            { id: 'execution-heatmap', label: 'Mapa de Calor', icon: 'ph-duotone ph-fire', link: '/execution/heatmap', dataPage: 'execution-heatmap' }
         ]
     },
+    { type: 'HASHMENU', id: 'reports', label: 'Reportes', submenu: [
+        { id: 'reports-issues', label: 'Temas', icon: 'ph-duotone ph-chat-circle-text', link: '/execution/issues', dataPage: 'execution-issues' },
+        { id: 'reports-daily-summary', label: 'Resumen de jornada', icon: 'ph-duotone ph-chart-line-up', link: '/execution/daily-summary', dataPage: 'execution-daily-summary' }
+    ] },
+    { type: 'HASHMENU', id: 'support', label: 'Soporte', submenu: [
+        { id: 'support-incidents', label: 'Incidencias', icon: 'ph-duotone ph-warning-circle', link: '/execution/incidents', dataPage: 'execution-incidents' }
+    ] },
     { label: 'Sistema', type: 'HEADER' },
     { id: 'audit-log', label: 'Control de Revisión', icon: 'ph-duotone ph-shield-check', link: '/control-de-revision', dataPage: 'audit-log' },
     { id: 'addons-admin', label: 'Add-ons', icon: 'ph-duotone ph-puzzle-piece', link: '/system/addons', dataPage: 'addons-admin', adminOnly: true }

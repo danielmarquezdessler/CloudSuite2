@@ -211,7 +211,7 @@ $shadow-sm: 0 1px 2px rgba(16, 24, 40, .08); $shadow-md: 0 4px 10px rgba(16, 24,
 .cloudsuite-sidebar-module__toggle { display:flex !important; width:100%; align-items:center; border:0; background:transparent; text-align:left; }
 .cloudsuite-sidebar-module__toggle .pc-mtext { flex:1; color:var(--pc-sidebar-caption-color); font-size:12px; font-weight:600; }
 .cloudsuite-sidebar-module__toggle .pc-arrow { color:var(--pc-sidebar-caption-color); transition:transform .25s ease; }
-.pc-sidebar .cloudsuite-sidebar-module > .pc-submenu { display:block; max-height:0; overflow:hidden; visibility:hidden; opacity:0; transition:max-height .25s ease,opacity .2s ease,visibility 0s linear .25s; }
+.pc-sidebar .pc-navbar > .cloudsuite-sidebar-module > .pc-submenu { display:block !important; max-height:0; overflow:hidden; visibility:hidden; opacity:0; transition:max-height .25s ease,opacity .2s ease,visibility 0s linear .25s; }
 .pc-sidebar .cloudsuite-sidebar-module.pc-trigger > .pc-submenu { max-height:720px; visibility:visible; opacity:1; transition:max-height .25s ease,opacity .2s ease; }
 .pc-sidebar .cloudsuite-sidebar-module.pc-trigger > .cloudsuite-sidebar-module__toggle > .pc-arrow { transform:rotate(90deg); }
 .cloudsuite-sidebar-module .pc-submenu .pc-link { display:flex; align-items:center; padding:10px 20px 10px 28px; }
