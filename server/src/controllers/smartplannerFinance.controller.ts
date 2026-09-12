@@ -11,3 +11,5 @@ export const contracts = async (r: Request, p: Response) => { try { p.json(await
 export const saveContract = async (r: Request, p: Response) => { try { p.status(r.params.contractId ? 200 : 201).json(await service.saveContract(r.user!, ...ids(r), r.params.contractId ? String(r.params.contractId) : null, r.body)); } catch (e) { fail(p, e); } };
 export const sign = async (r: Request, p: Response) => { try { p.json(await service.signContract(r.user!, ...ids(r), String(r.params.contractId), r.file)); } catch (e) { fail(p, e); } };
 export const removeContract = async (r: Request, p: Response) => { try { await service.removeContract(r.user!, ...ids(r), String(r.params.contractId)); p.status(204).end(); } catch (e) { fail(p, e); } };
+export const overview = async (r: Request, p: Response) => { try { p.json(await service.financeOverview(r.user!, ...ids(r))); } catch (e) { fail(p, e); } };
+export const legalLimit = async (r: Request, p: Response) => { try { p.json(await service.setLegalLimit(r.user!, ...ids(r), r.body)); } catch (e) { fail(p, e); } };
