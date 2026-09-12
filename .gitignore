@@ -6,6 +6,7 @@ build/
 # Local environment files (the template stays versioned)
 .env*
 !.env.example
+server/.secrets/
 .firebase/
 *.log
 
