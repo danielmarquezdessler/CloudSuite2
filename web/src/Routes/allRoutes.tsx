@@ -23,6 +23,7 @@ import SettingsPlaceholder from '../pages/Modules/System/SettingsPlaceholder';
 import AddonsAdmin from '../pages/Modules/System/AddonsAdmin';
 import SmartPlanner from '../pages/Modules/SmartPlanner/SmartPlanner';
 import Contributors from '../pages/Modules/SmartPlanner/Contributors';
+import Providers from '../pages/Modules/SmartPlanner/Providers';
 import LiveVisits from '../pages/Modules/Execution/LiveVisits';
 import Heatmap from '../pages/Modules/Execution/Heatmap';
 import Undecided from '../pages/Modules/Execution/Undecided';
@@ -211,6 +212,7 @@ const routes = [
     { path: "/system/addons", component: <AddonsAdmin /> },
     { path: "/smartplanner", component: <SmartPlanner /> },
     { path: "/smartplanner/contributors", component: <Contributors /> },
+    { path: "/smartplanner/providers", component: <Providers /> },
     { path: "/audit-log", component: <AuditLog /> },
     { path: "/notifications", component: <Notifications /> },
     { path: "/planning/questions", component: <QuestionsEditor /> },
