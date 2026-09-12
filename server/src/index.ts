@@ -8,6 +8,7 @@ import { systemRouter } from './routes/system.routes.js';
 import { planningRouter } from './routes/planning.routes.js';
 import { executionRouter } from './routes/execution.routes.js';
 import { mapRouter } from './routes/map.routes.js';
+import { smartplannerRouter } from './routes/smartplanner.routes.js';
 import { getFirestoreStartupDiagnostic, verifyFirestoreReachability } from './config/firebase.js';
 
 const app = express();
@@ -33,6 +34,7 @@ app.use('/api', systemRouter);
 app.use('/api', planningRouter);
 app.use('/api', executionRouter);
 app.use('/api', mapRouter);
+app.use('/api', smartplannerRouter);
 
 async function startServer() {
   try {

@@ -58,6 +58,7 @@ const NestedMenu: React.FC<{ menuItems: any }> = ({ menuItems }) => {
       if (item.type === 'HEADER') return <li key={item.label} className="pc-item pc-caption"><label>{t(item.label)}</label></li>;
       if (item.addon === 'smartPlanner') {
         const enabled = enabledAddons.smartPlanner;
+        if (enabled) return <li key={item.id} className="pc-item cloudsuite-sidebar-addon is-enabled"><Link to={item.link || '/smartplanner'} className="pc-link cloudsuite-sidebar-addon__button"><span className="pc-micon"><i className={item.icon} /></span><span className="pc-mtext">{t(item.label)}</span></Link></li>;
         return <li key={item.id} className={`pc-item cloudsuite-sidebar-addon ${enabled ? 'is-enabled' : 'is-disabled'}`}>
           <button type="button" className="pc-link cloudsuite-sidebar-addon__button" disabled={!enabled} aria-disabled={!enabled} title={enabled ? 'SmartPlanner está habilitado para esta organización.' : 'SmartPlanner estará disponible próximamente.'}>
             {item.icon && <span className="pc-micon"><i className={item.icon} /></span>}

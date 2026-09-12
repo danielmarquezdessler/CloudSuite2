@@ -1,0 +1,5 @@
+import { Router } from 'express'; import { requireAuth } from '../middleware/requireAuth.js'; import { requireAddon } from '../middleware/requireAddon.js'; import * as c from '../controllers/smartplanner.controller.js';
+export const smartplannerRouter=Router(); const b='/organizations/:orgId/campaigns/:campId/smartplanner';
+const protectedAddon = [requireAuth, requireAddon('smartPlanner')] as const;
+smartplannerRouter.get(`${b}/areas`,...protectedAddon,c.areas); smartplannerRouter.post(`${b}/areas`,...protectedAddon,c.createArea); smartplannerRouter.put(`${b}/areas/:areaId`,...protectedAddon,c.updateArea); smartplannerRouter.delete(`${b}/areas/:areaId`,...protectedAddon,c.removeArea);
+smartplannerRouter.get(`${b}/tasks`,...protectedAddon,c.tasks); smartplannerRouter.post(`${b}/tasks`,...protectedAddon,c.createTask); smartplannerRouter.put(`${b}/tasks/:taskId`,...protectedAddon,c.updateTask); smartplannerRouter.delete(`${b}/tasks/:taskId`,...protectedAddon,c.removeTask); smartplannerRouter.get(`${b}/members`,...protectedAddon,c.members); smartplannerRouter.put(`${b}/members/:memberId/role`,...protectedAddon,c.role);

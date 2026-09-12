@@ -403,7 +403,7 @@ const menuItems = [
             { id: 'organization-users', label: 'Usuarios', icon: 'ph-duotone ph-user-plus', link: '/organization/users', dataPage: 'users' }
         ]
     },
-    { id: 'smart-planner', label: 'SmartPlanner', icon: 'ph-duotone ph-sparkle', addon: 'smartPlanner' },
+    { id: 'smart-planner', label: 'SmartPlanner', icon: 'ph-duotone ph-sparkle', addon: 'smartPlanner', link: '/smartplanner' },
     {
         type: 'HASHMENU', id: 'electoral-conversion', label: 'Conversión electoral',
         submenu: [

@@ -1,0 +1,15 @@
+import { Request, Response } from 'express';
+import * as service from '../services/smartplanner.service.js';
+import { ForbiddenError, NotFoundError, ValidationError } from '../services/access.service.js';
+const ids = (r: Request) => [String(r.params.orgId), String(r.params.campId)] as const;
+const fail = (s: Response, e: unknown) => { if (e instanceof ForbiddenError) return s.status(403).json({ message:e.message }); if (e instanceof NotFoundError) return s.status(404).json({ message:e.message }); if (e instanceof ValidationError || e instanceof Error) return s.status(400).json({ message:e.message }); return s.status(500).json({ message:'No pudimos completar la operación.' }); };
+export const areas = async(r:Request,s:Response)=>{try{s.json(await service.listAreas(r.user!,...ids(r)));}catch(e){fail(s,e)}};
+export const createArea = async(r:Request,s:Response)=>{try{s.status(201).json(await service.saveArea(r.user!,...ids(r),null,r.body));}catch(e){fail(s,e)}};
+export const updateArea = async(r:Request,s:Response)=>{try{s.json(await service.saveArea(r.user!,...ids(r),String(r.params.areaId),r.body));}catch(e){fail(s,e)}};
+export const removeArea = async(r:Request,s:Response)=>{try{await service.deleteArea(r.user!,...ids(r),String(r.params.areaId));s.status(204).end();}catch(e){fail(s,e)}};
+export const tasks = async(r:Request,s:Response)=>{try{s.json(await service.listTasks(r.user!,...ids(r)));}catch(e){fail(s,e)}};
+export const members = async(r:Request,s:Response)=>{try{s.json(await service.listMembers(r.user!,...ids(r)));}catch(e){fail(s,e)}};
+export const createTask = async(r:Request,s:Response)=>{try{s.status(201).json(await service.saveTask(r.user!,...ids(r),null,r.body));}catch(e){fail(s,e)}};
+export const updateTask = async(r:Request,s:Response)=>{try{s.json(await service.saveTask(r.user!,...ids(r),String(r.params.taskId),r.body));}catch(e){fail(s,e)}};
+export const removeTask = async(r:Request,s:Response)=>{try{await service.deleteTask(r.user!,...ids(r),String(r.params.taskId));s.status(204).end();}catch(e){fail(s,e)}};
+export const role = async(r:Request,s:Response)=>{try{s.json(await service.setRole(r.user!,...ids(r),String(r.params.memberId),r.body?.smartPlannerRole));}catch(e){fail(s,e)}};
