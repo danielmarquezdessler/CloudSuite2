@@ -143,12 +143,10 @@ export default function GoogleMapCanvas({ points, polygons = [], opportunities =
             const coordinates = ring.slice(0, -1).map((position: number[]) => ({ lat: position[1], lng: position[0] }));
             if (coordinates.length >= 3) drawing.onPolygonComplete(coordinates);
           });
+          // The Google adapter creates its OverlayView asynchronously.  Select the
+          // drawing mode only once that view is ready so it receives map input.
+          terraDraw.on('ready', () => { if (!cancelled) terraDraw?.setMode('polygon'); });
           terraDraw.start();
-          // `ready` may be emitted synchronously by the adapter, before a listener
-          // registered after `start()` can observe it.  Selecting the polygon mode
-          // immediately after start is supported by Terra Draw and makes the control
-          // usable on both cached and cold Google Maps loads.
-          terraDraw.setMode('polygon');
         };
         projectionListener = maps.event.addListenerOnce(map, 'projection_changed', startTerraDraw);
         maps.event.addListenerOnce(map, 'idle', startTerraDraw);
