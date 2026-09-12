@@ -403,6 +403,7 @@ const menuItems = [
             { id: 'organization-users', label: 'Usuarios', icon: 'ph-duotone ph-user-plus', link: '/organization/users', dataPage: 'users' }
         ]
     },
+    { id: 'smart-planner', label: 'SmartPlanner', icon: 'ph-duotone ph-sparkle', addon: 'smartPlanner' },
     {
         type: 'HASHMENU', id: 'electoral-conversion', label: 'Conversión electoral',
         submenu: [
@@ -437,7 +438,8 @@ const menuItems = [
         ]
     },
     { label: 'Sistema', type: 'HEADER' },
-    { id: 'audit-log', label: 'Control de Revisión', icon: 'ph-duotone ph-shield-check', link: '/control-de-revision', dataPage: 'audit-log' }
+    { id: 'audit-log', label: 'Control de Revisión', icon: 'ph-duotone ph-shield-check', link: '/control-de-revision', dataPage: 'audit-log' },
+    { id: 'addons-admin', label: 'Add-ons', icon: 'ph-duotone ph-puzzle-piece', link: '/system/addons', dataPage: 'addons-admin', adminOnly: true }
 ];
 
 export { menuItems, templateMenuItems };

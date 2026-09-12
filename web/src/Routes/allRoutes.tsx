@@ -20,6 +20,7 @@ import Encuestas from '../pages/Modules/Planning/Encuestas';
 import Presupuesto from '../pages/Modules/Planning/Presupuesto';
 import Asesor from '../pages/Modules/Planning/Asesor';
 import SettingsPlaceholder from '../pages/Modules/System/SettingsPlaceholder';
+import AddonsAdmin from '../pages/Modules/System/AddonsAdmin';
 import LiveVisits from '../pages/Modules/Execution/LiveVisits';
 import Heatmap from '../pages/Modules/Execution/Heatmap';
 import Undecided from '../pages/Modules/Execution/Undecided';
@@ -205,6 +206,7 @@ const routes = [
     { path: "/electoral-conversion/mapa", component: <VotersMap /> },
     { path: "/visit/:voterId", component: <VisitScreen /> },
     { path: "/control-de-revision", component: <AuditLog /> },
+    { path: "/system/addons", component: <AddonsAdmin /> },
     { path: "/audit-log", component: <AuditLog /> },
     { path: "/notifications", component: <Notifications /> },
     { path: "/planning/questions", component: <QuestionsEditor /> },

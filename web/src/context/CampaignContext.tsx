@@ -3,10 +3,13 @@ import { useAuth } from './AuthContext';
 import { authenticatedRequest } from '../lib/api';
 
 export type CampaignOption = { id: string; nombre: string; memberCount: number; voterCount: number };
-type Me = { organization?: { id: string; nombre?: string }; campaigns?: Array<{ id: string; nombre: string }>; role?: string };
+export type EnabledAddons = { smartPlanner: boolean };
+type Me = { organization?: { id: string; nombre?: string; enabledAddons?: Partial<EnabledAddons> }; campaigns?: Array<{ id: string; nombre: string }>; role?: string };
 type CampaignContextValue = {
   organizationId: string | null;
   role: string;
+  enabledAddons: EnabledAddons;
+  updateEnabledAddons: (addons: EnabledAddons) => void;
   campaigns: CampaignOption[];
   activeCampaign: CampaignOption | null;
   activeCampaignId: string | null;
@@ -21,7 +24,8 @@ type CampaignContextValue = {
 const CampaignContext = createContext<CampaignContextValue | undefined>(undefined);
 const storageKey = (uid: string) => `cloudsuite.activeCampaign.${uid}`;
 const snapshotKey = (uid: string) => `cloudsuite.campaignSnapshot.${uid}`;
-type CampaignSnapshot = { organizationId: string; role: string; campaigns: CampaignOption[] };
+type CampaignSnapshot = { organizationId: string; role: string; campaigns: CampaignOption[]; enabledAddons?: EnabledAddons };
+const defaultEnabledAddons: EnabledAddons = { smartPlanner: false };
 
 function storedSnapshot(uid: string): CampaignSnapshot | null {
   try {
@@ -34,6 +38,7 @@ export function CampaignProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [organizationId, setOrganizationId] = useState<string | null>(null);
   const [role, setRole] = useState('');
+  const [enabledAddons, setEnabledAddonsState] = useState<EnabledAddons>(defaultEnabledAddons);
   const [campaigns, setCampaigns] = useState<CampaignOption[]>([]);
   const [activeCampaignId, setActiveId] = useState<string | null>(null);
   const [loading, setLoading] = useState(Boolean(user));
@@ -41,7 +46,7 @@ export function CampaignProvider({ children }: { children: ReactNode }) {
 
   const reload = useCallback(async () => {
     if (!user) {
-      setOrganizationId(null); setRole(''); setCampaigns([]); setActiveId(null); setError(''); setLoading(false);
+      setOrganizationId(null); setRole(''); setEnabledAddonsState(defaultEnabledAddons); setCampaigns([]); setActiveId(null); setError(''); setLoading(false);
       return;
     }
     setLoading(true);
@@ -55,10 +60,10 @@ export function CampaignProvider({ children }: { children: ReactNode }) {
           : cached.campaigns.some(campaign => campaign.id === storedId)
             ? storedId
             : cached.campaigns[0].id;
-        setOrganizationId(cached.organizationId); setRole(cached.role); setCampaigns(cached.campaigns); setActiveId(nextId); setError(''); setLoading(false);
+        setOrganizationId(cached.organizationId); setRole(cached.role); setEnabledAddonsState(cached.enabledAddons ?? defaultEnabledAddons); setCampaigns(cached.campaigns); setActiveId(nextId); setError(''); setLoading(false);
         return;
       }
-      setOrganizationId(null); setRole(''); setCampaigns([]); setActiveId(null);
+      setOrganizationId(null); setRole(''); setEnabledAddonsState(defaultEnabledAddons); setCampaigns([]); setActiveId(null);
       setError(me.error?.message ?? 'No hay una campaña disponible.'); setLoading(false);
       return;
     }
@@ -72,8 +77,9 @@ export function CampaignProvider({ children }: { children: ReactNode }) {
       : available.some((campaign) => campaign.id === storedId)
         ? storedId
         : available[0]?.id ?? null;
-    setOrganizationId(orgId); setRole(me.data.role ?? ''); setCampaigns(available); setActiveId(nextId);
-    localStorage.setItem(snapshotKey(user.uid), JSON.stringify({ organizationId: orgId, role: me.data.role ?? '', campaigns: available }));
+    const nextEnabledAddons: EnabledAddons = { smartPlanner: me.data.organization.enabledAddons?.smartPlanner === true };
+    setOrganizationId(orgId); setRole(me.data.role ?? ''); setEnabledAddonsState(nextEnabledAddons); setCampaigns(available); setActiveId(nextId);
+    localStorage.setItem(snapshotKey(user.uid), JSON.stringify({ organizationId: orgId, role: me.data.role ?? '', campaigns: available, enabledAddons: nextEnabledAddons }));
     if (nextId) localStorage.setItem(storageKey(user.uid), nextId);
     setError(details.error?.message ?? ''); setLoading(false);
   }, [activeCampaignId, user]);
@@ -94,6 +100,14 @@ export function CampaignProvider({ children }: { children: ReactNode }) {
     if (user) localStorage.setItem(storageKey(user.uid), campaign.id);
   }, [user]);
 
+  const updateEnabledAddons = useCallback((addons: EnabledAddons) => {
+    setEnabledAddonsState(addons);
+    if (user && organizationId) {
+      const snapshot = storedSnapshot(user.uid);
+      if (snapshot) localStorage.setItem(snapshotKey(user.uid), JSON.stringify({ ...snapshot, enabledAddons: addons }));
+    }
+  }, [organizationId, user]);
+
   const createCampaign = useCallback(async (nombre: string) => {
     if (!user || !organizationId) throw new Error('No hay una organización activa.');
     const result = await authenticatedRequest<CampaignOption>(user, `/api/organizations/${organizationId}/campaigns`, { method: 'POST', body: JSON.stringify({ nombre }) });
@@ -105,7 +119,7 @@ export function CampaignProvider({ children }: { children: ReactNode }) {
   }, [activateCampaign, organizationId, user]);
 
   const activeCampaign = useMemo(() => campaigns.find((campaign) => campaign.id === activeCampaignId) ?? null, [activeCampaignId, campaigns]);
-  const value = useMemo(() => ({ organizationId, role, campaigns, activeCampaign, activeCampaignId, loading, error, setActiveCampaignId, activateCampaign, createCampaign, reload }), [organizationId, role, campaigns, activeCampaign, activeCampaignId, loading, error, setActiveCampaignId, activateCampaign, createCampaign, reload]);
+  const value = useMemo(() => ({ organizationId, role, enabledAddons, updateEnabledAddons, campaigns, activeCampaign, activeCampaignId, loading, error, setActiveCampaignId, activateCampaign, createCampaign, reload }), [organizationId, role, enabledAddons, updateEnabledAddons, campaigns, activeCampaign, activeCampaignId, loading, error, setActiveCampaignId, activateCampaign, createCampaign, reload]);
   return <CampaignContext.Provider value={value}>{children}</CampaignContext.Provider>;
 }
 

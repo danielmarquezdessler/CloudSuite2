@@ -16,7 +16,7 @@ const pages = [
   ['Territorio', '/planning/territory'], ['Metas', '/planning/goals'], ['Rutas', '/planning/routes'],
   ['Encuestas', '/planning/surveys'], ['Presupuesto', '/planning/budget'], ['Asesor', '/planning/advisor'],
   ['Visitas en vivo', '/execution/live'], ['Mapa de calor', '/execution/heatmap'], ['Indecisos', '/execution/undecided']
-  ,['Tareas', '/execution/tasks'], ['Productividad', '/execution/productivity'], ['Incidencias', '/execution/incidents'], ['Resumen de jornada', '/execution/daily-summary'], ['Temas', '/execution/issues']
+  ,['Tareas', '/execution/tasks'], ['Productividad', '/execution/productivity'], ['Incidencias', '/execution/incidents'], ['Resumen de jornada', '/execution/daily-summary'], ['Temas', '/execution/issues'], ['Administración de add-ons', '/system/addons']
 ];
 const minimumPadding = 12;
 const minimumHeaderGap = 16;
@@ -40,6 +40,13 @@ try {
   await page.getByLabel('Contraseña').fill(env.E2E_PASSWORD);
   await page.getByRole('button', { name: 'Ingresar', exact: true }).click();
   await page.waitForURL(/dashboard/);
+  // Wait for the real active-campaign context, otherwise a fast route sweep can
+  // audit loading fallbacks instead of the authenticated page content.
+  await page.locator('.cs-campaign-selector').waitFor({ state: 'visible' });
+  await page.waitForFunction(() => {
+    const selector = document.querySelector('.cs-campaign-selector');
+    return Boolean(selector && !selector.disabled);
+  }, undefined, { timeout: 30_000 });
 
   for (const [name, route] of pages) {
     await page.goto(`${appUrl}${route}`, { waitUntil: 'domcontentloaded' });

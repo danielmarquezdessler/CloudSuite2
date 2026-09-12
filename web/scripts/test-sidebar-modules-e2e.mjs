@@ -12,7 +12,8 @@ const host = '127.0.0.1';
 const apiUrl = 'http://127.0.0.1:8080';
 const webUrl = `http://${host}:5189`;
 const chromiumPath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE ?? 'C:/Users/Admin/AppData/Local/ms-playwright/chromium-1234/chrome-win64/chrome.exe';
-const storageKey = 'cloudsuite.sidebar.modules';
+const storageKey = 'cloudsuite.sidebar.openModule';
+const legacyStorageKey = 'cloudsuite.sidebar.modules';
 
 function parseEnv(source) {
   return Object.fromEntries(source.split(/\r?\n/).map((line) => line.trim()).filter((line) => line && !line.startsWith('#')).map((line) => {
@@ -58,6 +59,17 @@ const expanded = async (page, id) => page.locator(`[data-sidebar-module="${id}"]
 let apiProcess;
 let viteProcess;
 let browser;
+let restoreAdminVerification = null;
+
+async function login(page, env) {
+  await page.goto(webUrl, { waitUntil: 'domcontentloaded' });
+  await page.getByLabel('Email').fill(env.E2E_EMAIL);
+  await page.getByLabel('Contraseña').fill(env.E2E_PASSWORD);
+  await page.getByRole('button', { name: 'Ingresar', exact: true }).click();
+  await page.waitForURL(/\/dashboard(?:\?|$)/);
+  await page.locator('nav.pc-sidebar').waitFor({ state: 'visible', timeout: 40_000 });
+}
+
 try {
   const env = parseEnv(await readFile(envPath, 'utf8'));
   if (!env.E2E_EMAIL || !env.E2E_PASSWORD) throw new Error('Faltan E2E_EMAIL o E2E_PASSWORD en web/.env.test.');
@@ -75,17 +87,10 @@ try {
   page.setDefaultTimeout(20_000);
   page.on('console', (message) => { if (message.type() === 'error') console.error(`[browser] ${message.text()}`); });
   page.on('pageerror', (error) => console.error(`[pageerror] ${error.message}`));
-  await page.goto(webUrl, { waitUntil: 'domcontentloaded' });
-  await page.getByLabel('Email').fill(env.E2E_EMAIL);
-  await page.getByLabel('Contraseña').fill(env.E2E_PASSWORD);
-  await page.getByRole('button', { name: 'Ingresar', exact: true }).click();
-  await page.waitForURL(/\/dashboard(?:\?|$)/);
-  // URL navigation happens before Firebase finishes restoring the authenticated layout.
-  // Wait for the real post-login shell before exercising a page refresh.
-  await page.locator('nav.pc-sidebar').waitFor({ state: 'visible', timeout: 40_000 });
+  await login(page, env);
 
-  // A first visit without the saved preference must start with Organization only.
-  await page.evaluate((key) => localStorage.removeItem(key), storageKey);
+  // A first visit without a saved preference must start with Organization only.
+  await page.evaluate(([key, legacyKey]) => { localStorage.removeItem(key); localStorage.removeItem(legacyKey); }, [storageKey, legacyStorageKey]);
   await page.reload({ waitUntil: 'domcontentloaded' });
   await page.locator('nav.pc-sidebar').waitFor({ state: 'visible', timeout: 40_000 });
   await page.locator('[data-sidebar-module="organization"] > button').waitFor();
@@ -93,28 +98,74 @@ try {
     const value = await expanded(page, id);
     if (value !== expected) throw new Error(`Estado inicial incorrecto para ${id}: esperado ${expected}, recibido ${value}.`);
   }
-  console.log('Estado inicial OK: solo Organización expandido.');
+  const transition = await page.locator('[data-sidebar-module="organization"] > ul').evaluate((element) => getComputedStyle(element).transitionProperty);
+  if (!transition.includes('max-height')) throw new Error(`La transición del acordeón no está configurada (transition-property=${transition}).`);
+  if (await page.locator('.cloudsuite-sidebar-addon__badge').getByText('Próximamente').count() !== 1) throw new Error('SmartPlanner debería mostrarse bloqueado con el badge Próximamente.');
+  if (!await page.locator('.cloudsuite-sidebar-addon__button').isDisabled()) throw new Error('SmartPlanner debe quedar no navegable cuando el add-on está deshabilitado.');
+  console.log('Estado inicial OK: solo Organización expandido; transición y gate de SmartPlanner verificados.');
 
   // On a direct Planning route, its group must expand even if no preference was saved for it.
   await page.goto(`${webUrl}/planning/calendar`, { waitUntil: 'domcontentloaded' });
   await page.getByRole('heading', { name: /Calendario Electoral/i }).first().waitFor();
-  if (await expanded(page, 'planning') !== 'true') throw new Error('Planificación no se autoexpandió al entrar directamente en /planning/calendar.');
+  if (await expanded(page, 'planning') !== 'true' || await expanded(page, 'organization') !== 'false') throw new Error('Planificación no se autoexpandió de forma exclusiva al entrar directamente en /planning/calendar.');
   await page.screenshot({ path: resolve(screenshots, 'sidebar-module-planning-debug.png'), fullPage: false });
   await page.locator('[data-sidebar-module="planning"] a[data-page="calendar"]').waitFor({ state: 'visible' });
   console.log('Autoexpansión por ruta activa OK: Planificación.');
 
-  // Persist an independent user choice while on Dashboard, where none of these modules is active.
+  // A manual change is an accordion: opening a module must close the previous one and persist one ID only.
   await page.goto(`${webUrl}/dashboard`, { waitUntil: 'domcontentloaded' });
   await page.locator('[data-sidebar-module="organization"] > button').click();
   await page.locator('[data-sidebar-module="electoral-conversion"] > button').click();
   if (await expanded(page, 'organization') !== 'false' || await expanded(page, 'electoral-conversion') !== 'true') throw new Error('No se pudo alternar el estado manual de los módulos.');
+  const storedOpenModule = await page.evaluate((key) => localStorage.getItem(key), storageKey);
+  if (storedOpenModule !== '"electoral-conversion"') throw new Error(`La preferencia debería guardar un único módulo, recibió ${storedOpenModule}.`);
   await page.reload({ waitUntil: 'domcontentloaded' });
   if (await expanded(page, 'organization') !== 'false' || await expanded(page, 'electoral-conversion') !== 'true') throw new Error('El estado de los módulos no persistió tras recargar.');
   await page.screenshot({ path: resolve(screenshots, 'sidebar-module-groups.png'), fullPage: false });
-  console.log('Persistencia localStorage OK: estado restaurado tras recarga.');
-  console.log('E2E sidebar OK: estado inicial, autoexpansión y persistencia verificados sin mocks.');
+  console.log('Persistencia localStorage OK: un único módulo restaurado tras recarga.');
+
+  // The persistent E2E account is a Cliente. Temporarily grant only its test
+  // token the existing admin role, exercise the real API/UI gate, and restore
+  // both claims and the exact Firestore add-on document in finally.
+  const { adminAuth, db } = await import('../../server/dist/config/firebase.js');
+  const authUser = await adminAuth.getUserByEmail(env.E2E_EMAIL);
+  const profile = await db.collection('users').doc(authUser.uid).get();
+  const orgId = env.E2E_ORG_ID || profile.data()?.orgIds?.[0];
+  const campId = env.E2E_CAMPAIGN_ID || (await db.collection('organizations').doc(orgId).collection('campaigns').limit(1).get()).docs[0]?.id;
+  if (typeof orgId !== 'string' || typeof campId !== 'string') throw new Error('No fue posible resolver la organización/campaña E2E para verificar SmartPlanner.');
+  const orgRef = db.collection('organizations').doc(orgId);
+  const organization = await orgRef.get();
+  const originalClaims = authUser.customClaims ?? {};
+  const originalEnabledAddons = organization.data()?.enabledAddons;
+  restoreAdminVerification = async () => {
+    await adminAuth.setCustomUserClaims(authUser.uid, originalClaims);
+    if (originalEnabledAddons === undefined) await orgRef.set({ enabledAddons: { smartPlanner: false } }, { merge: true });
+    else await orgRef.set({ enabledAddons: originalEnabledAddons }, { merge: true });
+  };
+  await adminAuth.setCustomUserClaims(authUser.uid, { ...originalClaims, role: 'admin', orgId, camps: { ...((originalClaims.camps && typeof originalClaims.camps === 'object') ? originalClaims.camps : {}), [campId]: true } });
+
+  await browser.close();
+  browser = await chromium.launch({ headless: true, executablePath: chromiumPath });
+  const adminPage = await browser.newPage({ viewport: { width: 1440, height: 980 } });
+  adminPage.setDefaultTimeout(20_000);
+  await login(adminPage, env);
+  await adminPage.goto(`${webUrl}/system/addons`, { waitUntil: 'domcontentloaded' });
+  await adminPage.getByRole('heading', { name: 'Administración de add-ons' }).waitFor();
+  const enableRequest = adminPage.waitForResponse((response) => response.request().method() === 'PUT' && /\/addons\/smart-planner$/.test(new URL(response.url()).pathname) && response.status() === 200);
+  await adminPage.getByRole('button', { name: 'Habilitar SmartPlanner', exact: true }).click();
+  await enableRequest;
+  await adminPage.locator('.cloudsuite-sidebar-addon__button').waitFor({ state: 'visible' });
+  await adminPage.waitForFunction(() => {
+    const button = document.querySelector('.cloudsuite-sidebar-addon__button');
+    return Boolean(button && !button.disabled);
+  });
+  if (await adminPage.locator('.cloudsuite-sidebar-addon__button').isDisabled()) throw new Error('SmartPlanner siguió deshabilitado después de habilitar el add-on.');
+  if (await adminPage.locator('.cloudsuite-sidebar-addon__badge').count()) throw new Error('El badge Próximamente siguió visible después de habilitar SmartPlanner.');
+  console.log('Gate de SmartPlanner OK: administrador habilitó el add-on real y el sidebar reflejó el cambio.');
+  console.log('E2E sidebar OK: estado inicial, transición, acordeón estricto, autoexpansión, persistencia y SmartPlanner bloqueado verificados sin mocks.');
 } finally {
   await browser?.close();
+  await restoreAdminVerification?.();
   viteProcess?.kill();
   apiProcess?.kill();
 }

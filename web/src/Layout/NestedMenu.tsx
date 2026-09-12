@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import React, { useEffect, useState } from 'react';
 import FeatherIcon from 'feather-icons-react';
 import { useTranslation } from 'react-i18next';
+import { useActiveCampaign } from '../context/CampaignContext';
 
 interface MenuItem {
   id?: string;
@@ -13,36 +14,57 @@ interface MenuItem {
   badge?: string;
   dataPage?: string;
   submenu?: MenuItem[];
+  addon?: 'smartPlanner';
+  adminOnly?: boolean;
 }
 
-const SIDEBAR_STATE_KEY = 'cloudsuite.sidebar.modules';
-const DEFAULT_MODULES: Record<string, boolean> = { organization: true, 'electoral-conversion': false, planning: false, execution: false };
+const SIDEBAR_STATE_KEY = 'cloudsuite.sidebar.openModule';
+const LEGACY_SIDEBAR_STATE_KEY = 'cloudsuite.sidebar.modules';
+const DEFAULT_OPEN_MODULE = 'organization';
+
+function readOpenModule() {
+  try {
+    const saved = window.localStorage.getItem(SIDEBAR_STATE_KEY);
+    if (saved !== null) return JSON.parse(saved) as string | null;
+
+    // Preserve the user's most recent choice while moving away from the old
+    // multi-open representation. Subsequent writes only use the single value.
+    const legacy = JSON.parse(window.localStorage.getItem(LEGACY_SIDEBAR_STATE_KEY) ?? 'null') as Record<string, boolean> | null;
+    return Object.entries(legacy ?? {}).find(([, expanded]) => expanded)?.[0] ?? DEFAULT_OPEN_MODULE;
+  } catch {
+    return DEFAULT_OPEN_MODULE;
+  }
+}
 
 const NestedMenu: React.FC<{ menuItems: any }> = ({ menuItems }) => {
   const router = useLocation();
   const { t } = useTranslation();
-  const [openModules, setOpenModules] = useState<Record<string, boolean>>(() => {
-    try {
-      const saved = window.localStorage.getItem(SIDEBAR_STATE_KEY);
-      return saved ? { ...DEFAULT_MODULES, ...JSON.parse(saved) } : DEFAULT_MODULES;
-    } catch {
-      return DEFAULT_MODULES;
-    }
-  });
+  const { enabledAddons, role } = useActiveCampaign();
+  const [openModule, setOpenModule] = useState<string | null>(readOpenModule);
 
   useEffect(() => {
     const activeModule = menuItems.find((item: MenuItem) => item.submenu?.some((child: MenuItem) => child.link === router.pathname));
-    if (activeModule?.id) setOpenModules((previous) => previous[activeModule.id!] ? previous : { ...previous, [activeModule.id!]: true });
+    if (activeModule?.id) setOpenModule(activeModule.id);
   }, [menuItems, router.pathname]);
 
-  useEffect(() => { window.localStorage.setItem(SIDEBAR_STATE_KEY, JSON.stringify(openModules)); }, [openModules]);
+  useEffect(() => { window.localStorage.setItem(SIDEBAR_STATE_KEY, JSON.stringify(openModule)); }, [openModule]);
 
-  const toggleModule = (id: string) => setOpenModules((previous) => ({ ...previous, [id]: !previous[id] }));
+  const toggleModule = (id: string) => setOpenModule((current) => current === id ? null : id);
   const isActive = (item: MenuItem) => item.link === router.pathname;
 
   return <>
     {menuItems.map((item: MenuItem) => {
+      if (item.adminOnly && role !== 'admin') return null;
       if (item.type === 'HEADER') return <li key={item.label} className="pc-item pc-caption"><label>{t(item.label)}</label></li>;
+      if (item.addon === 'smartPlanner') {
+        const enabled = enabledAddons.smartPlanner;
+        return <li key={item.id} className={`pc-item cloudsuite-sidebar-addon ${enabled ? 'is-enabled' : 'is-disabled'}`}>
+          <button type="button" className="pc-link cloudsuite-sidebar-addon__button" disabled={!enabled} aria-disabled={!enabled} title={enabled ? 'SmartPlanner está habilitado para esta organización.' : 'SmartPlanner estará disponible próximamente.'}>
+            {item.icon && <span className="pc-micon"><i className={item.icon} /></span>}
+            <span className="pc-mtext">{t(item.label)}</span>{!enabled && <span className="cloudsuite-sidebar-addon__badge">Próximamente</span>}
+          </button>
+        </li>;
+      }
       if (!item.submenu) return <li key={item.id} className={`pc-item ${isActive(item) ? 'active' : ''}`}>
         <Link to={item.link || '#'} className="pc-link" data-page={item.dataPage}>
           {item.icon && <span className="pc-micon"><i className={item.icon} /></span>}
@@ -50,7 +72,7 @@ const NestedMenu: React.FC<{ menuItems: any }> = ({ menuItems }) => {
         </Link>
       </li>;
 
-      const expanded = Boolean(item.id && openModules[item.id]);
+      const expanded = item.id === openModule;
       const containsActiveItem = item.submenu.some(isActive);
       return <li key={item.id} data-sidebar-module={item.id} className={`pc-item pc-hasmenu cloudsuite-sidebar-module ${expanded ? 'pc-trigger' : ''} ${containsActiveItem ? 'active' : ''}`}>
         <button type="button" className="pc-link cloudsuite-sidebar-module__toggle" aria-expanded={expanded} aria-controls={`sidebar-module-${item.id}`} onClick={() => item.id && toggleModule(item.id)}>

@@ -6,6 +6,7 @@ import { appendAudit } from './audit.service.js';
 
 export class ConflictError extends Error {}
 export class NotFoundError extends Error {}
+export class ForbiddenError extends Error {}
 
 interface BootstrapInput {
   organizationName: string;
@@ -56,6 +57,7 @@ export async function bootstrapOrganization(user: DecodedIdToken, input: Bootstr
     transaction.set(orgRef, {
       nombre: organizationName,
       ownerUid: user.uid,
+      enabledAddons: { smartPlanner: false },
       createdAt: FieldValue.serverTimestamp()
     });
     transaction.set(orgRef.collection('members').doc(user.uid), {
@@ -145,10 +147,35 @@ export async function getCurrentUserData(user: DecodedIdToken) {
       email: profile.email ?? user.email ?? '',
       displayName: profile.displayName ?? null
     },
-    organization: { id: organizationSnapshot.id, nombre: organization.nombre },
+    organization: {
+      id: organizationSnapshot.id,
+      nombre: organization.nombre,
+      enabledAddons: { smartPlanner: organization.enabledAddons?.smartPlanner === true }
+    },
     campaigns: campaignsSnapshot.docs
       .filter((campaign) => claimsArePending || allCampaigns || camps[campaign.id] === true)
       .map((campaign) => ({ id: campaign.id, nombre: campaign.data().nombre })),
     role: typeof user.role === 'string' ? user.role : member.role ?? 'sin-rol'
   };
+}
+
+/**
+ * Add-ons change the scope of an organization, so only the platform-level
+ * administrator claim may alter them. Campaign owners (role "cliente") are
+ * deliberately not allowed to enable paid or gated modules for themselves.
+ */
+export async function setSmartPlannerEnabled(user: DecodedIdToken, orgId: string, enabled: unknown) {
+  if (user.role !== 'admin') {
+    throw new ForbiddenError('Solo un administrador global puede administrar add-ons.');
+  }
+  if (typeof enabled !== 'boolean') {
+    throw new Error('El valor de SmartPlanner debe ser verdadero o falso.');
+  }
+
+  const orgRef = db.collection('organizations').doc(orgId);
+  const organization = await orgRef.get();
+  if (!organization.exists) throw new NotFoundError('La organización no existe.');
+
+  await orgRef.set({ enabledAddons: { ...(organization.data()?.enabledAddons ?? {}), smartPlanner: enabled } }, { merge: true });
+  return { enabledAddons: { smartPlanner: enabled } };
 }
