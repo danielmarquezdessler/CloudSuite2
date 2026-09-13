@@ -127,6 +127,22 @@ try {
   }
   console.log(`[Selector de campaña modal] cards=${modalAudit.length}, paddingFailures=${modalAudit.filter((card) => card.failed).length}`);
 
+  await modal.getByRole('button', { name: 'Cerrar', exact: true }).click();
+  await page.getByRole('button', { name: 'Abrir addons', exact: true }).click();
+  const launcher = page.locator('.cloudsuite-launcher-menu');
+  await launcher.waitFor({ state: 'visible' });
+  const launcherAudit = await launcher.locator('.cloudsuite-launcher-card[data-card="true"]').evaluateAll((elements, minPadding) => elements.map((element) => {
+    const style = getComputedStyle(element);
+    const padding = { top: Number.parseFloat(style.paddingTop), right: Number.parseFloat(style.paddingRight), bottom: Number.parseFloat(style.paddingBottom), left: Number.parseFloat(style.paddingLeft) };
+    return { padding, failed: Object.values(padding).some((value) => value < minPadding) };
+  }), minimumPadding);
+  cardsAudited += launcherAudit.length;
+  if (launcherAudit.length !== 5) failures.push(`Launcher Addons — se esperaban 5 cards canónicas y se encontraron ${launcherAudit.length}.`);
+  for (const [index, card] of launcherAudit.entries()) {
+    if (card.failed) failures.push(`Launcher Addons — card ${index + 1} — ${formatBox(card.padding)}`);
+  }
+  console.log(`[Launcher Addons] cards=${launcherAudit.length}, paddingFailures=${launcherAudit.filter((card) => card.failed).length}`);
+
   console.log(`\nPADDING AUDIT SUMMARY\nCards audited: ${cardsAudited}\nPadding failures: ${failures.length}\nCardHeaders audited: ${headersAudited}\nHeader-gap failures: ${headerFailures.length}\nGhost-card warnings: ${ghosts.length}`);
   if (failures.length) console.error(`\nPADDING FAILURES\n${failures.join('\n')}`);
   if (headerFailures.length) console.error(`\nHEADER-GAP FAILURES\n${headerFailures.join('\n')}`);
