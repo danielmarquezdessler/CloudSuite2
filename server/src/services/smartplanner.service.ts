@@ -2,6 +2,7 @@ import { DecodedIdToken } from 'firebase-admin/auth';
 import { FieldValue } from 'firebase-admin/firestore';
 import { db } from '../config/firebase.js';
 import { assertCampaignAccess, ForbiddenError, NotFoundError, ValidationError } from './access.service.js';
+import { createNotification } from './notifications.service.js';
 
 const defaults = [
   ['Estrategia', 'Dirección política y prioridades de campaña.', '#0060F0'], ['Comunicación', 'Mensajes, prensa y contenidos.', '#7C3AED'], ['Avanzada y Logística', 'Operación territorial y recursos.', '#F97316'], ['Finanzas', 'Presupuesto, compras y rendición.', '#10B981'], ['Jurídico', 'Cumplimiento y documentación electoral.', '#EF4444']
@@ -33,7 +34,28 @@ export async function saveArea(user: DecodedIdToken, orgId: string, campId: stri
 export async function deleteArea(user: DecodedIdToken, orgId: string, campId: string, id: string) { await manager(user, orgId, campId); await campaign(orgId, campId).collection('spAreas').doc(id).delete(); }
 export async function listTasks(user: DecodedIdToken, orgId: string, campId: string) { await addon(user, orgId, campId); const member = await membership(user, orgId, campId); const role = String(member.data()?.smartPlannerRole ?? 'miembro'); let tasks: SmartPlannerTask[] = (await campaign(orgId, campId).collection('spTasks').orderBy('createdAt', 'desc').get()).docs.map(serialize); if (!['cliente', 'admin'].includes(String(user.role)) && !['contador', 'pm'].includes(role)) tasks = tasks.filter((task) => task.assignedTo === user.uid); return tasks; }
 export async function listMembers(user: DecodedIdToken, orgId: string, campId: string) { await addon(user, orgId, campId); const snap = await campaign(orgId, campId).collection('members').get(); return snap.docs.map((doc) => ({ uid: doc.id, ...doc.data() })); }
-export async function saveTask(user: DecodedIdToken, orgId: string, campId: string, id: string | null, input: Record<string, unknown>) { if (!id) await manager(user, orgId, campId); else await addon(user, orgId, campId); const ref = id ? campaign(orgId, campId).collection('spTasks').doc(id) : campaign(orgId, campId).collection('spTasks').doc(); const existing = id ? await ref.get() : null; if (id && !existing?.exists) throw new NotFoundError('La tarea no existe.'); const member = await membership(user, orgId, campId); const role = String(member.data()?.smartPlannerRole ?? 'miembro'); const canManage = ['cliente', 'admin'].includes(String(user.role)) || ['contador', 'pm'].includes(role); if (id && !canManage && existing?.data()?.assignedTo !== user.uid) throw new ForbiddenError('Solo podés mover tus propias tareas.'); const status = String(input.status ?? existing?.data()?.status ?? 'por_hacer'); if (!statuses.includes(status as typeof statuses[number])) throw new ValidationError('El estado no es válido.'); if (!canManage) { await ref.update({ status, completedAt: status === 'completada' ? FieldValue.serverTimestamp() : null, updatedAt: FieldValue.serverTimestamp() }); return { id, status }; }
-  const title = String(input.title ?? '').trim(); if (!title) throw new ValidationError('El título de la tarea es obligatorio.'); const priority = String(input.priority ?? 'media'); if (!priorities.includes(priority as typeof priorities[number])) throw new ValidationError('La prioridad no es válida.'); const parsedCost = Number(input.cost ?? 0); const cost = Number.isFinite(parsedCost) ? Math.max(0, parsedCost) : 0; const data = { title, description: String(input.description ?? ''), areaId: String(input.areaId ?? ''), assignedTo: String(input.assignedTo ?? ''), status, priority, startDate: String(input.startDate ?? ''), dueDate: String(input.dueDate ?? ''), cost }; if (!data.areaId || !data.assignedTo || !data.dueDate) throw new ValidationError('Área, responsable y fecha límite son obligatorios.'); await ref.set({ ...data, ...(id ? { updatedAt: FieldValue.serverTimestamp() } : { createdAt: FieldValue.serverTimestamp() }), ...(status === 'completada' ? { completedAt: FieldValue.serverTimestamp() } : {}) }, { merge: true }); return { id: ref.id, ...data }; }
+export async function saveTask(user: DecodedIdToken, orgId: string, campId: string, id: string | null, input: Record<string, unknown>) {
+  if (!id) await manager(user, orgId, campId); else await addon(user, orgId, campId);
+  const ref = id ? campaign(orgId, campId).collection('spTasks').doc(id) : campaign(orgId, campId).collection('spTasks').doc();
+  const existing = id ? await ref.get() : null;
+  if (id && !existing?.exists) throw new NotFoundError('La tarea no existe.');
+  const member = await membership(user, orgId, campId);
+  const role = String(member.data()?.smartPlannerRole ?? 'miembro');
+  const canManage = ['cliente', 'admin'].includes(String(user.role)) || ['contador', 'pm'].includes(role);
+  if (id && !canManage && existing?.data()?.assignedTo !== user.uid) throw new ForbiddenError('Solo podés mover tus propias tareas.');
+  const status = String(input.status ?? existing?.data()?.status ?? 'por_hacer');
+  if (!statuses.includes(status as typeof statuses[number])) throw new ValidationError('El estado no es válido.');
+  if (!canManage) { await ref.update({ status, completedAt: status === 'completada' ? FieldValue.serverTimestamp() : null, updatedAt: FieldValue.serverTimestamp() }); return { id, status }; }
+  const title = String(input.title ?? '').trim();
+  if (!title) throw new ValidationError('El título de la tarea es obligatorio.');
+  const priority = String(input.priority ?? 'media');
+  if (!priorities.includes(priority as typeof priorities[number])) throw new ValidationError('La prioridad no es válida.');
+  const parsedCost = Number(input.cost ?? 0); const cost = Number.isFinite(parsedCost) ? Math.max(0, parsedCost) : 0;
+  const data = { title, description: String(input.description ?? ''), areaId: String(input.areaId ?? ''), assignedTo: String(input.assignedTo ?? ''), status, priority, startDate: String(input.startDate ?? ''), dueDate: String(input.dueDate ?? ''), cost };
+  if (!data.areaId || !data.assignedTo || !data.dueDate) throw new ValidationError('Área, responsable y fecha límite son obligatorios.');
+  await ref.set({ ...data, ...(id ? { updatedAt: FieldValue.serverTimestamp() } : { createdAt: FieldValue.serverTimestamp() }), ...(status === 'completada' ? { completedAt: FieldValue.serverTimestamp() } : {}) }, { merge: true });
+  if (data.assignedTo !== user.uid && data.assignedTo !== existing?.data()?.assignedTo) await createNotification(data.assignedTo, { type: 'smartplanner_task_assigned', title: 'Nueva tarea asignada', message: data.title, metadata: { path: '/smartplanner', orgId, campId, taskId: ref.id } });
+  return { id: ref.id, ...data };
+}
 export async function deleteTask(user: DecodedIdToken, orgId: string, campId: string, id: string) { await manager(user, orgId, campId); await campaign(orgId, campId).collection('spTasks').doc(id).delete(); }
 export async function setRole(user: DecodedIdToken, orgId: string, campId: string, uid: string, smartPlannerRole: unknown) { if (user.role !== 'cliente' && user.role !== 'admin') throw new ForbiddenError('Solo Cliente o admin puede asignar roles de SmartPlanner.'); await addon(user, orgId, campId); const role = String(smartPlannerRole ?? 'miembro'); if (!['contador', 'pm', 'miembro'].includes(role)) throw new ValidationError('El rol de SmartPlanner no es válido.'); const ref = campaign(orgId, campId).collection('members').doc(uid); if (!(await ref.get()).exists) throw new NotFoundError('El miembro no existe.'); await ref.update({ smartPlannerRole: role, updatedAt: FieldValue.serverTimestamp() }); return { uid, smartPlannerRole: role }; }
