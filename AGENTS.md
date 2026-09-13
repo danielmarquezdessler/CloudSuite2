@@ -34,6 +34,12 @@ Ningún componente puede renderizar dos o más elementos hermanos (bloques de te
 - `npm run test:e2e` desde `web/` ejecuta `scripts/test-e2e-real.mjs`: usa Firebase Auth, la API Node y Firestore reales, inicia Vite en el puerto 5188 y levanta la API en 8080 únicamente si no hay una API sana. No intercepta ni simula HTTP.
 - Para regenerar el entorno, eliminá solo el usuario E2E en Firebase Authentication y su organización de prueba indicada por `web/.env.test` en Firestore; luego eliminá o vaciá ese archivo local y ejecutá `npm run test:e2e`. Cuando el ADC local venza, ejecutar `gcloud auth application-default login`, reiniciar el backend y comprobar `GET http://127.0.0.1:8080/health`.
 
+## Cuenta primaria de validación
+
+- `danielmarquez82@hotmail.com` es la cuenta primaria de validación en producción. Nunca puede quedar bloqueada de una funcionalidad o add-on que ya se considere terminado.
+- Al introducir un nuevo flag de disponibilidad (por ejemplo, `enabledAddons.*`) o cualquier mecanismo de gating equivalente, habilitarlo por defecto para todas las organizaciones de esta cuenta —incluidas organizaciones existentes mediante una migración/backfill— antes de informar el feature como terminado.
+- Las cuentas E2E son complementarias: una verificación automatizada no reemplaza una comprobación final en la cuenta real de Daniel para las funcionalidades publicadas en producción.
+
 ## Tareas programadas de SmartPlanner
 
 - `npm run notify:smartplanner-due` desde `server/` revisa las facturas pendientes o emitidas que vencen dentro de los próximos siete días y crea como máximo una notificación diaria por factura. En producción debe ejecutarse una vez por día mediante Cloud Scheduler/Cloud Run Job; no depende de una instancia web persistente.
