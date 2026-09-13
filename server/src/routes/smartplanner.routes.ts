@@ -7,6 +7,7 @@ import * as operations from '../controllers/smartplannerOperations.controller.js
 import * as crew from '../controllers/smartplannerCrew.controller.js';
 import * as messages from '../controllers/smartplannerMessages.controller.js';
 import * as crisis from '../controllers/smartplannerCrisis.controller.js';
+import * as transversal from '../controllers/smartplannerTransversal.controller.js';
 export const smartplannerRouter=Router(); const b='/organizations/:orgId/campaigns/:campId/smartplanner';
 const protectedAddon = [requireAuth, requireAddon('smartPlanner')] as const;
 const signatureUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 2 * 1024 * 1024 } });
@@ -26,3 +27,7 @@ smartplannerRouter.get(`${b}/messages`,...protectedAddon,messages.list); smartpl
 smartplannerRouter.get(`${b}/crisis-protocols`,...protectedAddon,crisis.protocols); smartplannerRouter.post(`${b}/crisis-protocols`,...protectedAddon,crisis.protocol); smartplannerRouter.put(`${b}/crisis-protocols/:id`,...protectedAddon,crisis.protocol); smartplannerRouter.post(`${b}/crisis-protocols/:id/activate`,...protectedAddon,crisis.activation); smartplannerRouter.get(`${b}/crisis-activations`,...protectedAddon,crisis.activations);
 smartplannerRouter.get(`${b}/promises`,...protectedAddon,crisis.promises); smartplannerRouter.post(`${b}/promises`,...protectedAddon,crisis.promise); smartplannerRouter.put(`${b}/promises/:id`,...protectedAddon,crisis.promise); smartplannerRouter.post(`${b}/promises/:id/submit-legal-review`,...protectedAddon,crisis.legal('submit')); smartplannerRouter.post(`${b}/promises/:id/approve`,...protectedAddon,crisis.legal('approve')); smartplannerRouter.post(`${b}/promises/:id/reject`,...protectedAddon,crisis.legal('reject'));
 smartplannerRouter.get(`${b}/election-day-tasks`,...protectedAddon,crisis.day); smartplannerRouter.post(`${b}/election-day-tasks`,...protectedAddon,crisis.dayTask); smartplannerRouter.put(`${b}/election-day-tasks/:id`,...protectedAddon,crisis.dayTask);
+smartplannerRouter.get(`${b}/tickets`,...protectedAddon,transversal.tickets); smartplannerRouter.post(`${b}/tickets`,...protectedAddon,transversal.ticket); smartplannerRouter.put(`${b}/tickets/:id`,...protectedAddon,transversal.ticket);
+smartplannerRouter.get(`${b}/areas/:areaId/messages`,...protectedAddon,transversal.chat); smartplannerRouter.post(`${b}/areas/:areaId/messages`,...protectedAddon,transversal.send);
+smartplannerRouter.get(`${b}/staff`,...protectedAddon,transversal.staff); smartplannerRouter.post(`${b}/staff`,...protectedAddon,transversal.saveStaff); smartplannerRouter.put(`${b}/staff/:id`,...protectedAddon,transversal.saveStaff); smartplannerRouter.put(`${b}/staff/:id/attendance`,...protectedAddon,transversal.attendance); smartplannerRouter.post(`${b}/staff/:id/leaves`,...protectedAddon,transversal.leave);
+smartplannerRouter.get(`${b}/config`,...protectedAddon,transversal.config); smartplannerRouter.put(`${b}/config`,...protectedAddon,transversal.config);
