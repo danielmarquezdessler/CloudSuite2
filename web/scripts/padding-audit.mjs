@@ -16,7 +16,7 @@ const pages = [
   ['Territorio', '/planning/territory'], ['Metas', '/planning/goals'], ['Rutas', '/planning/routes'],
   ['Encuestas', '/planning/surveys'], ['Presupuesto', '/planning/budget'], ['Asesor', '/planning/advisor'],
   ['Visitas en vivo', '/execution/live'], ['Mapa de calor', '/execution/heatmap'], ['Indecisos', '/execution/undecided'], ['SmartPlanner', '/smartplanner'], ['Aportantes SmartPlanner', '/smartplanner/contributors'], ['Proveedores SmartPlanner', '/smartplanner/providers'], ['Facturación SmartPlanner', '/smartplanner/invoices'], ['Contratos SmartPlanner', '/smartplanner/contracts'], ['Materiales SmartPlanner', '/smartplanner/materials'], ['Mapa de Avanzada SmartPlanner', '/smartplanner/operations'], ['Sugerencias de cuadrilla SmartPlanner', '/smartplanner/crews'], ['Validación de mensajes SmartPlanner', '/smartplanner/messages']
-  ,['Tareas', '/execution/tasks'], ['Productividad', '/execution/productivity'], ['Incidencias', '/execution/incidents'], ['Resumen de jornada', '/execution/daily-summary'], ['Temas', '/execution/issues'], ['Administración de add-ons', '/system/addons']
+  ,['War Room SmartPlanner', '/smartplanner/war-room'], ['Viabilidad jurídica SmartPlanner', '/smartplanner/promises'], ['Panel Día D SmartPlanner', '/smartplanner/election-day'], ['Tareas', '/execution/tasks'], ['Productividad', '/execution/productivity'], ['Incidencias', '/execution/incidents'], ['Resumen de jornada', '/execution/daily-summary'], ['Temas', '/execution/issues'], ['Administración de add-ons', '/system/addons']
 ];
 const minimumPadding = 12;
 const minimumHeaderGap = 16;
