@@ -65,6 +65,8 @@ export async function generateWorkOrder(user: DecodedIdToken, orgId: string, cam
   if (!operation.exists) throw new NotFoundError('La operación no existe.');
   const source = operation.data() ?? {}; const required = requirements(source.requirements as Record<string, unknown> ?? {});
   if (!required.providerId) throw new ValidationError('Elegí un proveedor antes de generar la orden de trabajo.');
+  const provider = await campaign(orgId, campId).collection('spProviders').doc(required.providerId).get();
+  if (!provider.exists || provider.data()?.deleted) throw new ValidationError('El proveedor seleccionado ya no está disponible.');
   if (typeof source.workOrderProjectId === 'string' && source.workOrderProjectId) return { projectId: source.workOrderProjectId, reused: true };
   const labels = [['tarima', 'Tarima'], ['sonido', 'Sonido'], ['seguridad', 'Seguridad'], ['banderas', 'Banderas']].filter(([key]) => required[key as keyof typeof required] === true).map(([, label]) => label);
   if (required.otros) labels.push(required.otros);
