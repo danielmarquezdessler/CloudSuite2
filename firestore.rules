@@ -27,6 +27,10 @@ service cloud.firestore {
     match /organizations/{orgId}/campaigns/{campId}/surveys/{surveyId} { allow read: if campaignMember(orgId, campId); allow write: if false; }
     match /organizations/{orgId}/campaigns/{campId}/budgets/{budgetId} { allow read: if campaignMember(orgId, campId); allow write: if false; }
     match /organizations/{orgId}/campaigns/{campId}/aiSuggestions/{suggestionId} { allow read: if campaignMember(orgId, campId); allow write: if false; }
+    // Live operational feeds are read directly by authenticated campaign members.
+    // Every mutation still goes through the Node API/Admin SDK.
+    match /organizations/{orgId}/campaigns/{campId}/spElectionDayTasks/{taskId} { allow read: if campaignMember(orgId, campId); allow write: if false; }
+    match /organizations/{orgId}/campaigns/{campId}/spAreas/{areaId}/messages/{messageId} { allow read: if campaignMember(orgId, campId); allow write: if false; }
     match /organizations/{orgId}/campaigns/{campId}/auditLog/{logId} { allow read: if isCliente(orgId) && canAccessCampaign(campId); allow write: if false; }
     match /organizations/{orgId}/campaigns/{campId}/{document=**} { allow read, write: if false; }
     match /users/{uid} { allow read, update: if signedIn() && request.auth.uid == uid; allow create, delete: if false; }

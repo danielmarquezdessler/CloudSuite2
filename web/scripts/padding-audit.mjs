@@ -50,6 +50,9 @@ try {
 
   for (const [name, route] of pages) {
     await page.goto(`${appUrl}${route}`, { waitUntil: 'domcontentloaded' });
+    if (route === '/smartplanner/war-room') await page.getByRole('heading', { name: 'Motor de Crisis' }).waitFor({ state: 'visible' });
+    if (route === '/smartplanner/promises') await page.getByRole('heading', { name: 'Propuestas de campaña' }).waitFor({ state: 'visible' });
+    if (route === '/smartplanner/election-day') await page.getByRole('heading', { name: 'Panel del Día D' }).waitFor({ state: 'visible' });
     await page.waitForTimeout(500);
     const audit = await page.evaluate(({ minPadding, minHeaderGap }) => {
       const visible = (element) => {
