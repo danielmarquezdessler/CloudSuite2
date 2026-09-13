@@ -66,7 +66,11 @@
     "test:e2e:smartplanner-phase4-realtime": "node scripts/test-smartplanner-phase4-realtime-e2e.mjs",
     "test:e2e:smartplanner-notifications": "node scripts/test-smartplanner-notifications-e2e.mjs",
     "test:e2e:smartplanner-staff": "node scripts/test-smartplanner-staff-e2e.mjs",
-    "test:e2e:smartplanner-transversal": "node scripts/test-smartplanner-transversal-e2e.mjs"
+    "test:e2e:smartplanner-transversal": "node scripts/test-smartplanner-transversal-e2e.mjs",
+    "test:e2e:smartplanner-chat-realtime": "node scripts/test-smartplanner-chat-realtime-e2e.mjs",
+    "test:e2e:smartplanner-reports": "node scripts/test-smartplanner-reports-e2e.mjs",
+    "test:e2e:smartplanner-settings": "node scripts/test-smartplanner-settings-e2e.mjs",
+    "test:e2e:smartplanner-tickets-ui": "node scripts/test-smartplanner-tickets-ui-e2e.mjs"
   },
   "dependencies": {
     "@ckeditor/ckeditor5-build-balloon": "^41.3.1",
