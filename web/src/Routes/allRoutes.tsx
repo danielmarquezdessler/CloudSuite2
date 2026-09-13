@@ -33,6 +33,7 @@ import Messages from '../pages/Modules/SmartPlanner/Messages';
 import { WarRoom, Promises, ElectionDay } from '../pages/Modules/SmartPlanner/Phase4';
 import Tickets from '../pages/Modules/SmartPlanner/Tickets';
 import AreaChat from '../pages/Modules/SmartPlanner/AreaChat';
+import { Staff, Settings } from '../pages/Modules/SmartPlanner/StaffSettings';
 import LiveVisits from '../pages/Modules/Execution/LiveVisits';
 import Heatmap from '../pages/Modules/Execution/Heatmap';
 import Undecided from '../pages/Modules/Execution/Undecided';
@@ -233,6 +234,8 @@ const routes = [
     { path: "/smartplanner/election-day", component: <ElectionDay /> },
     { path: "/smartplanner/tickets", component: <Tickets /> },
     { path: "/smartplanner/chat", component: <AreaChat /> },
+    { path: "/smartplanner/staff", component: <Staff /> },
+    { path: "/smartplanner/settings", component: <Settings /> },
     { path: "/audit-log", component: <AuditLog /> },
     { path: "/notifications", component: <Notifications /> },
     { path: "/planning/questions", component: <QuestionsEditor /> },
