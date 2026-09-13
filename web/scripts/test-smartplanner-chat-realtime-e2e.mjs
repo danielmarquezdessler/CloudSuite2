@@ -1,0 +1,18 @@
+import { readFile } from 'node:fs/promises';
+import { initializeApp, deleteApp } from 'firebase/app';
+import { getAuth, signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import { collection, getFirestore, onSnapshot, orderBy, query } from 'firebase/firestore';
+
+const parse = async (path) => Object.fromEntries((await readFile(new URL(path, import.meta.url), 'utf8')).split(/\r?\n/).filter((line) => line && !line.startsWith('#')).map((line) => { const index = line.indexOf('='); return [line.slice(0, index), line.slice(index + 1)]; }));
+const [runtime, test] = await Promise.all([parse('../.env'), parse('../.env.test')]);
+const app = initializeApp({ apiKey: runtime.VITE_FIREBASE_API_KEY, authDomain: runtime.VITE_FIREBASE_AUTH_DOMAIN, projectId: runtime.VITE_FIREBASE_PROJECT_ID, appId: runtime.VITE_FIREBASE_APP_ID });
+const auth = getAuth(app); const firestore = getFirestore(app); let unsubscribe; let messageId = '';
+try {
+  const { adminAuth, db } = await import('../../server/dist/config/firebase.js'); const transversal = await import('../../server/dist/services/smartplannerTransversal.service.js'); const planner = await import('../../server/dist/services/smartplanner.service.js');
+  const account = await adminAuth.getUserByEmail(test.E2E_EMAIL); const profile = await db.collection('users').doc(account.uid).get(); const orgId = test.E2E_ORG_ID || profile.data()?.orgIds?.[0]; const campId = test.E2E_CAMPAIGN_ID || (await db.collection('organizations').doc(orgId).collection('campaigns').limit(1).get()).docs[0]?.id;
+  const area = (await planner.listAreas({ uid: account.uid, email: account.email, ...(account.customClaims ?? {}) }, orgId, campId)).find((item) => item.name === 'Estrategia'); if (!area) throw new Error('No existe el área Estrategia.');
+  await signInWithEmailAndPassword(auth, test.E2E_EMAIL, test.E2E_PASSWORD); const source = query(collection(firestore, 'organizations', orgId, 'campaigns', campId, 'spAreas', area.id, 'messages'), orderBy('createdAt', 'asc')); const text = `Chat realtime E2E ${Date.now()}`;
+  await new Promise((resolve, reject) => { const timeout = setTimeout(() => reject(new Error('onSnapshot no entregó el snapshot inicial del chat.')), 15000); unsubscribe = onSnapshot(source, () => { clearTimeout(timeout); resolve(); }, reject); });
+  const observed = new Promise((resolve, reject) => { const timeout = setTimeout(() => reject(new Error('El chat no reflejó el mensaje remoto sin recargar.')), 15000); unsubscribe?.(); unsubscribe = onSnapshot(source, (snapshot) => { if (snapshot.docs.some((document) => document.data().text === text)) { clearTimeout(timeout); resolve(); } }, reject); });
+  const result = await transversal.sendChat({ uid: account.uid, email: account.email, ...(account.customClaims ?? {}) }, orgId, campId, area.id, text); messageId = result.id; await observed; console.log('Chat realtime E2E OK: el cliente Firebase mostró el mensaje nuevo de Estrategia sin recargar.');
+} finally { if (messageId) { const { adminAuth, db } = await import('../../server/dist/config/firebase.js'); const account = await adminAuth.getUserByEmail(test.E2E_EMAIL); const profile = await db.collection('users').doc(account.uid).get(); const orgId = test.E2E_ORG_ID || profile.data()?.orgIds?.[0]; const campId = test.E2E_CAMPAIGN_ID || (await db.collection('organizations').doc(orgId).collection('campaigns').limit(1).get()).docs[0]?.id; const area = (await db.collection('organizations').doc(orgId).collection('campaigns').doc(campId).collection('spAreas').where('name', '==', 'Estrategia').limit(1).get()).docs[0]; await area?.ref.collection('messages').doc(messageId).delete(); } unsubscribe?.(); await signOut(auth); await deleteApp(app); }
