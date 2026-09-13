@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
+    "notify:smartplanner-due": "node scripts/smartplanner-due-invoices.mjs",
     "start": "node dist/index.js"
   },
   "dependencies": {
