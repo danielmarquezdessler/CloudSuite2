@@ -32,6 +32,7 @@ import CrewSuggestions from '../pages/Modules/SmartPlanner/CrewSuggestions';
 import Messages from '../pages/Modules/SmartPlanner/Messages';
 import { WarRoom, Promises, ElectionDay } from '../pages/Modules/SmartPlanner/Phase4';
 import Tickets from '../pages/Modules/SmartPlanner/Tickets';
+import AreaChat from '../pages/Modules/SmartPlanner/AreaChat';
 import LiveVisits from '../pages/Modules/Execution/LiveVisits';
 import Heatmap from '../pages/Modules/Execution/Heatmap';
 import Undecided from '../pages/Modules/Execution/Undecided';
@@ -231,6 +232,7 @@ const routes = [
     { path: "/smartplanner/promises", component: <Promises /> },
     { path: "/smartplanner/election-day", component: <ElectionDay /> },
     { path: "/smartplanner/tickets", component: <Tickets /> },
+    { path: "/smartplanner/chat", component: <AreaChat /> },
     { path: "/audit-log", component: <AuditLog /> },
     { path: "/notifications", component: <Notifications /> },
     { path: "/planning/questions", component: <QuestionsEditor /> },
