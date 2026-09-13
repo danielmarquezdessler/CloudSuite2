@@ -5,6 +5,7 @@ import { useAuth } from '../../../context/AuthContext';
 import { useCampaign } from '../Organization/useCampaign';
 import { authenticatedFetch, useAuthenticatedQuery } from '../../../lib/api';
 import PageContainer from '../../../components/Shared/PageContainer';
+import HeroBanner from '../../../components/Shared/HeroBanner';
 import ContentPanel from '../../../components/Shared/ContentPanel';
 import Stack from '../../../components/Shared/Stack';
 import Inline from '../../../components/Shared/Inline';
@@ -53,5 +54,5 @@ export default function AreaChat({ embedded = false, areaId: initialAreaId }: Pr
   </Stack>;
 
   if (embedded) return <ContentPanel icon="chat" title="Chat del área" subtitle="Mensajes en tiempo real del frente seleccionado.">{contents}</ContentPanel>;
-  return <PageContainer><ContentPanel icon="chat" title="Chat por área" subtitle="Conversación interna en tiempo real.">{contents}</ContentPanel></PageContainer>;
+  return <PageContainer><Stack gap="lg"><HeroBanner icon="chat" eyebrow="COORDINACIÓN INTERNA" title="Chat por área" subtitle="Conversación interna en tiempo real." /><ContentPanel icon="chat" title="Chat por área" subtitle="Conversación interna en tiempo real.">{contents}</ContentPanel></Stack></PageContainer>;
 }
