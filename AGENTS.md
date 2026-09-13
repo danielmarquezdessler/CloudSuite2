@@ -34,6 +34,10 @@ Ningún componente puede renderizar dos o más elementos hermanos (bloques de te
 - `npm run test:e2e` desde `web/` ejecuta `scripts/test-e2e-real.mjs`: usa Firebase Auth, la API Node y Firestore reales, inicia Vite en el puerto 5188 y levanta la API en 8080 únicamente si no hay una API sana. No intercepta ni simula HTTP.
 - Para regenerar el entorno, eliminá solo el usuario E2E en Firebase Authentication y su organización de prueba indicada por `web/.env.test` en Firestore; luego eliminá o vaciá ese archivo local y ejecutá `npm run test:e2e`. Cuando el ADC local venza, ejecutar `gcloud auth application-default login`, reiniciar el backend y comprobar `GET http://127.0.0.1:8080/health`.
 
+## Tareas programadas de SmartPlanner
+
+- `npm run notify:smartplanner-due` desde `server/` revisa las facturas pendientes o emitidas que vencen dentro de los próximos siete días y crea como máximo una notificación diaria por factura. En producción debe ejecutarse una vez por día mediante Cloud Scheduler/Cloud Run Job; no depende de una instancia web persistente.
+
 ## Cómo desplegar a producción
 
 - Plataforma: Cloud Run (`cloudsuite-api`) y Firebase Hosting, ambos en el proyecto `politicfy-cloudsuite`; Cloud Run se publica en `southamerica-east1` y usa la cuenta `cloudsuite-api@politicfy-cloudsuite.iam.gserviceaccount.com`.
