@@ -11,6 +11,7 @@ import ContentPanel from '../../../components/Shared/ContentPanel';
 import Stack from '../../../components/Shared/Stack';
 import Inline from '../../../components/Shared/Inline';
 import PrimaryButton from '../../../components/Shared/PrimaryButton';
+import SelectControl from '../../../components/Shared/SelectControl';
 
 type Item = { id: string; name?: string; title?: string; description?: string; status?: string; time?: string; reason?: string; generatedTaskIds?: string[] };
 type ProtocolTask = { title: string; areaId: string; assignedRole: string };
@@ -49,8 +50,8 @@ export function WarRoom() {
         <textarea aria-label="Descripción del protocolo" className="form-control" value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Descripción" />
         <Stack gap="sm">{tasks.map((task, index) => <Inline gap="sm" className="sp-protocol-task" key={index}>
           <input aria-label={`Tarea ${index + 1}`} className="form-control" value={task.title} onChange={(event) => updateTask(index, 'title', event.target.value)} placeholder="Acción a ejecutar" required />
-          <select aria-label={`Área de tarea ${index + 1}`} className="form-select" value={task.areaId} onChange={(event) => updateTask(index, 'areaId', event.target.value)} required><option value="">Área responsable</option>{(areas.data ?? []).map((area) => <option key={area.id} value={area.id}>{area.name}</option>)}</select>
-          <select aria-label={`Rol de tarea ${index + 1}`} className="form-select" value={task.assignedRole} onChange={(event) => updateTask(index, 'assignedRole', event.target.value)}><option value="operativo">Operativo</option><option value="legal">Jurídico</option><option value="prensa">Prensa</option><option value="diseño">Diseño</option><option value="coordinacion">Coordinación</option></select>
+          <SelectControl ariaLabel={`Área de tarea ${index + 1}`} label="Área responsable" value={task.areaId} onChange={(value) => updateTask(index, 'areaId', value)} options={[{ value: '', label: 'Área responsable', disabled: true }, ...(areas.data ?? []).map((area) => ({ value: area.id, label: area.name ?? 'Área sin nombre' }))]} />
+          <SelectControl ariaLabel={`Rol de tarea ${index + 1}`} label="Rol responsable" value={task.assignedRole} onChange={(value) => updateTask(index, 'assignedRole', value)} options={[{ value: 'operativo', label: 'Operativo' }, { value: 'legal', label: 'Jurídico' }, { value: 'prensa', label: 'Prensa' }, { value: 'diseño', label: 'Diseño' }, { value: 'coordinacion', label: 'Coordinación' }]} />
           {tasks.length > 1 && <button type="button" className="btn btn-outline-danger" aria-label={`Quitar tarea ${index + 1}`} onClick={() => setTasks((current) => current.filter((_, position) => position !== index))}>×</button>}
         </Inline>)}</Stack>
         <Inline gap="sm"><button type="button" className="btn btn-outline-primary" onClick={() => setTasks((current) => [...current, blankTask()])}>+ Agregar tarea</button><PrimaryButton type="submit" icon="plus">Crear protocolo</PrimaryButton></Inline>

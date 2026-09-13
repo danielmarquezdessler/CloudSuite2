@@ -53,7 +53,7 @@ try {
     if (route === '/smartplanner/war-room') await page.getByRole('heading', { name: 'Motor de Crisis' }).waitFor({ state: 'visible' });
     if (route === '/smartplanner/promises') await page.getByRole('heading', { name: 'Propuestas de campaña' }).waitFor({ state: 'visible' });
     if (route === '/smartplanner/election-day') await page.getByRole('heading', { name: 'Panel del Día D' }).waitFor({ state: 'visible' });
-    if (route === '/smartplanner/chat') await page.getByRole('heading', { name: 'Chat por área' }).waitFor({ state: 'visible' });
+    if (route === '/smartplanner/chat') await page.locator('h1', { hasText: 'Chat por área' }).waitFor({ state: 'visible' });
     if (route === '/smartplanner/tickets') await page.getByRole('heading', { name: 'Tickets' }).waitFor({ state: 'visible' });
     if (route === '/smartplanner/reports') await page.getByRole('heading', { name: 'Reportes SmartPlanner' }).waitFor({ state: 'visible' });
     if (route === '/smartplanner/staff') await page.getByRole('heading', { name: 'Personal', exact: true }).waitFor({ state: 'visible' });
