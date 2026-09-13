@@ -59,7 +59,9 @@
     "test:e2e:campaign-timeline": "node scripts/test-campaign-timeline-e2e-real.mjs",
     "test:e2e:smartplanner": "node scripts/test-smartplanner-e2e.mjs",
     "test:e2e:smartplanner-finance": "node scripts/test-smartplanner-finance-e2e.mjs",
-    "test:e2e:smartplanner-materials": "node scripts/test-smartplanner-materials-e2e.mjs"
+    "test:e2e:smartplanner-materials": "node scripts/test-smartplanner-materials-e2e.mjs",
+    "test:e2e:smartplanner-operations": "node scripts/test-smartplanner-operations-e2e.mjs",
+    "test:e2e:smartplanner-phase3": "node scripts/test-smartplanner-phase3-e2e.mjs"
   },
   "dependencies": {
     "@ckeditor/ckeditor5-build-balloon": "^41.3.1",

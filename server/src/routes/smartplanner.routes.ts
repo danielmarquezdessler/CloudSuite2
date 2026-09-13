@@ -3,6 +3,9 @@ import * as contributors from '../controllers/smartplannerContributors.controlle
 import * as providers from '../controllers/smartplannerProviders.controller.js';
 import * as finance from '../controllers/smartplannerFinance.controller.js';
 import * as materials from '../controllers/smartplannerMaterials.controller.js';
+import * as operations from '../controllers/smartplannerOperations.controller.js';
+import * as crew from '../controllers/smartplannerCrew.controller.js';
+import * as messages from '../controllers/smartplannerMessages.controller.js';
 export const smartplannerRouter=Router(); const b='/organizations/:orgId/campaigns/:campId/smartplanner';
 const protectedAddon = [requireAuth, requireAddon('smartPlanner')] as const;
 const signatureUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 2 * 1024 * 1024 } });
@@ -14,3 +17,8 @@ smartplannerRouter.get(`${b}/invoices`,...protectedAddon,finance.invoices); smar
 smartplannerRouter.get(`${b}/finance-overview`,...protectedAddon,finance.overview); smartplannerRouter.put(`${b}/finance-overview/legal-limit`,...protectedAddon,finance.legalLimit);
 smartplannerRouter.get(`${b}/contracts`,...protectedAddon,finance.contracts); smartplannerRouter.post(`${b}/contracts`,...protectedAddon,finance.saveContract); smartplannerRouter.put(`${b}/contracts/:contractId`,...protectedAddon,finance.saveContract); smartplannerRouter.delete(`${b}/contracts/:contractId`,...protectedAddon,finance.removeContract); smartplannerRouter.post(`${b}/contracts/:contractId/sign`,...protectedAddon,signatureUpload.single('signature'),finance.sign);
 smartplannerRouter.get(`${b}/materials`,...protectedAddon,materials.list); smartplannerRouter.post(`${b}/materials`,...protectedAddon,materials.save); smartplannerRouter.put(`${b}/materials/:materialId`,...protectedAddon,materials.save); smartplannerRouter.delete(`${b}/materials/:materialId`,...protectedAddon,materials.remove);
+smartplannerRouter.get(`${b}/operations`,...protectedAddon,operations.list); smartplannerRouter.post(`${b}/operations`,...protectedAddon,operations.save); smartplannerRouter.put(`${b}/operations/:operationId`,...protectedAddon,operations.save); smartplannerRouter.delete(`${b}/operations/:operationId`,...protectedAddon,operations.remove);
+smartplannerRouter.put(`${b}/operations/:operationId/requirements`,...protectedAddon,operations.requirements); smartplannerRouter.post(`${b}/operations/:operationId/work-order`,...protectedAddon,operations.workOrder);
+smartplannerRouter.get(`${b}/crew-suggestions`,...protectedAddon,crew.suggestions); smartplannerRouter.post(`${b}/crew-suggestions/:zoneId/assign`,...protectedAddon,crew.assign);
+const mediaUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
+smartplannerRouter.get(`${b}/messages`,...protectedAddon,messages.list); smartplannerRouter.post(`${b}/messages`,...protectedAddon,messages.save); smartplannerRouter.put(`${b}/messages/:messageId`,...protectedAddon,messages.save); smartplannerRouter.delete(`${b}/messages/:messageId`,...protectedAddon,messages.remove); smartplannerRouter.post(`${b}/messages/:messageId/submit`,...protectedAddon,messages.submit); smartplannerRouter.post(`${b}/messages/:messageId/approve`,...protectedAddon,messages.approve); smartplannerRouter.post(`${b}/messages/:messageId/reject`,...protectedAddon,messages.reject); smartplannerRouter.post(`${b}/messages/upload`,...protectedAddon,mediaUpload.single('media'),messages.upload);

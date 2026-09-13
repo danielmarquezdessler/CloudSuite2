@@ -47,6 +47,10 @@ export function loadGoogleMapsApi() {
 }
 
 function markerColor(state?: string) {
+  if (state === 'planificado') return '#64748b';
+  if (state === 'en_montaje') return '#f97316';
+  if (state === 'listo') return '#16a34a';
+  if (state === 'finalizado') return '#2563eb';
   if (state === 'converted_yes') return '#16a34a';
   if (state === 'converted_no') return '#dc2626';
   if (state === 'undecided') return '#eab308';

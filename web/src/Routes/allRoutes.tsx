@@ -27,6 +27,9 @@ import Providers from '../pages/Modules/SmartPlanner/Providers';
 import Invoices from '../pages/Modules/SmartPlanner/Invoices';
 import Contracts from '../pages/Modules/SmartPlanner/Contracts';
 import Materials from '../pages/Modules/SmartPlanner/Materials';
+import Operations from '../pages/Modules/SmartPlanner/Operations';
+import CrewSuggestions from '../pages/Modules/SmartPlanner/CrewSuggestions';
+import Messages from '../pages/Modules/SmartPlanner/Messages';
 import LiveVisits from '../pages/Modules/Execution/LiveVisits';
 import Heatmap from '../pages/Modules/Execution/Heatmap';
 import Undecided from '../pages/Modules/Execution/Undecided';
@@ -219,6 +222,9 @@ const routes = [
     { path: "/smartplanner/invoices", component: <Invoices /> },
     { path: "/smartplanner/contracts", component: <Contracts /> },
     { path: "/smartplanner/materials", component: <Materials /> },
+    { path: "/smartplanner/operations", component: <Operations /> },
+    { path: "/smartplanner/crews", component: <CrewSuggestions /> },
+    { path: "/smartplanner/messages", component: <Messages /> },
     { path: "/audit-log", component: <AuditLog /> },
     { path: "/notifications", component: <Notifications /> },
     { path: "/planning/questions", component: <QuestionsEditor /> },
