@@ -1,5 +1,6 @@
 import { DecodedIdToken } from 'firebase-admin/auth';
 import { FieldValue } from 'firebase-admin/firestore';
+import { randomUUID } from 'node:crypto';
 import { db, storage } from '../config/firebase.js';
 import { assertCampaignAccess, ForbiddenError, NotFoundError, ValidationError } from './access.service.js';
 import { createNotification } from './notifications.service.js';
@@ -18,6 +19,7 @@ const campaign = (orgId: string, campId: string) => db.collection('organizations
 type UserStory = { role: string; action: string; benefit: string };
 type AcceptanceCriterion = { id: string; description: string; given: string; when: string; then: string; useGivenWhenThen: boolean; completed: boolean };
 type ChecklistItem = { id: string; name: string; completed: boolean; responsible: string; dueDate: string };
+type Sprint = { name: string; startDate: string; endDate: string; status: 'planificado' | 'activo' | 'cerrado' };
 const text = (value: unknown, maximum = 500) => String(value ?? '').trim().slice(0, maximum);
 function cleanUserStory(value: unknown): UserStory | null {
   if (!value || typeof value !== 'object') return null;
@@ -39,6 +41,9 @@ function cleanChecklist(value: unknown): ChecklistItem[] {
     return { id: text(entry.id, 100) || `check-${index + 1}`, name: text(entry.name, 300), completed: entry.completed === true, responsible: text(entry.responsible, 128), dueDate: text(entry.dueDate, 20) };
   }).filter((entry) => entry.name);
 }
+const number = (value: unknown, min = 0, max = Number.MAX_SAFE_INTEGER) => Math.min(max, Math.max(min, Number(value) || 0));
+function cleanLinks(value: unknown) { return Array.isArray(value) ? value.slice(0, 50).map((item) => { const link = item && typeof item === 'object' ? item as Record<string, unknown> : {}; const url = text(link.url, 2000); return { name: text(link.name, 200) || url, url, type: ['documento', 'figma', 'github', 'api', 'dashboard', 'otro'].includes(String(link.type)) ? String(link.type) : 'otro' }; }).filter((link) => /^https?:\/\//i.test(link.url)) : []; }
+function cleanRelations(value: unknown, parentPbiId: string) { const source = value && typeof value === 'object' ? value as Record<string, unknown> : {}; const ids = (item: unknown) => Array.isArray(item) ? Array.from(new Set(item.map((id) => text(id, 128)).filter(Boolean))).slice(0, 50) : []; return { parentId: parentPbiId, relatedIds: ids(source.relatedIds), dependsOnIds: ids(source.dependsOnIds), blocksIds: ids(source.blocksIds), duplicateOfId: text(source.duplicateOfId, 128) }; }
 async function activityName(user: DecodedIdToken) {
   const profile = await db.collection('users').doc(user.uid).get();
   return String(profile.data()?.displayName ?? user.name ?? user.email ?? 'Miembro');
@@ -116,6 +121,9 @@ export async function deleteCategory(user: DecodedIdToken, orgId: string, campId
   const linked = await campaign(orgId, campId).collection('spTasks').where('categoryId', '==', id).get(); const batch = db.batch();
   linked.docs.forEach((task) => batch.update(task.ref, { categoryId: FieldValue.delete(), updatedAt: FieldValue.serverTimestamp() })); batch.delete(ref); await batch.commit();
 }
+export async function listSprints(user: DecodedIdToken, orgId: string, campId: string) { await addon(user, orgId, campId); return (await campaign(orgId, campId).collection('spSprints').orderBy('startDate', 'desc').get()).docs.map(serialize); }
+export async function saveSprint(user: DecodedIdToken, orgId: string, campId: string, id: string | null, input: Record<string, unknown>) { await manager(user, orgId, campId); const name = text(input.name, 160); const status = String(input.status ?? 'planificado'); if (!name || !['planificado', 'activo', 'cerrado'].includes(status)) throw new ValidationError('Nombre o estado de Sprint inválido.'); const ref = id ? campaign(orgId, campId).collection('spSprints').doc(id) : campaign(orgId, campId).collection('spSprints').doc(); const data: Sprint = { name, startDate: text(input.startDate, 20), endDate: text(input.endDate, 20), status: status as Sprint['status'] }; await ref.set({ ...data, ...(id ? { updatedAt: FieldValue.serverTimestamp() } : { createdAt: FieldValue.serverTimestamp() }) }, { merge: true }); return { id: ref.id, ...data }; }
+export async function deleteSprint(user: DecodedIdToken, orgId: string, campId: string, id: string) { await manager(user, orgId, campId); await campaign(orgId, campId).collection('spSprints').doc(id).delete(); }
 export async function listTasks(user: DecodedIdToken, orgId: string, campId: string) { await addon(user, orgId, campId); const member = await membership(user, orgId, campId); const role = String(member.data()?.smartPlannerRole ?? 'miembro'); let tasks: SmartPlannerTask[] = (await campaign(orgId, campId).collection('spTasks').orderBy('createdAt', 'desc').get()).docs.map(serialize); if (!['cliente', 'admin'].includes(String(user.role)) && !['contador', 'pm'].includes(role)) tasks = tasks.filter((task) => task.assignedTo === user.uid); return tasks; }
 export async function listMembers(user: DecodedIdToken, orgId: string, campId: string) {
   await addon(user, orgId, campId);
@@ -179,7 +187,9 @@ export async function saveTask(user: DecodedIdToken, orgId: string, campId: stri
   const userStory = cleanUserStory(input.userStory ?? existing?.data()?.userStory);
   const acceptanceCriteria = cleanAcceptanceCriteria(input.acceptanceCriteria ?? existing?.data()?.acceptanceCriteria);
   const checklist = cleanChecklist(input.checklist ?? existing?.data()?.checklist);
-  const data = { title, description: String(input.description ?? ''), areaId: String(input.areaId ?? ''), assignedTo: String(input.assignedTo ?? ''), categoryId, parentPbiId, displayId, userStory, acceptanceCriteria, checklist, status, priority, startDate: String(input.startDate ?? ''), dueDate: String(input.dueDate ?? ''), cost };
+  const sprintId = text(input.sprintId ?? existing?.data()?.sprintId, 128); if (sprintId && !(await campaign(orgId, campId).collection('spSprints').doc(sprintId).get()).exists) throw new ValidationError('El Sprint seleccionado no existe.');
+  const attachments = Array.isArray(input.attachments) ? input.attachments : existing?.data()?.attachments ?? [];
+  const data = { title, description: String(input.description ?? ''), areaId: String(input.areaId ?? ''), assignedTo: String(input.assignedTo ?? ''), categoryId, parentPbiId, displayId, userStory, acceptanceCriteria, checklist, status, priority, startDate: String(input.startDate ?? ''), dueDate: String(input.dueDate ?? ''), cost, storyPoints: number(input.storyPoints ?? existing?.data()?.storyPoints), risk: ['alto', 'medio', 'bajo'].includes(String(input.risk ?? existing?.data()?.risk)) ? String(input.risk ?? existing?.data()?.risk) : 'medio', businessValue: number(input.businessValue ?? existing?.data()?.businessValue), timeCriticality: number(input.timeCriticality ?? existing?.data()?.timeCriticality), effort: number(input.effort ?? existing?.data()?.effort), targetDate: text(input.targetDate ?? existing?.data()?.targetDate, 20), estimatedHours: number(input.estimatedHours ?? existing?.data()?.estimatedHours), registeredHours: number(input.registeredHours ?? existing?.data()?.registeredHours), progressPercent: number(input.progressPercent ?? existing?.data()?.progressPercent, 0, 100), sprintId, milestone: text(input.milestone ?? existing?.data()?.milestone, 200), release: text(input.release ?? existing?.data()?.release, 100), module: text(input.module ?? existing?.data()?.module, 150), tags: Array.isArray(input.tags) ? Array.from(new Set(input.tags.map((tag) => text(tag, 60)).filter(Boolean))).slice(0, 30) : existing?.data()?.tags ?? [], version: text(input.version ?? existing?.data()?.version, 80), blocked: input.blocked === true, blockedReason: text(input.blockedReason, 500), relations: cleanRelations(input.relations ?? existing?.data()?.relations, parentPbiId), attachments, links: cleanLinks(input.links ?? existing?.data()?.links) };
   if (!data.areaId || !data.assignedTo || !data.dueDate) throw new ValidationError('Área, responsable y fecha límite son obligatorios.');
   await ref.set({ ...data, ...(id ? { updatedAt: FieldValue.serverTimestamp() } : { createdAt: FieldValue.serverTimestamp(), createdBy: user.uid }), ...(status === 'completada' ? { completedAt: FieldValue.serverTimestamp() } : {}) }, { merge: true });
   if (existing?.exists) await writeTaskActivity(ref, user, existing.data() ?? {}, data);
@@ -187,6 +197,7 @@ export async function saveTask(user: DecodedIdToken, orgId: string, campId: stri
   return { id: ref.id, ...data };
 }
 export async function deleteTask(user: DecodedIdToken, orgId: string, campId: string, id: string) { await manager(user, orgId, campId); await campaign(orgId, campId).collection('spTasks').doc(id).delete(); }
+export async function uploadTaskAttachment(user: DecodedIdToken, orgId: string, campId: string, taskId: string, file?: Express.Multer.File) { await addon(user, orgId, campId); if (!file?.buffer) throw new ValidationError('Seleccioná un archivo.'); const ref = await taskRefFor(user, orgId, campId, taskId); const name = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_'); const path = `smartplanner/pbis/${orgId}/${campId}/${taskId}/${Date.now()}-${randomUUID()}-${name}`; const token = randomUUID(); await storage.bucket().file(path).save(file.buffer, { resumable: false, contentType: file.mimetype, metadata: { metadata: { firebaseStorageDownloadTokens: token } } }); const uploadedBy = await activityName(user); const attachment = { name: file.originalname, url: `https://firebasestorage.googleapis.com/v0/b/${storage.bucket().name}/o/${encodeURIComponent(path)}?alt=media&token=${token}`, type: file.mimetype, size: file.size, uploadedBy, uploadedAt: new Date().toISOString() }; await ref.update({ attachments: [...((await ref.get()).data()?.attachments ?? []), attachment], updatedAt: FieldValue.serverTimestamp() }); await writeTaskActivity(ref, user, {}, { attachments: name }); return attachment; }
 async function taskRefFor(user: DecodedIdToken, orgId: string, campId: string, taskId: string) {
   await addon(user, orgId, campId);
   const ref = campaign(orgId, campId).collection('spTasks').doc(taskId);

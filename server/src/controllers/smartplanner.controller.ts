@@ -11,11 +11,16 @@ export const categories = async(r:Request,s:Response)=>{try{s.json(await service
 export const createCategory = async(r:Request,s:Response)=>{try{s.status(201).json(await service.saveCategory(r.user!,...ids(r),null,r.body));}catch(e){fail(s,e)}};
 export const updateCategory = async(r:Request,s:Response)=>{try{s.json(await service.saveCategory(r.user!,...ids(r),String(r.params.categoryId),r.body));}catch(e){fail(s,e)}};
 export const removeCategory = async(r:Request,s:Response)=>{try{await service.deleteCategory(r.user!,...ids(r),String(r.params.categoryId));s.status(204).end();}catch(e){fail(s,e)}};
+export const sprints = async(r:Request,s:Response)=>{try{s.json(await service.listSprints(r.user!,...ids(r)));}catch(e){fail(s,e)}};
+export const createSprint = async(r:Request,s:Response)=>{try{s.status(201).json(await service.saveSprint(r.user!,...ids(r),null,r.body));}catch(e){fail(s,e)}};
+export const updateSprint = async(r:Request,s:Response)=>{try{s.json(await service.saveSprint(r.user!,...ids(r),String(r.params.sprintId),r.body));}catch(e){fail(s,e)}};
+export const removeSprint = async(r:Request,s:Response)=>{try{await service.deleteSprint(r.user!,...ids(r),String(r.params.sprintId));s.status(204).end();}catch(e){fail(s,e)}};
 export const tasks = async(r:Request,s:Response)=>{try{s.json(await service.listTasks(r.user!,...ids(r)));}catch(e){fail(s,e)}};
 export const members = async(r:Request,s:Response)=>{try{s.json(await service.listMembers(r.user!,...ids(r)));}catch(e){fail(s,e)}};
 export const createTask = async(r:Request,s:Response)=>{try{s.status(201).json(await service.saveTask(r.user!,...ids(r),null,r.body));}catch(e){fail(s,e)}};
 export const updateTask = async(r:Request,s:Response)=>{try{s.json(await service.saveTask(r.user!,...ids(r),String(r.params.taskId),r.body));}catch(e){fail(s,e)}};
 export const removeTask = async(r:Request,s:Response)=>{try{await service.deleteTask(r.user!,...ids(r),String(r.params.taskId));s.status(204).end();}catch(e){fail(s,e)}};
+export const uploadTaskAttachment = async(r:Request,s:Response)=>{try{s.status(201).json(await service.uploadTaskAttachment(r.user!,...ids(r),String(r.params.taskId),r.file));}catch(e){fail(s,e)}};
 export const taskComments = async(r:Request,s:Response)=>{try{s.json(await service.listTaskComments(r.user!,...ids(r),String(r.params.taskId)));}catch(e){fail(s,e)}};
 export const createTaskComment = async(r:Request,s:Response)=>{try{s.status(201).json(await service.createTaskComment(r.user!,...ids(r),String(r.params.taskId),r.body));}catch(e){fail(s,e)}};
 export const taskActivity = async(r:Request,s:Response)=>{try{s.json(await service.listTaskActivity(r.user!,...ids(r),String(r.params.taskId)));}catch(e){fail(s,e)}};
