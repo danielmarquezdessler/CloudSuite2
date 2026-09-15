@@ -46,18 +46,31 @@ export async function listTasks(user: DecodedIdToken, orgId: string, campId: str
 export async function listMembers(user: DecodedIdToken, orgId: string, campId: string) {
   await addon(user, orgId, campId);
   const snap = await campaign(orgId, campId).collection('members').get();
-  return Promise.all(snap.docs.map(async (doc) => {
+  const members = await Promise.all(snap.docs.map(async (doc) => {
     const membership = doc.data();
     const profile = (await db.collection('users').doc(doc.id).get()).data();
     return {
       uid: doc.id,
       ...membership,
+      email: profile?.email ?? membership.email,
       displayName: profile?.displayName ?? membership.displayName,
       firstName: profile?.firstName ?? membership.firstName,
       lastName: profile?.lastName ?? membership.lastName,
       photoURL: readableProfilePhoto(profile)
     };
   }));
+  if (!members.some((member) => member.uid === user.uid)) {
+    const profile = (await db.collection('users').doc(user.uid).get()).data();
+    members.unshift({
+      uid: user.uid,
+      email: profile?.email ?? user.email ?? '',
+      displayName: profile?.displayName ?? user.name ?? user.email ?? 'Miembro',
+      firstName: profile?.firstName,
+      lastName: profile?.lastName,
+      photoURL: readableProfilePhoto(profile)
+    });
+  }
+  return members;
 }
 export async function saveTask(user: DecodedIdToken, orgId: string, campId: string, id: string | null, input: Record<string, unknown>) {
   if (!id) await manager(user, orgId, campId); else await addon(user, orgId, campId);

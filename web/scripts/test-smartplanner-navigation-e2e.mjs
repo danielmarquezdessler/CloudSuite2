@@ -56,6 +56,38 @@ async function expectVisibleBackButtons(page, route) {
 async function expectSecondaryNavigation(page) {
   const navigation = page.locator('[data-smartplanner-nav]');
   await navigation.waitFor({ state: 'visible' });
+  const navigationStyles = await page.evaluate(() => {
+    const navigation = document.querySelector('[data-smartplanner-nav]');
+    const desktop = navigation?.querySelector('.sp-secondary-nav__desktop');
+    const header = document.querySelector('.cs-topbar');
+    if (!navigation || !desktop || !header) return null;
+    const navStyle = getComputedStyle(navigation);
+    const desktopStyle = getComputedStyle(desktop);
+    return {
+      position: navStyle.position,
+      navTop: Math.round(navigation.getBoundingClientRect().top),
+      headerBottom: Math.round(header.getBoundingClientRect().bottom),
+      display: desktopStyle.display,
+      minHeight: desktopStyle.minHeight,
+      alignItems: desktopStyle.alignItems,
+      gap: desktopStyle.gap,
+      paddingLeft: desktopStyle.paddingLeft,
+      paddingRight: desktopStyle.paddingRight,
+      overflowX: desktopStyle.overflowX,
+      background: desktopStyle.backgroundColor,
+      color: desktopStyle.color,
+      borderBottom: `${desktopStyle.borderBottomWidth} ${desktopStyle.borderBottomStyle} ${desktopStyle.borderBottomColor}`
+    };
+  });
+  const expectedStyles = { position: 'fixed', display: 'flex', minHeight: '48px', alignItems: 'center', gap: '2px', paddingLeft: '24px', paddingRight: '24px', overflowX: 'auto', background: 'rgb(245, 245, 245)', color: 'rgb(255, 255, 255)', borderBottom: '2px solid rgb(255, 205, 54)' };
+  if (!navigationStyles || navigationStyles.navTop !== navigationStyles.headerBottom || Object.entries(expectedStyles).some(([key, value]) => navigationStyles[key] !== value)) {
+    throw new Error(`El submenú no respeta el anclaje o los estilos solicitados: ${JSON.stringify(navigationStyles)}.`);
+  }
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+  await page.waitForTimeout(120);
+  const stickyTop = await navigation.evaluate((element) => Math.round(element.getBoundingClientRect().top));
+  if (stickyTop !== navigationStyles.headerBottom) throw new Error(`El submenú dejó de estar fijo al hacer scroll (top=${stickyTop}).`);
+  console.log('Submenú visual OK: pegado al header, fijo y con los atributos CSS solicitados.');
   for (const label of ['Home', 'Cuartel', 'Finanzas', 'Operación', 'Crisis y Jurídico', 'Comunicación', 'Reportes', 'Personal', 'Configuración']) {
     await navigation.getByText(label, { exact: true }).first().waitFor({ state: 'visible' });
   }
