@@ -14,7 +14,7 @@ page.setDefaultTimeout(15_000);
 async function assertSingleDownwardSelect(label) {
   const control = page.getByRole('button', { name: label, exact: true });
   await control.click();
-  const menu = page.locator('.dropdown-menu.show').last();
+  const menu = page.locator('[data-dropdown-portal]').last();
   await menu.waitFor({ state: 'visible' });
   const geometry = await control.evaluate((element, menuElement) => {
     const trigger = element.getBoundingClientRect();
@@ -28,6 +28,7 @@ async function assertSingleDownwardSelect(label) {
     await page.screenshot({ path: join(screenshotsDir, 'select-controls.png') });
   }
   await page.keyboard.press('Escape');
+  await menu.waitFor({ state: 'hidden' });
 }
 
 try {
@@ -41,7 +42,7 @@ try {
   await page.getByRole('button', { name: 'Crear usuario', exact: true }).first().click();
   await assertSingleDownwardSelect('Campaña');
   await page.getByRole('button', { name: 'Campaña', exact: true }).click();
-  await page.locator('.dropdown-menu.show').last().locator('.dropdown-item').nth(1).click();
+  await page.locator('[data-dropdown-portal]').last().getByRole('option').nth(1).click();
   await assertSingleDownwardSelect('Función');
   await page.getByRole('button', { name: 'Cancelar', exact: true }).click();
 

@@ -1,6 +1,6 @@
-import { ReactNode, useEffect, useMemo, useState } from 'react';
-import { Dropdown } from 'react-bootstrap';
+import { ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { Icon } from './Icons';
+import DropdownPortal from './DropdownPortal';
 
 type SelectOption = { value: string; label: string; disabled?: boolean };
 type SelectControlProps = {
@@ -20,22 +20,18 @@ type SelectControlProps = {
 
 export default function SelectControl({ label, icon, className = '', children, id, name, ariaLabel, options, value, defaultValue, onChange, disabled = false }: SelectControlProps) {
   const [show, setShow] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const [internalValue, setInternalValue] = useState(value ?? defaultValue ?? options?.[0]?.value ?? '');
   const selectedValue = value ?? internalValue;
   const selectedLabel = useMemo(() => options?.find((option) => option.value === selectedValue)?.label ?? label, [label, options, selectedValue]);
   useEffect(() => { if (value !== undefined) setInternalValue(value); else if (defaultValue !== undefined) setInternalValue(defaultValue); }, [defaultValue, value]);
-  const trigger = <button id={id} type="button" className={'cd-select-control ' + className} aria-label={ariaLabel ?? label} aria-expanded={show} disabled={disabled}>{icon && <Icon name={icon} size={16} color="#2f6fe4" strokeWidth={2} />}<span>{selectedLabel}</span>{children}<span className={'cd-select-control__chevron' + (show ? ' is-open' : '')}><Icon name="chevron-down" size={14} color="#6b86ad" strokeWidth={2.2} /></span></button>;
+  const trigger = <button ref={triggerRef} id={id} type="button" className={'cd-select-control ' + className} aria-label={ariaLabel ?? label} aria-expanded={show} aria-haspopup={Boolean(options)} data-select-control={options ? '' : undefined} onClick={() => options && !disabled && setShow((current) => !current)} disabled={disabled}>{icon && <Icon name={icon} size={16} color="#2f6fe4" strokeWidth={2} />}<span>{selectedLabel}</span>{children}<span className={'cd-select-control__chevron' + (show ? ' is-open' : '')}><Icon name="chevron-down" size={14} color="#6b86ad" strokeWidth={2.2} /></span></button>;
   if (!options) return trigger;
 
   const choose = (nextValue: string) => { setInternalValue(nextValue); onChange?.(nextValue); setShow(false); };
-  return <Dropdown className={'cd-select-dropdown' + (show ? ' is-open' : '')} show={show} onToggle={(nextShow) => setShow(nextShow)} drop="down">
-    <Dropdown.Toggle as="span" className="cd-select-dropdown__toggle">{trigger}</Dropdown.Toggle>
+  return <div className={'cd-select-dropdown' + (show ? ' is-open' : '')}>
+    <span className="cd-select-dropdown__toggle">{trigger}</span>
     {name && <input type="hidden" name={name} value={selectedValue} />}
-    <Dropdown.Menu
-      className="cd-select-dropdown__menu"
-      popperConfig={{ modifiers: [{ name: 'flip', options: { fallbackPlacements: ['top-start'], padding: 12 } }] }}
-    >
-      {options.map((option) => <Dropdown.Item key={option.value} active={option.value === selectedValue} disabled={option.disabled} onClick={() => choose(option.value)}>{option.label}</Dropdown.Item>)}
-    </Dropdown.Menu>
-  </Dropdown>;
+    <DropdownPortal open={show} anchorRef={triggerRef} onDismiss={() => setShow(false)}>{options.map((option) => <button role="option" type="button" key={option.value} className={`cd-select-dropdown__option${option.value === selectedValue ? ' is-active' : ''}`} aria-selected={option.value === selectedValue} disabled={option.disabled} onClick={() => choose(option.value)}>{option.label}</button>)}</DropdownPortal>
+  </div>;
 }
