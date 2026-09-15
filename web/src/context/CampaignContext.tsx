@@ -92,6 +92,12 @@ export function CampaignProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => { void reload(); }, [reload]);
 
+  useEffect(() => {
+    const refreshWhenOnline = () => { void reload(); };
+    window.addEventListener('online', refreshWhenOnline);
+    return () => window.removeEventListener('online', refreshWhenOnline);
+  }, [reload]);
+
   const setActiveCampaignId = useCallback((campaignId: string) => {
     if (!campaigns.some((campaign) => campaign.id === campaignId)) return;
     setActiveId(campaignId);
