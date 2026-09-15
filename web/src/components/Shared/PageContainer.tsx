@@ -12,5 +12,5 @@ type PageContainerProps = PropsWithChildren<HTMLAttributes<HTMLDivElement> & { c
 export default function PageContainer({ children, className = '', backTo, backLabel, ...props }: PageContainerProps) {
   const location = useLocation();
   const resolvedBackTo = backTo ?? (location.pathname.startsWith('/smartplanner/') ? '/smartplanner' : undefined);
-  return <div className={`cs-page-container cs-page ${className}`.trim()} {...props}><div className="cs-page-container__content">{children}</div>{resolvedBackTo && <div className="cs-page-container__back" data-back-button="page"><BackButton to={resolvedBackTo} label={backLabel ?? 'Regresar a inicio'} variant="link" /></div>}{location.pathname.startsWith('/smartplanner') && <CommunicationsWidget />}</div>;
+  return <div className={`cs-page-container cs-page ${className}`.trim()} {...props}><div className="cs-page-container__content">{children}</div>{resolvedBackTo && <div className="cs-page-container__back" data-back-button="page"><BackButton to={resolvedBackTo} label={backLabel ?? 'Regresar a inicio'} variant="link" /></div>}<CommunicationsWidget /></div>;
 }

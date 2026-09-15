@@ -1,6 +1,6 @@
 import { DecodedIdToken } from 'firebase-admin/auth';
 import { FieldValue } from 'firebase-admin/firestore';
-import { db } from '../config/firebase.js';
+import { db, storage } from '../config/firebase.js';
 import { assertCampaignAccess, ForbiddenError, NotFoundError, ValidationError } from './access.service.js';
 import { createNotification } from './notifications.service.js';
 
@@ -12,6 +12,16 @@ const priorities = ['baja', 'media', 'alta'] as const;
 const campaign = (orgId: string, campId: string) => db.collection('organizations').doc(orgId).collection('campaigns').doc(campId);
 type SmartPlannerTask = { id: string; assignedTo?: string; [key: string]: unknown };
 const serialize = (doc: FirebaseFirestore.QueryDocumentSnapshot) => ({ id: doc.id, ...doc.data(), createdAt: doc.data().createdAt?.toDate?.().toISOString?.() ?? null, completedAt: doc.data().completedAt?.toDate?.().toISOString?.() ?? null });
+function readableProfilePhoto(profile: Record<string, unknown> | undefined) {
+  const photoURL = profile?.photoURL;
+  if (typeof photoURL !== 'string' || !photoURL) return null;
+  if (/^https?:\/\//.test(photoURL)) return photoURL;
+  const reference = /^gs:\/\/([^/]+)\/(.+)$/.exec(photoURL);
+  const token = typeof profile?.avatarDownloadToken === 'string' ? profile.avatarDownloadToken : '';
+  if (!reference || !token) return null;
+  const [, bucket, path] = reference;
+  return `https://firebasestorage.googleapis.com/v0/b/${bucket || storage.bucket().name}/o/${encodeURIComponent(path)}?alt=media&token=${encodeURIComponent(token)}`;
+}
 
 async function addon(user: DecodedIdToken, orgId: string, campId: string) {
   assertCampaignAccess(user, orgId, campId);
@@ -33,7 +43,22 @@ export async function listAreas(user: DecodedIdToken, orgId: string, campId: str
 export async function saveArea(user: DecodedIdToken, orgId: string, campId: string, id: string | null, input: Record<string, unknown>) { await manager(user, orgId, campId); const name = String(input.name ?? '').trim(); if (!name) throw new ValidationError('El nombre del área es obligatorio.'); const ref = id ? campaign(orgId, campId).collection('spAreas').doc(id) : campaign(orgId, campId).collection('spAreas').doc(); if (id && !(await ref.get()).exists) throw new NotFoundError('El área no existe.'); const data = { name, description: String(input.description ?? '').trim(), color: String(input.color ?? '#0060F0'), order: Number(input.order ?? Date.now()) }; await ref.set({ ...data, ...(id ? { updatedAt: FieldValue.serverTimestamp() } : { createdAt: FieldValue.serverTimestamp() }) }, { merge: true }); return { id: ref.id, ...data }; }
 export async function deleteArea(user: DecodedIdToken, orgId: string, campId: string, id: string) { await manager(user, orgId, campId); await campaign(orgId, campId).collection('spAreas').doc(id).delete(); }
 export async function listTasks(user: DecodedIdToken, orgId: string, campId: string) { await addon(user, orgId, campId); const member = await membership(user, orgId, campId); const role = String(member.data()?.smartPlannerRole ?? 'miembro'); let tasks: SmartPlannerTask[] = (await campaign(orgId, campId).collection('spTasks').orderBy('createdAt', 'desc').get()).docs.map(serialize); if (!['cliente', 'admin'].includes(String(user.role)) && !['contador', 'pm'].includes(role)) tasks = tasks.filter((task) => task.assignedTo === user.uid); return tasks; }
-export async function listMembers(user: DecodedIdToken, orgId: string, campId: string) { await addon(user, orgId, campId); const snap = await campaign(orgId, campId).collection('members').get(); return snap.docs.map((doc) => ({ uid: doc.id, ...doc.data() })); }
+export async function listMembers(user: DecodedIdToken, orgId: string, campId: string) {
+  await addon(user, orgId, campId);
+  const snap = await campaign(orgId, campId).collection('members').get();
+  return Promise.all(snap.docs.map(async (doc) => {
+    const membership = doc.data();
+    const profile = (await db.collection('users').doc(doc.id).get()).data();
+    return {
+      uid: doc.id,
+      ...membership,
+      displayName: profile?.displayName ?? membership.displayName,
+      firstName: profile?.firstName ?? membership.firstName,
+      lastName: profile?.lastName ?? membership.lastName,
+      photoURL: readableProfilePhoto(profile)
+    };
+  }));
+}
 export async function saveTask(user: DecodedIdToken, orgId: string, campId: string, id: string | null, input: Record<string, unknown>) {
   if (!id) await manager(user, orgId, campId); else await addon(user, orgId, campId);
   const ref = id ? campaign(orgId, campId).collection('spTasks').doc(id) : campaign(orgId, campId).collection('spTasks').doc();

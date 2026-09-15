@@ -8,5 +8,6 @@ const fail = (response: Response, error: unknown) => {
 };
 export const list = async (request: Request, response: Response) => { try { response.json(await channels.listChannels(request.user!, ...ids(request))); } catch (error) { fail(response, error); } };
 export const create = async (request: Request, response: Response) => { try { response.status(201).json(await channels.createChannel(request.user!, ...ids(request), request.body)); } catch (error) { fail(response, error); } };
+export const direct = async (request: Request, response: Response) => { try { response.status(201).json(await channels.directChannel(request.user!, ...ids(request), request.body?.recipientId)); } catch (error) { fail(response, error); } };
 export const messages = async (request: Request, response: Response) => { try { response.json(await channels.listMessages(request.user!, ...ids(request), String(request.params.channelId))); } catch (error) { fail(response, error); } };
-export const send = async (request: Request, response: Response) => { try { response.status(201).json(await channels.sendMessage(request.user!, ...ids(request), String(request.params.channelId), request.body?.text, request.file)); } catch (error) { fail(response, error); } };
+export const send = async (request: Request, response: Response) => { try { response.status(201).json(await channels.sendMessage(request.user!, ...ids(request), String(request.params.channelId), request.body?.text, request.file, request.body?.mentionedIds)); } catch (error) { fail(response, error); } };
