@@ -15,6 +15,15 @@ const areaPosition = (area: Record<string, unknown>) => {
 const statuses = ['por_hacer', 'en_progreso', 'en_revision', 'completada'] as const;
 const priorities = ['baja', 'media', 'alta'] as const;
 const campaign = (orgId: string, campId: string) => db.collection('organizations').doc(orgId).collection('campaigns').doc(campId);
+export async function nextPbiDisplayId(orgId: string, campId: string) {
+  const counter = campaign(orgId, campId).collection('spMeta').doc('pbiCounter');
+  return db.runTransaction(async (transaction) => {
+    const current = Number((await transaction.get(counter)).data()?.lastDisplayNumber ?? 1000);
+    const next = Number.isFinite(current) ? current + 1 : 1001;
+    transaction.set(counter, { lastDisplayNumber: next, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+    return `PBI-${next}`;
+  });
+}
 type SmartPlannerTask = { id: string; assignedTo?: string; [key: string]: unknown };
 const serialize = (doc: FirebaseFirestore.QueryDocumentSnapshot) => ({ id: doc.id, ...doc.data(), createdAt: doc.data().createdAt?.toDate?.().toISOString?.() ?? null, completedAt: doc.data().completedAt?.toDate?.().toISOString?.() ?? null });
 function readableProfilePhoto(profile: Record<string, unknown> | undefined) {
@@ -120,9 +129,10 @@ export async function saveTask(user: DecodedIdToken, orgId: string, campId: stri
   const parsedCost = Number(input.cost ?? 0); const cost = Number.isFinite(parsedCost) ? Math.max(0, parsedCost) : 0;
   const categoryId = String(input.categoryId ?? existing?.data()?.categoryId ?? '').trim();
   if (categoryId && !(await campaign(orgId, campId).collection('spCategories').doc(categoryId).get()).exists) throw new ValidationError('La categoría seleccionada no existe.');
-  const data = { title, description: String(input.description ?? ''), areaId: String(input.areaId ?? ''), assignedTo: String(input.assignedTo ?? ''), categoryId, status, priority, startDate: String(input.startDate ?? ''), dueDate: String(input.dueDate ?? ''), cost };
+  const displayId = String(existing?.data()?.displayId ?? await nextPbiDisplayId(orgId, campId));
+  const data = { title, description: String(input.description ?? ''), areaId: String(input.areaId ?? ''), assignedTo: String(input.assignedTo ?? ''), categoryId, displayId, status, priority, startDate: String(input.startDate ?? ''), dueDate: String(input.dueDate ?? ''), cost };
   if (!data.areaId || !data.assignedTo || !data.dueDate) throw new ValidationError('Área, responsable y fecha límite son obligatorios.');
-  await ref.set({ ...data, ...(id ? { updatedAt: FieldValue.serverTimestamp() } : { createdAt: FieldValue.serverTimestamp() }), ...(status === 'completada' ? { completedAt: FieldValue.serverTimestamp() } : {}) }, { merge: true });
+  await ref.set({ ...data, ...(id ? { updatedAt: FieldValue.serverTimestamp() } : { createdAt: FieldValue.serverTimestamp(), createdBy: user.uid }), ...(status === 'completada' ? { completedAt: FieldValue.serverTimestamp() } : {}) }, { merge: true });
   if (data.assignedTo !== user.uid && data.assignedTo !== existing?.data()?.assignedTo) await createNotification(data.assignedTo, { type: 'smartplanner_task_assigned', title: 'Nueva tarea asignada', message: data.title, metadata: { path: '/smartplanner', orgId, campId, taskId: ref.id } });
   return { id: ref.id, ...data };
 }

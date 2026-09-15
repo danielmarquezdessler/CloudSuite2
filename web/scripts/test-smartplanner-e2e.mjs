@@ -98,7 +98,8 @@ try {
   await page.getByText(title, { exact: true }).first().waitFor();
   const createdTask = await creationResponse.json();
   const task = await orgRef.collection('campaigns').doc(campId).collection('spTasks').doc(createdTask.id).get();
-  if (!task.exists || task.data()?.title !== title) throw new Error('La tarea creada no llegó a Firestore.');
+  if (!task.exists || task.data()?.title !== title) throw new Error('El PBI creado no llegó a Firestore.');
+  if (!/^PBI-\d+$/.test(String(task.data()?.displayId ?? ''))) throw new Error(`El PBI no recibió un displayId legible: ${task.data()?.displayId ?? 'sin valor'}.`);
   createdTaskIds.push(task.id);
   const move = page.waitForResponse((response) => response.request().method() === 'PUT' && response.url().includes(`/smartplanner/tasks/${task.id}`));
   const draggableTask = page.locator(`[data-kanban-task="${task.id}"]`);
