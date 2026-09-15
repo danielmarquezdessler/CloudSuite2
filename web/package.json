@@ -71,7 +71,8 @@
     "test:e2e:smartplanner-reports": "node scripts/test-smartplanner-reports-e2e.mjs",
     "test:e2e:smartplanner-settings": "node scripts/test-smartplanner-settings-e2e.mjs",
     "test:e2e:smartplanner-tickets-ui": "node scripts/test-smartplanner-tickets-ui-e2e.mjs",
-    "test:e2e:smartplanner-navigation": "node scripts/test-smartplanner-navigation-e2e.mjs"
+    "test:e2e:smartplanner-navigation": "node scripts/test-smartplanner-navigation-e2e.mjs",
+    "test:e2e:addons-launcher": "node scripts/test-addons-launcher-e2e.mjs"
   },
   "dependencies": {
     "@ckeditor/ckeditor5-build-balloon": "^41.3.1",

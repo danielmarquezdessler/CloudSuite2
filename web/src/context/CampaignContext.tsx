@@ -68,6 +68,13 @@ export function CampaignProvider({ children }: { children: ReactNode }) {
       return;
     }
     const orgId = me.data.organization.id;
+    const nextEnabledAddons: EnabledAddons = { smartPlanner: me.data.organization.enabledAddons?.smartPlanner === true };
+    // El acceso a add-ons depende exclusivamente de /api/me. Aplicarlo antes de
+    // la consulta secundaria evita mostrar un estado de plan obsoleto mientras
+    // se actualiza el detalle de campañas.
+    setOrganizationId(orgId);
+    setRole(me.data.role ?? '');
+    setEnabledAddonsState(nextEnabledAddons);
     const details = await authenticatedRequest<CampaignOption[]>(user, `/api/organizations/${orgId}/campaigns`);
     const available = details.data?.filter((item) => me.data!.campaigns!.some((campaign) => campaign.id === item.id))
       ?? me.data.campaigns.map((campaign) => ({ ...campaign, memberCount: 0, voterCount: 0 }));
@@ -77,8 +84,7 @@ export function CampaignProvider({ children }: { children: ReactNode }) {
       : available.some((campaign) => campaign.id === storedId)
         ? storedId
         : available[0]?.id ?? null;
-    const nextEnabledAddons: EnabledAddons = { smartPlanner: me.data.organization.enabledAddons?.smartPlanner === true };
-    setOrganizationId(orgId); setRole(me.data.role ?? ''); setEnabledAddonsState(nextEnabledAddons); setCampaigns(available); setActiveId(nextId);
+    setCampaigns(available); setActiveId(nextId);
     localStorage.setItem(snapshotKey(user.uid), JSON.stringify({ organizationId: orgId, role: me.data.role ?? '', campaigns: available, enabledAddons: nextEnabledAddons }));
     if (nextId) localStorage.setItem(storageKey(user.uid), nextId);
     setError(details.error?.message ?? ''); setLoading(false);

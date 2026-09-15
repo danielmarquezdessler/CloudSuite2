@@ -12,7 +12,9 @@ const addons: Addon[] = [
   { label: 'Ballot Box', subtitle: 'Sistema de boca de urna en tiempo real', icon: 'ph-ballot', accent: 'var(--bs-secondary)', comingSoon: true },
   { label: 'Civica Pulse', subtitle: 'Software de Inteligencia Política profesional', icon: 'ph-activity', accent: 'var(--bs-success)', href: 'https://civicapulse.com/' },
   { label: 'Governo Hub', subtitle: 'Sistema de gestión de gobiernos locales', icon: 'ph-buildings', accent: 'var(--bs-primary)', href: 'http://governohub.com/' },
-  { label: 'Termómetro Comunitario', subtitle: 'Sistema de medición de opinión pública y focus group', icon: 'ph-thermometer', accent: 'var(--bs-warning)', href: 'https://termometrocomunitario.programascomunitarios.org' }
+  { label: 'Termómetro Comunitario', subtitle: 'Sistema de medición de opinión pública y focus group', icon: 'ph-thermometer', accent: 'var(--bs-warning)', href: 'https://termometrocomunitario.programascomunitarios.org' },
+  { label: 'Apolo', subtitle: 'Estudio de entrenamiento y comunicación política', icon: 'ph-microphone-stage', accent: 'var(--bs-danger)', href: 'http://apolo.politicfy.com/' },
+  { label: 'Lazzarus', subtitle: 'Empleados digitales autónomos para gobierno y campañas electorales', icon: 'ph-robot', accent: 'var(--bs-info)', href: 'https://lazzarusapp.com/' }
 ];
 
 export default function AppLauncher() {
