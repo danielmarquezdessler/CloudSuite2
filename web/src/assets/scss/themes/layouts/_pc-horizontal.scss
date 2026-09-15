@@ -5,7 +5,7 @@
 [data-pc-layout='horizontal'] {
   @media (min-width: 1025px) {
     .pc-header {
-      z-index: 1027;
+      z-index: $z-sticky-header;
       background: var(--pc-sidebar-background);
       box-shadow: none;
 

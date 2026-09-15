@@ -8,7 +8,7 @@
   position: fixed;
   top: 0;
   bottom: 0;
-  z-index: 1026;
+  z-index: $z-sticky-header;
   overflow: hidden;
   box-shadow: var(--pc-sidebar-shadow);
   border-right: var(--pc-sidebar-border);
@@ -1158,7 +1158,7 @@
     right: 0;
     left: 0;
     width: 100%;
-    z-index: 1024;
+    z-index: $z-sticky-header;
     margin-bottom: 0;
     border-radius: 0px;
     border: none;

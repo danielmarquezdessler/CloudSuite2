@@ -45,6 +45,20 @@ $headings-font-weight: 700;
 - Buttons: `.btn`, `.btn-primary`, `.btn-success`, `.btn-danger` y `.btn-warning`.
 - Navbar y sidebar: controles e iconos del template LightAble.
 
+## Escala global de z-index
+
+```scss
+$z-base: 1;
+$z-sticky-header: 100;
+$z-dropdown: 1000;
+$z-modal-backdrop: 2000;
+$z-modal: 2100;
+$z-toast: 3000;
+$z-tooltip: 3500;
+```
+
+Ningún elemento flotante (dropdown, modal, tooltip o toast) puede usar un `z-index` fuera de esta escala. Los componentes canónicos deben consumir estos tokens; los niveles bajos solo se reservan para capas decorativas dentro de su propio componente.
+
 ## Regla obligatoria de espaciado
 
 Ningún componente puede renderizar dos o más elementos hermanos (bloques de texto o botones/acciones) sin envolverlos en `Stack` (vertical) o `Inline` (horizontal). Está prohibido usar `margin` o `gap` hardcodeado a mano para separar elementos hermanos dentro de una card. Si necesitás separar algo, usá estos componentes; si no alcanzan para el caso, avisá antes de improvisar un valor nuevo.

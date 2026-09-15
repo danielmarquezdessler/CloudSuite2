@@ -11,7 +11,7 @@
   position: fixed;
   left: $sidebar-width;
   right: 0;
-  z-index: 1025;
+  z-index: $z-sticky-header;
   display: flex;
 
   ul {

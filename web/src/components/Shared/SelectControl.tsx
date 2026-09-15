@@ -28,7 +28,7 @@ export default function SelectControl({ label, icon, className = '', children, i
   if (!options) return trigger;
 
   const choose = (nextValue: string) => { setInternalValue(nextValue); onChange?.(nextValue); setShow(false); };
-  return <Dropdown className="cd-select-dropdown" show={show} onToggle={(nextShow) => setShow(nextShow)} drop="down">
+  return <Dropdown className={'cd-select-dropdown' + (show ? ' is-open' : '')} show={show} onToggle={(nextShow) => setShow(nextShow)} drop="down">
     <Dropdown.Toggle as="span" className="cd-select-dropdown__toggle">{trigger}</Dropdown.Toggle>
     {name && <input type="hidden" name={name} value={selectedValue} />}
     <Dropdown.Menu

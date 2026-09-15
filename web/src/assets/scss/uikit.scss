@@ -48,7 +48,7 @@ section {
   position: fixed;
   padding: 16px 0;
   width: 100%;
-  z-index: 1030;
+  z-index: $z-sticky-header;
   backdrop-filter: blur(7px);
   background-color: var(--pc-header-background);
 
@@ -73,7 +73,7 @@ section {
 
 .component-page {
   .navbar {
-    z-index: 1025;
+    z-index: $z-sticky-header;
   }
 
   .list-group {
@@ -132,7 +132,7 @@ section {
     @media (min-width: 1200px) {
       position: sticky;
       top: 100px;
-      z-index: 1020;
+      z-index: $z-sticky-header;
     }
     @media (max-width: 1199.98px) {
       width: 300px;
@@ -238,7 +238,7 @@ section {
 
 .pc-modal {
   position: fixed;
-  z-index: 1099;
+  z-index: $z-modal;
   top: 0;
   right: 0;
   width: 100%;

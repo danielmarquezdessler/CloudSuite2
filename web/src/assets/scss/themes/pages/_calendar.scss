@@ -308,7 +308,7 @@
   border-radius: $dropdown-border-radius;
   border: none;
   overflow: hidden;
-  z-index: 1040;
+  z-index: $z-dropdown;
 
   .fc-popover-header,
   .fc-popover-body {
@@ -361,7 +361,7 @@
   position: sticky;
   top: calc(100% - 80px);
   left: calc(100% - 120px);
-  z-index: 1025;
+  z-index: $z-sticky-header;
 }
 .cal-event-offcanvas{
   --bs-offcanvas-zindex: 1081;

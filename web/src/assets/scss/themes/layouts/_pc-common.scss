@@ -37,7 +37,7 @@
   top: $header-height;
   left: $sidebar-width;
   right: 0;
-  z-index: 1023;
+  z-index: $z-sticky-header;
   min-height: 55px;
   padding: 13px 0px;
   background: transparent;

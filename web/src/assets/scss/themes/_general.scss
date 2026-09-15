@@ -245,16 +245,16 @@ strong {
 
 /* Example modals */
 .modal {
-  z-index: 1072;
+  z-index: $z-modal;
 
   .popover,
   .tooltip {
-    z-index: 1073;
+    z-index: $z-tooltip;
   }
 }
 
 .modal-backdrop {
-  z-index: 1071;
+  z-index: $z-modal-backdrop;
 }
 
 .bd-example-modal {
@@ -444,7 +444,7 @@ pre[class*="language-"]>code {
   margin-top: 0;
 }
 .toast-container{
-  z-index: 1022;
+  z-index: $z-toast;
 }
 
 .carousel-indicators {

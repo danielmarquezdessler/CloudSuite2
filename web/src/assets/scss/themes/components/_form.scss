@@ -531,7 +531,7 @@ $value in $theme-colors {
 .sticky-action {
   top: $header-height;
   position: sticky;
-  z-index: 1020;
+  z-index: $z-sticky-header;
   background: var(--bs-card-bg);
   border-radius: var(--bs-card-border-radius);
 }
@@ -684,14 +684,14 @@ $value in $theme-colors {
 // uppy start
 
 .uppy-Dashboard--modal {
-  z-index: 1030;
+  z-index: $z-modal;
 
   .uppy-Dashboard-overlay {
-    z-index: 1030;
+    z-index: $z-modal;
   }
 
   .uppy-Dashboard-inner {
-    z-index: 1031;
+    z-index: $z-modal + 1;
   }
 }
 
@@ -1310,7 +1310,7 @@ $choices-icon-cross-inverse: url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjEi
     position: absolute;
     text-align: left;
     top: 100%;
-    z-index: 1000;
+    z-index: $z-dropdown;
 
     >li {
       >a {
@@ -1363,7 +1363,7 @@ $choices-icon-cross-inverse: url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjEi
 
 .editor-toolbar.fullscreen,
 .CodeMirror-fullscreen {
-  z-index: 1099;
+  z-index: $z-modal;
 }
 .flatpickr-calendar{
   @include media-breakpoint-down(sm) {

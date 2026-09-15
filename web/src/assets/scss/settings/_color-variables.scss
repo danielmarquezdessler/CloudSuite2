@@ -20,6 +20,15 @@ $gray-900: #303030;
 $black: #000000;
 $neutral: #6B7280;
 
+// CloudSuite global z-index scale. Floating UI must use these tokens only.
+$z-base: 1;
+$z-sticky-header: 100;
+$z-dropdown: 1000;
+$z-modal-backdrop: 2000;
+$z-modal: 2100;
+$z-toast: 3000;
+$z-tooltip: 3500;
+
 // blue color
 $blue-100: #B4E5FC;
 $blue-200: #82D4FA;

@@ -59,7 +59,7 @@ section {
   position: fixed;
   padding: 16px 0;
   width: 100%;
-  z-index: 1099;
+  z-index: $z-sticky-header;
   top: 0;
   backdrop-filter: blur(7px);
   background-color: var(--pc-header-background);
