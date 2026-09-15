@@ -38,7 +38,7 @@ export default function SmartPlannerNav() {
         const active = group.items.some((item) => matchesPath(location.pathname, item.to)) || (group.label === 'Comunicación' && location.pathname === '/smartplanner/chat');
         return <Dropdown as="span" key={group.label} className="sp-secondary-nav__group">
           <Dropdown.Toggle as="button" type="button" className={active ? 'is-active' : ''}>{group.label}<i className="ph-duotone ph-caret-down" aria-hidden="true" /></Dropdown.Toggle>
-          <Dropdown.Menu className="sp-secondary-nav__menu">
+          <Dropdown.Menu className="sp-secondary-nav__menu" popperConfig={{ strategy: 'fixed' }}>
             {group.items.map((item) => <Dropdown.Item as={Link} to={item.to} key={item.to} active={matchesPath(location.pathname, item.to)}>{item.label}</Dropdown.Item>)}
           </Dropdown.Menu>
         </Dropdown>;

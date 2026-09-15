@@ -102,12 +102,30 @@ async function expectSecondaryNavigation(page) {
   for (const visit of visits) {
     const toggle = navigation.getByRole('button', { name: visit.group, exact: true });
     await toggle.click();
-    await navigation.locator('.sp-secondary-nav__menu.show').getByRole('link', { name: visit.item, exact: true }).click();
+    const menu = navigation.locator('.sp-secondary-nav__menu.show');
+    await menu.waitFor({ state: 'visible' });
+    const layering = await page.evaluate(() => {
+      const nav = document.querySelector('[data-smartplanner-nav]');
+      const desktop = nav?.querySelector('.sp-secondary-nav__desktop');
+      const menu = nav?.querySelector('.sp-secondary-nav__menu.show');
+      if (!nav || !desktop || !menu) return null;
+      const box = menu.getBoundingClientRect();
+      const point = document.elementFromPoint(box.left + Math.min(18, box.width / 2), box.top + Math.min(18, box.height / 2));
+      return {
+        navZIndex: Number.parseInt(getComputedStyle(nav).zIndex, 10),
+        menuZIndex: Number.parseInt(getComputedStyle(menu).zIndex, 10),
+        desktopOverflowY: getComputedStyle(desktop).overflowY,
+        menuVisible: box.width > 0 && box.height > 0 && box.bottom <= window.innerHeight,
+        menuOnTop: Boolean(point?.closest('.sp-secondary-nav__menu'))
+      };
+    });
+    if (!layering || layering.navZIndex < 1000 || layering.menuZIndex < 1000 || layering.desktopOverflowY === 'hidden' || !layering.menuVisible || !layering.menuOnTop) throw new Error(`${visit.group}: el dropdown quedó recortado o detrás del contenido: ${JSON.stringify(layering)}.`);
+    await menu.getByRole('link', { name: visit.item, exact: true }).click();
     await page.waitForURL(`${webUrl}${visit.path}`);
     if (!await toggle.evaluate((element) => element.classList.contains('is-active'))) {
       throw new Error(`${visit.path}: el grupo ${visit.group} no se resaltó como activo.`);
     }
-    console.log(`Submenú OK: ${visit.group} → ${visit.item}.`);
+    console.log(`Submenú OK: ${visit.group} → ${visit.item}, visible por encima del contenido.`);
   }
 
   await page.setViewportSize({ width: 390, height: 844 });
