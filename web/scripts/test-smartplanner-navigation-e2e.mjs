@@ -41,14 +41,16 @@ async function waitForApi() {
 }
 
 async function expectVisibleBackButtons(page, route) {
-  const heroButton = page.locator('[data-back-button="hero"] .cd-back-button');
-  const pageButton = page.locator('[data-back-button="page"] .cd-back-button');
+  const heroButton = page.locator('[data-back-button="hero"] .cd-back-button--icon');
+  const pageButton = page.locator('[data-back-button="page"] .cd-back-button--link');
   await heroButton.waitFor({ state: 'visible' }).catch(() => { throw new Error(`${route}: falta el BackButton visible dentro del Hero.`); });
   await pageButton.scrollIntoViewIfNeeded();
   await pageButton.waitFor({ state: 'visible' }).catch(() => { throw new Error(`${route}: falta el BackButton visible al final del contenido.`); });
   for (const [position, button] of [['Hero', heroButton], ['final', pageButton]]) {
     if (await button.getAttribute('href') !== '/smartplanner') throw new Error(`${route}: el BackButton de ${position} no navega a /smartplanner.`);
   }
+  if ((await heroButton.boundingBox())?.width !== 40) throw new Error(`${route}: el BackButton superior debe medir 40px.`);
+  if ((await pageButton.textContent())?.trim() !== '‹ Regresar a inicio') throw new Error(`${route}: el BackButton final debe mostrar “Regresar a inicio”.`);
 }
 
 try {
@@ -97,10 +99,10 @@ try {
   console.log(`BackButton navigation OK: ${smartPlannerRoutes.length}/${smartPlannerRoutes.length} rutas internas tienen controles arriba y abajo.`);
 
   await page.goto(`${webUrl}/smartplanner/tickets`, { waitUntil: 'domcontentloaded' });
-  await page.locator('[data-back-button="hero"] .cd-back-button').click();
+  await page.locator('[data-back-button="hero"] .cd-back-button--icon').click();
   await page.waitForURL(`${webUrl}/smartplanner`);
   await page.goto(`${webUrl}/smartplanner/tickets`, { waitUntil: 'domcontentloaded' });
-  await page.locator('[data-back-button="page"] .cd-back-button').click();
+  await page.locator('[data-back-button="page"] .cd-back-button--link').click();
   await page.waitForURL(`${webUrl}/smartplanner`);
   console.log('Navegación real OK: BackButton superior e inferior vuelven a /smartplanner.');
 
