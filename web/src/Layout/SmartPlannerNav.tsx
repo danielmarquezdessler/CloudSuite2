@@ -13,7 +13,7 @@ const groups: NavGroup[] = [
 ];
 
 const directLinks: NavLink[] = [{ label: 'Reportes', to: '/smartplanner/reports' }, { label: 'Personal', to: '/smartplanner/staff' }, { label: 'Configuración', to: '/smartplanner/settings' }];
-const allLinks = [{ label: 'Home', to: '/smartplanner' }, { label: 'Cuartel', to: '/smartplanner#smartplanner-board' }, ...groups.flatMap((group) => group.items), ...directLinks];
+const allLinks = [{ label: 'Home', to: '/smartplanner' }, { label: 'Backlog de Campaña', to: '/smartplanner/backlog' }, ...groups.flatMap((group) => group.items), ...directLinks];
 
 function matchesPath(pathname: string, to: string) {
   return to === '/smartplanner' ? pathname === to : pathname === to || pathname.startsWith(`${to}/`);
@@ -35,17 +35,15 @@ export default function SmartPlannerNav() {
   const location = useLocation();
   const navigate = useNavigate();
   if (!location.pathname.startsWith('/smartplanner')) return null;
-  const homeActive = location.pathname === '/smartplanner' && location.hash !== '#smartplanner-board';
-  const cuartelActive = location.pathname === '/smartplanner' && location.hash === '#smartplanner-board';
-  const activeLink = cuartelActive
-    ? allLinks.find((item) => item.to === '/smartplanner#smartplanner-board')
-    : allLinks.find((item) => item.to !== '/smartplanner#smartplanner-board' && matchesPath(location.pathname, item.to));
+  const homeActive = location.pathname === '/smartplanner';
+  const backlogActive = matchesPath(location.pathname, '/smartplanner/backlog') || matchesPath(location.pathname, '/smartplanner/pbi');
+  const activeLink = allLinks.find((item) => matchesPath(location.pathname, item.to));
   const onMobileChange = (event: ChangeEvent<HTMLSelectElement>) => navigate(event.target.value);
 
   return <nav className="sp-secondary-nav" aria-label="Navegación de SmartPlanner" data-smartplanner-nav>
     <div className="sp-secondary-nav__desktop">
       <Link to="/smartplanner" className={homeActive ? 'is-active' : ''}>Home</Link>
-      <Link to="/smartplanner#smartplanner-board" className={cuartelActive ? 'is-active' : ''}>Cuartel</Link>
+      <Link to="/smartplanner/backlog" className={backlogActive ? 'is-active' : ''}>Backlog de Campaña</Link>
       {groups.map((group) => {
         const active = group.items.some((item) => matchesPath(location.pathname, item.to)) || (group.label === 'Comunicación' && location.pathname === '/smartplanner/chat');
         return <SmartPlannerNavGroup key={group.label} group={group} active={active} pathname={location.pathname} />;
@@ -56,7 +54,7 @@ export default function SmartPlannerNav() {
       <span>Sección SmartPlanner</span>
       <select aria-label="Navegación de SmartPlanner" value={activeLink?.to ?? '/smartplanner'} onChange={onMobileChange}>
         <option value="/smartplanner">Home</option>
-        <option value="/smartplanner#smartplanner-board">Cuartel</option>
+        <option value="/smartplanner/backlog">Backlog de Campaña</option>
         {groups.map((group) => <optgroup label={group.label} key={group.label}>{group.items.map((item) => <option key={item.to} value={item.to}>{item.label}</option>)}</optgroup>)}
         {directLinks.map((item) => <option key={item.to} value={item.to}>{item.label}</option>)}
       </select>

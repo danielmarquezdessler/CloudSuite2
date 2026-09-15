@@ -35,6 +35,7 @@ import Tickets from '../pages/Modules/SmartPlanner/Tickets';
 import Communications from '../pages/Modules/SmartPlanner/Communications';
 import { Staff, Settings } from '../pages/Modules/SmartPlanner/StaffSettings';
 import Reports from '../pages/Modules/SmartPlanner/Reports';
+import Backlog from '../pages/Modules/SmartPlanner/Backlog';
 import LiveVisits from '../pages/Modules/Execution/LiveVisits';
 import Heatmap from '../pages/Modules/Execution/Heatmap';
 import Undecided from '../pages/Modules/Execution/Undecided';
@@ -222,6 +223,7 @@ const routes = [
     { path: "/control-de-revision", component: <AuditLog /> },
     { path: "/system/addons", component: <AddonsAdmin /> },
     { path: "/smartplanner", component: <SmartPlanner /> },
+    { path: "/smartplanner/backlog", component: <Backlog /> },
     { path: "/smartplanner/contributors", component: <Contributors /> },
     { path: "/smartplanner/providers", component: <Providers /> },
     { path: "/smartplanner/invoices", component: <Invoices /> },
