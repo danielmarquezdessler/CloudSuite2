@@ -48,6 +48,29 @@ export async function listAreas(user: DecodedIdToken, orgId: string, campId: str
 }
 export async function saveArea(user: DecodedIdToken, orgId: string, campId: string, id: string | null, input: Record<string, unknown>) { await manager(user, orgId, campId); const name = String(input.name ?? '').trim(); if (!name) throw new ValidationError('El nombre del área es obligatorio.'); const ref = id ? campaign(orgId, campId).collection('spAreas').doc(id) : campaign(orgId, campId).collection('spAreas').doc(); if (id && !(await ref.get()).exists) throw new NotFoundError('El área no existe.'); const data = { name, description: String(input.description ?? '').trim(), color: String(input.color ?? '#0060F0'), order: Number(input.order ?? Date.now()) }; await ref.set({ ...data, ...(id ? { updatedAt: FieldValue.serverTimestamp() } : { createdAt: FieldValue.serverTimestamp() }) }, { merge: true }); return { id: ref.id, ...data }; }
 export async function deleteArea(user: DecodedIdToken, orgId: string, campId: string, id: string) { await manager(user, orgId, campId); await campaign(orgId, campId).collection('spAreas').doc(id).delete(); }
+export async function listCategories(user: DecodedIdToken, orgId: string, campId: string) {
+  await addon(user, orgId, campId);
+  const snapshot = await campaign(orgId, campId).collection('spCategories').get();
+  const categories = snapshot.docs.map(serialize) as Array<Record<string, unknown>>;
+  return categories.sort((left, right) => String(left.name ?? '').localeCompare(String(right.name ?? '')));
+}
+export async function saveCategory(user: DecodedIdToken, orgId: string, campId: string, id: string | null, input: Record<string, unknown>) {
+  await manager(user, orgId, campId);
+  const name = String(input.name ?? '').trim(); if (!name) throw new ValidationError('El nombre de la categoría es obligatorio.');
+  const categories = campaign(orgId, campId).collection('spCategories'); const ref = id ? categories.doc(id) : categories.doc();
+  if (id && !(await ref.get()).exists) throw new NotFoundError('La categoría no existe.');
+  const duplicate = (await categories.get()).docs.find((doc) => doc.id !== ref.id && String(doc.data().name ?? '').trim().toLocaleLowerCase() === name.toLocaleLowerCase());
+  if (duplicate) throw new ValidationError('Ya existe una categoría con ese nombre.');
+  const data = { name, color: String(input.color ?? '#7C3AED') };
+  await ref.set({ ...data, ...(id ? { updatedAt: FieldValue.serverTimestamp() } : { createdAt: FieldValue.serverTimestamp() }) }, { merge: true });
+  return { id: ref.id, ...data };
+}
+export async function deleteCategory(user: DecodedIdToken, orgId: string, campId: string, id: string) {
+  await manager(user, orgId, campId);
+  const ref = campaign(orgId, campId).collection('spCategories').doc(id); if (!(await ref.get()).exists) throw new NotFoundError('La categoría no existe.');
+  const linked = await campaign(orgId, campId).collection('spTasks').where('categoryId', '==', id).get(); const batch = db.batch();
+  linked.docs.forEach((task) => batch.update(task.ref, { categoryId: FieldValue.delete(), updatedAt: FieldValue.serverTimestamp() })); batch.delete(ref); await batch.commit();
+}
 export async function listTasks(user: DecodedIdToken, orgId: string, campId: string) { await addon(user, orgId, campId); const member = await membership(user, orgId, campId); const role = String(member.data()?.smartPlannerRole ?? 'miembro'); let tasks: SmartPlannerTask[] = (await campaign(orgId, campId).collection('spTasks').orderBy('createdAt', 'desc').get()).docs.map(serialize); if (!['cliente', 'admin'].includes(String(user.role)) && !['contador', 'pm'].includes(role)) tasks = tasks.filter((task) => task.assignedTo === user.uid); return tasks; }
 export async function listMembers(user: DecodedIdToken, orgId: string, campId: string) {
   await addon(user, orgId, campId);
@@ -95,7 +118,9 @@ export async function saveTask(user: DecodedIdToken, orgId: string, campId: stri
   const priority = String(input.priority ?? 'media');
   if (!priorities.includes(priority as typeof priorities[number])) throw new ValidationError('La prioridad no es válida.');
   const parsedCost = Number(input.cost ?? 0); const cost = Number.isFinite(parsedCost) ? Math.max(0, parsedCost) : 0;
-  const data = { title, description: String(input.description ?? ''), areaId: String(input.areaId ?? ''), assignedTo: String(input.assignedTo ?? ''), status, priority, startDate: String(input.startDate ?? ''), dueDate: String(input.dueDate ?? ''), cost };
+  const categoryId = String(input.categoryId ?? existing?.data()?.categoryId ?? '').trim();
+  if (categoryId && !(await campaign(orgId, campId).collection('spCategories').doc(categoryId).get()).exists) throw new ValidationError('La categoría seleccionada no existe.');
+  const data = { title, description: String(input.description ?? ''), areaId: String(input.areaId ?? ''), assignedTo: String(input.assignedTo ?? ''), categoryId, status, priority, startDate: String(input.startDate ?? ''), dueDate: String(input.dueDate ?? ''), cost };
   if (!data.areaId || !data.assignedTo || !data.dueDate) throw new ValidationError('Área, responsable y fecha límite son obligatorios.');
   await ref.set({ ...data, ...(id ? { updatedAt: FieldValue.serverTimestamp() } : { createdAt: FieldValue.serverTimestamp() }), ...(status === 'completada' ? { completedAt: FieldValue.serverTimestamp() } : {}) }, { merge: true });
   if (data.assignedTo !== user.uid && data.assignedTo !== existing?.data()?.assignedTo) await createNotification(data.assignedTo, { type: 'smartplanner_task_assigned', title: 'Nueva tarea asignada', message: data.title, metadata: { path: '/smartplanner', orgId, campId, taskId: ref.id } });

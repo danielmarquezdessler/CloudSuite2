@@ -7,6 +7,10 @@ export const areas = async(r:Request,s:Response)=>{try{s.json(await service.list
 export const createArea = async(r:Request,s:Response)=>{try{s.status(201).json(await service.saveArea(r.user!,...ids(r),null,r.body));}catch(e){fail(s,e)}};
 export const updateArea = async(r:Request,s:Response)=>{try{s.json(await service.saveArea(r.user!,...ids(r),String(r.params.areaId),r.body));}catch(e){fail(s,e)}};
 export const removeArea = async(r:Request,s:Response)=>{try{await service.deleteArea(r.user!,...ids(r),String(r.params.areaId));s.status(204).end();}catch(e){fail(s,e)}};
+export const categories = async(r:Request,s:Response)=>{try{s.json(await service.listCategories(r.user!,...ids(r)));}catch(e){fail(s,e)}};
+export const createCategory = async(r:Request,s:Response)=>{try{s.status(201).json(await service.saveCategory(r.user!,...ids(r),null,r.body));}catch(e){fail(s,e)}};
+export const updateCategory = async(r:Request,s:Response)=>{try{s.json(await service.saveCategory(r.user!,...ids(r),String(r.params.categoryId),r.body));}catch(e){fail(s,e)}};
+export const removeCategory = async(r:Request,s:Response)=>{try{await service.deleteCategory(r.user!,...ids(r),String(r.params.categoryId));s.status(204).end();}catch(e){fail(s,e)}};
 export const tasks = async(r:Request,s:Response)=>{try{s.json(await service.listTasks(r.user!,...ids(r)));}catch(e){fail(s,e)}};
 export const members = async(r:Request,s:Response)=>{try{s.json(await service.listMembers(r.user!,...ids(r)));}catch(e){fail(s,e)}};
 export const createTask = async(r:Request,s:Response)=>{try{s.status(201).json(await service.saveTask(r.user!,...ids(r),null,r.body));}catch(e){fail(s,e)}};
