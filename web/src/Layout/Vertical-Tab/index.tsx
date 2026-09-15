@@ -9,6 +9,7 @@ import Header from '../Header';
 import TopBar from '../Topbar';
 import Footer from '../Footer';
 import SubMenuList from '../SubMenuList';
+import SmartPlannerNav from '../SmartPlannerNav';
 
 interface LayoutProps {
     children: ReactNode;
@@ -131,6 +132,7 @@ const VerticalTab = ({ children }: LayoutProps) => {
                     themeMode={themeMode}
                     changeThemeMode={changeThemeMode}
                 />
+                <SmartPlannerNav />
                 <div className="pc-container">
                     <SubMenuList />
                     <div className={"pc-content " + getLayoutWidth}>

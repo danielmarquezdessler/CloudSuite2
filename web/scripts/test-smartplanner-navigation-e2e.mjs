@@ -53,6 +53,41 @@ async function expectVisibleBackButtons(page, route) {
   if ((await pageButton.textContent())?.trim() !== '‹ Regresar a inicio') throw new Error(`${route}: el BackButton final debe mostrar “Regresar a inicio”.`);
 }
 
+async function expectSecondaryNavigation(page) {
+  const navigation = page.locator('[data-smartplanner-nav]');
+  await navigation.waitFor({ state: 'visible' });
+  for (const label of ['Home', 'Cuartel', 'Finanzas', 'Operación', 'Crisis y Jurídico', 'Comunicación', 'Reportes', 'Personal', 'Configuración']) {
+    await navigation.getByText(label, { exact: true }).first().waitFor({ state: 'visible' });
+  }
+
+  const visits = [
+    { group: 'Finanzas', item: 'Aportantes', path: '/smartplanner/contributors' },
+    { group: 'Operación', item: 'Mapa de Avanzada', path: '/smartplanner/operations' },
+    { group: 'Crisis y Jurídico', item: 'War Room', path: '/smartplanner/war-room' },
+    { group: 'Comunicación', item: 'Centro de Comunicaciones', path: '/smartplanner/comunicaciones' }
+  ];
+
+  for (const visit of visits) {
+    const toggle = navigation.getByRole('button', { name: visit.group, exact: true });
+    await toggle.click();
+    await navigation.locator('.sp-secondary-nav__menu.show').getByRole('link', { name: visit.item, exact: true }).click();
+    await page.waitForURL(`${webUrl}${visit.path}`);
+    if (!await toggle.evaluate((element) => element.classList.contains('is-active'))) {
+      throw new Error(`${visit.path}: el grupo ${visit.group} no se resaltó como activo.`);
+    }
+    console.log(`Submenú OK: ${visit.group} → ${visit.item}.`);
+  }
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  const mobileSelect = navigation.getByLabel('Navegación de SmartPlanner');
+  await mobileSelect.waitFor({ state: 'visible' });
+  await mobileSelect.selectOption('/smartplanner/reports');
+  await page.waitForURL(`${webUrl}/smartplanner/reports`);
+  if ((await mobileSelect.inputValue()) !== '/smartplanner/reports') throw new Error('El selector móvil no refleja la ruta activa.');
+  await page.setViewportSize({ width: 1440, height: 980 });
+  console.log('Submenú móvil OK: selector compacto navega a Reportes.');
+}
+
 try {
   const env = parseEnv(await readFile(envPath, 'utf8'));
   const { adminAuth, db } = await import('../../server/dist/config/firebase.js');
@@ -83,6 +118,7 @@ try {
   await page.getByRole('button', { name: 'Ingresar', exact: true }).click();
   await page.waitForURL(/dashboard/);
   await profileLoaded;
+  if (await page.locator('[data-smartplanner-nav]').count()) throw new Error('El submenú de SmartPlanner apareció fuera de /smartplanner/*.');
   await page.goto(`${webUrl}/smartplanner`, { waitUntil: 'domcontentloaded' });
   await page.getByText('Este addon no está habilitado en tu plan').waitFor();
   await orgRef.set({ enabledAddons: { ...(originalAddons ?? {}), smartPlanner: true } }, { merge: true });
@@ -90,6 +126,7 @@ try {
   await page.reload({ waitUntil: 'domcontentloaded' });
   await addonsLoaded;
   await page.getByRole('heading', { name: 'Cuartel de campaña', exact: true }).waitFor();
+  await expectSecondaryNavigation(page);
 
   for (const route of smartPlannerRoutes) {
     await page.goto(`${webUrl}${route}`, { waitUntil: 'domcontentloaded' });

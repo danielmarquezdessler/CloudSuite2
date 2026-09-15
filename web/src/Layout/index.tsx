@@ -11,6 +11,7 @@ import Footer from './Footer';
 import VerticalTab from './Vertical-Tab';
 import HorizontalLayout from './HorizontalLayout/Header';
 import Moduler from './Moduler';
+import SmartPlannerNav from './SmartPlannerNav';
 
 interface LayoutProps {
   children: ReactNode;
@@ -129,6 +130,7 @@ const Layout = ({ children }: LayoutProps) => {
             themeMode={themeMode}
             changeThemeMode={changeThemeMode}
           />
+          <SmartPlannerNav />
           <div className="pc-container">
             <div className={"pc-content " + getLayoutWidth}>
               {children}
