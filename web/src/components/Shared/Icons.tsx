@@ -1,6 +1,6 @@
 import { ReactNode } from 'react';
 
-type IconName = 'people' | 'map' | 'cal' | 'bell' | 'pin' | 'target' | 'check' | 'clock' | 'gear' | 'home' | 'bars' | 'pulse' | 'list' | 'doc' | 'award' | 'search' | 'chevron-down' | 'chevron-left' | 'chevron-right' | 'plus' | 'help' | 'trend' | 'pie' | 'info';
+type IconName = 'people' | 'map' | 'cal' | 'bell' | 'pin' | 'target' | 'check' | 'clock' | 'gear' | 'home' | 'bars' | 'pulse' | 'list' | 'doc' | 'award' | 'search' | 'chevron-down' | 'chevron-left' | 'chevron-right' | 'plus' | 'help' | 'trend' | 'pie' | 'info' | 'warning' | 'alert' | 'close';
 
 const paths: Record<IconName, ReactNode> = {
   people: <><circle cx="9" cy="9" r="3" /><circle cx="17" cy="10" r="2.2" /><path d="M3 18.5c0-2.9 2.7-4.6 6-4.6s6 1.7 6 4.6" /><path d="M16.2 14.4c2.9 0 4.8 1.5 4.8 4.1" /></>,
@@ -26,7 +26,10 @@ const paths: Record<IconName, ReactNode> = {
   help: <><path d="M8.8 8.6a3.4 3.4 0 1 1 4.6 3.2c-1 .4-1.5 1.2-1.5 2.2v.5" /><path d="M12 18.6v.2" /></>,
   trend: <><path d="M4 15.5l5-5 3.5 3.5L20 7" /><path d="M15.5 7H20v4.5" /></>,
   pie: <><circle cx="12" cy="12" r="8.5" /><path d="M12 3.5v8.5l6 4.2" /></>,
-  info: <><circle cx="12" cy="12" r="8.5" /><path d="M12 10v5M12 7.5v.2" /></>
+  info: <><circle cx="12" cy="12" r="8.5" /><path d="M12 10v5M12 7.5v.2" /></>,
+  warning: <><path d="M12 3.5 21 20H3z" /><path d="M12 9v5M12 17v.2" /></>,
+  alert: <><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5v5M12 16.5v.2" /></>,
+  close: <path d="m7 7 10 10M17 7 7 17" />
 };
 
 export function Icon({ name, size = 22, color = 'currentColor', strokeWidth = 1.85, className }: { name: IconName; size?: number; color?: string; strokeWidth?: number; className?: string }) {
