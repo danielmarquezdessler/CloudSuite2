@@ -201,6 +201,7 @@ export default function VotersList() {
 
   return (
     <PageContainer>
+      <Stack gap="lg">
       <HeroBanner
         icon="users"
         title="Electores"
@@ -539,6 +540,7 @@ export default function VotersList() {
           setDuplicatesVersion((version) => version + 1);
         }}
       />
+      </Stack>
     </PageContainer>
   );
 }

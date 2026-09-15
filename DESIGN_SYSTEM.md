@@ -62,3 +62,5 @@ Ningún elemento flotante (dropdown, modal, tooltip o toast) puede usar un `z-in
 ## Regla obligatoria de espaciado
 
 Ningún componente puede renderizar dos o más elementos hermanos (bloques de texto o botones/acciones) sin envolverlos en `Stack` (vertical) o `Inline` (horizontal). Está prohibido usar `margin` o `gap` hardcodeado a mano para separar elementos hermanos dentro de una card. Si necesitás separar algo, usá estos componentes; si no alcanzan para el caso, avisá antes de improvisar un valor nuevo.
+
+Todo contenedor que agrupe dos o más `[data-card="true"]` como hermanos directos, en fila o grilla, debe definir un `gap` mediante un token de spacing establecido, de al menos `sm` (8px). Está prohibido usar `margin` en la card individual para separarla de sus hermanas: el espacio corresponde siempre al contenedor. `npm run test:padding-audit` verifica esta regla sobre cada ruta canónica.

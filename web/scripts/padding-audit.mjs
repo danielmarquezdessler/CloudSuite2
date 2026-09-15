@@ -9,7 +9,7 @@ const env = Object.fromEntries((await readFile(envFile, 'utf8')).split(/\r?\n/).
   return [line.slice(0, separator), line.slice(separator + 1)];
 }));
 
-const pages = [
+const allPages = [
   ['Dashboard', '/dashboard'], ['Funciones', '/organization/functions'], ['Equipos', '/organization/teams'],
   ['Usuarios', '/organization/users'], ['Campañas', '/organization/campaigns'], ['Candidatos', '/organization/candidates'], ['Electores', '/electoral-conversion/voters'], ['Mapa', '/electoral-conversion/map'],
   ['Preguntas de visita', '/planning/questions'], ['Control de Revisión', '/control-de-revision'], ['Calendario', '/planning/calendar'],
@@ -18,8 +18,11 @@ const pages = [
   ['Visitas en vivo', '/execution/live'], ['Mapa de calor', '/execution/heatmap'], ['Indecisos', '/execution/undecided'], ['SmartPlanner', '/smartplanner'], ['Aportantes SmartPlanner', '/smartplanner/contributors'], ['Proveedores SmartPlanner', '/smartplanner/providers'], ['Facturación SmartPlanner', '/smartplanner/invoices'], ['Contratos SmartPlanner', '/smartplanner/contracts'], ['Materiales SmartPlanner', '/smartplanner/materials'], ['Mapa de Avanzada SmartPlanner', '/smartplanner/operations'], ['Sugerencias de cuadrilla SmartPlanner', '/smartplanner/crews'], ['Validación de mensajes SmartPlanner', '/smartplanner/messages']
   ,['War Room SmartPlanner', '/smartplanner/war-room'], ['Viabilidad jurídica SmartPlanner', '/smartplanner/promises'], ['Panel Día D SmartPlanner', '/smartplanner/election-day'], ['Centro de Comunicaciones SmartPlanner', '/smartplanner/comunicaciones'], ['Tickets SmartPlanner', '/smartplanner/tickets'], ['Reportes SmartPlanner', '/smartplanner/reports'], ['Personal SmartPlanner', '/smartplanner/staff'], ['Configuración SmartPlanner', '/smartplanner/settings'], ['Tareas', '/execution/tasks'], ['Productividad', '/execution/productivity'], ['Incidencias', '/execution/incidents'], ['Resumen de jornada', '/execution/daily-summary'], ['Temas', '/execution/issues'], ['Administración de add-ons', '/system/addons']
 ];
+const selectedRoutes = new Set((process.env.PADDING_AUDIT_ROUTES ?? '').split(',').filter(Boolean));
+const pages = selectedRoutes.size ? allPages.filter(([, route]) => selectedRoutes.has(route)) : allPages;
 const minimumPadding = 12;
 const minimumHeaderGap = 16;
+const minimumSiblingCardGap = 8;
 
 function formatBox(box) {
   return `top:${box.top}px right:${box.right}px bottom:${box.bottom}px left:${box.left}px`;
@@ -31,8 +34,10 @@ page.setDefaultTimeout(30_000);
 const failures = [];
 const headerFailures = [];
 const ghosts = [];
+const siblingCardFailures = [];
 let cardsAudited = 0;
 let headersAudited = 0;
+let cardContainersAudited = 0;
 
 try {
   await page.goto(`${appUrl}/`);
@@ -59,7 +64,7 @@ try {
     if (route === '/smartplanner/staff') await page.getByRole('heading', { name: 'Personal', exact: true }).waitFor({ state: 'visible' });
     if (route === '/smartplanner/settings') await page.getByRole('heading', { name: 'Configuración' }).waitFor({ state: 'visible' });
     await page.waitForTimeout(500);
-    const audit = await page.evaluate(({ minPadding, minHeaderGap }) => {
+    const audit = await page.evaluate(({ minPadding, minHeaderGap, minSiblingCardGap }) => {
       const visible = (element) => {
         const box = element.getBoundingClientRect();
         const style = getComputedStyle(element);
@@ -83,6 +88,25 @@ try {
         // Keep the gate strict while allowing normal browser rounding noise.
         return { selector: selectorFor(element), gap, failed: hasVisibleNext && gap + 0.5 < minHeaderGap };
       });
+      const siblingCardContainers = [...document.querySelectorAll('*')].filter((element) => {
+        const directCards = [...element.children].filter((child) => child.matches('[data-card="true"]') && visible(child));
+        return directCards.length >= 2 && visible(element);
+      }).map((element) => {
+        const directCards = [...element.children].filter((child) => child.matches('[data-card="true"]') && visible(child));
+        const gaps = [];
+        for (let index = 0; index < directCards.length; index += 1) {
+          for (let nextIndex = index + 1; nextIndex < directCards.length; nextIndex += 1) {
+            const first = directCards[index].getBoundingClientRect(); const second = directCards[nextIndex].getBoundingClientRect();
+            const verticallyAligned = Math.min(first.bottom, second.bottom) - Math.max(first.top, second.top) > 1;
+            const horizontallyAligned = Math.min(first.right, second.right) - Math.max(first.left, second.left) > 1;
+            if (verticallyAligned) gaps.push(Math.max(second.left - first.right, first.left - second.right));
+            if (horizontallyAligned) gaps.push(Math.max(second.top - first.bottom, first.top - second.bottom));
+          }
+        }
+        const relevantGaps = gaps.filter((gap) => gap >= -0.5);
+        const minimumGap = relevantGaps.length ? Math.min(...relevantGaps) : null;
+        return { selector: selectorFor(element), cards: directCards.length, minimumGap, failed: minimumGap !== null && minimumGap + 0.5 < minSiblingCardGap };
+      });
       const ignoredGhosts = ['cd-hero', 'cd-page-controls', 'cd-search-input', 'cd-native-select', 'cd-select-control', 'cd-table-scroll', 'cd-map-stage', 'cd-map-notice', 'cd-state-pill', 'cd-user-identity'];
       const ghostCandidates = [...document.querySelectorAll('article, section, div')].filter((element) => {
         if (!visible(element) || element.matches('[data-card="true"], [data-card="true"] *')) return false;
@@ -92,11 +116,12 @@ try {
         const hasBorder = Number.parseFloat(style.borderTopWidth) > 0 || Number.parseFloat(style.borderRightWidth) > 0 || Number.parseFloat(style.borderBottomWidth) > 0 || Number.parseFloat(style.borderLeftWidth) > 0;
         return hasBorder && radius >= 8 && box.width >= 180 && box.height >= 88;
       }).map((element) => selectorFor(element));
-      return { cards, headers, ghosts: [...new Set(ghostCandidates)] };
-    }, { minPadding: minimumPadding, minHeaderGap: minimumHeaderGap });
+      return { cards, headers, siblingCardContainers, ghosts: [...new Set(ghostCandidates)] };
+    }, { minPadding: minimumPadding, minHeaderGap: minimumHeaderGap, minSiblingCardGap: minimumSiblingCardGap });
 
     cardsAudited += audit.cards.length;
     headersAudited += audit.headers.length;
+    cardContainersAudited += audit.siblingCardContainers.length;
     for (const card of audit.cards) {
       if (card.failed) failures.push(`${name} (${route}) — ${card.selector} — ${formatBox(card.padding)}`);
     }
@@ -104,8 +129,12 @@ try {
     for (const header of audit.headers) {
       if (header.failed) headerFailures.push(`${name} (${route}) — ${header.selector} — gap:${header.gap.toFixed(1)}px`);
     }
+    for (const container of audit.siblingCardContainers) {
+      if (container.failed) siblingCardFailures.push(`${name} (${route}) — ${container.selector} — ${container.cards} cards, gap:${container.minimumGap.toFixed(1)}px`);
+    }
+    for (const container of audit.siblingCardContainers.filter((item) => item.failed)) console.error(`[${name}] SIBLING CARD GAP: ${container.selector} = ${container.minimumGap.toFixed(1)}px`);
     for (const header of audit.headers.filter((item) => item.failed)) console.error(`[${name}] HEADER GAP: ${header.selector} = ${header.gap.toFixed(1)}px`);
-    console.log(`[${name}] cards=${audit.cards.length}, paddingFailures=${audit.cards.filter((card) => card.failed).length}, headers=${audit.headers.length}, headerGapFailures=${audit.headers.filter((header) => header.failed).length}, ghostWarnings=${audit.ghosts.length}`);
+    console.log(`[${name}] cards=${audit.cards.length}, paddingFailures=${audit.cards.filter((card) => card.failed).length}, headers=${audit.headers.length}, headerGapFailures=${audit.headers.filter((header) => header.failed).length}, cardContainers=${audit.siblingCardContainers.length}, siblingGapFailures=${audit.siblingCardContainers.filter((container) => container.failed).length}, ghostWarnings=${audit.ghosts.length}`);
   }
 
   // The active-campaign selector is rendered by the shared navbar, so open it
@@ -143,11 +172,12 @@ try {
   }
   console.log(`[Launcher Addons] cards=${launcherAudit.length}, paddingFailures=${launcherAudit.filter((card) => card.failed).length}`);
 
-  console.log(`\nPADDING AUDIT SUMMARY\nCards audited: ${cardsAudited}\nPadding failures: ${failures.length}\nCardHeaders audited: ${headersAudited}\nHeader-gap failures: ${headerFailures.length}\nGhost-card warnings: ${ghosts.length}`);
+  console.log(`\nPADDING AUDIT SUMMARY\nCards audited: ${cardsAudited}\nPadding failures: ${failures.length}\nCardHeaders audited: ${headersAudited}\nHeader-gap failures: ${headerFailures.length}\nSibling-card containers audited: ${cardContainersAudited}\nSibling-card gap failures: ${siblingCardFailures.length}\nGhost-card warnings: ${ghosts.length}`);
   if (failures.length) console.error(`\nPADDING FAILURES\n${failures.join('\n')}`);
   if (headerFailures.length) console.error(`\nHEADER-GAP FAILURES\n${headerFailures.join('\n')}`);
+  if (siblingCardFailures.length) console.error(`\nSIBLING-CARD GAP FAILURES\n${siblingCardFailures.join('\n')}`);
   if (ghosts.length) console.warn(`\nGHOST-CARD WARNINGS\n${ghosts.join('\n')}`);
-  if (failures.length || headerFailures.length) process.exitCode = 1;
+  if (failures.length || headerFailures.length || siblingCardFailures.length) process.exitCode = 1;
 } finally {
   await browser.close();
 }
