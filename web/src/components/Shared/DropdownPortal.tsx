@@ -7,18 +7,19 @@ type Position = { top: number; left: number; width: number; maxHeight: number };
  * Renders a floating menu at document level so parent overflow/stacking contexts
  * can never crop a canonical select menu.
  */
-export default function DropdownPortal({ open, anchorRef, onDismiss, className = '', children }: { open: boolean; anchorRef: RefObject<HTMLElement>; onDismiss: () => void; className?: string; children: ReactNode }) {
+export default function DropdownPortal({ open, anchorRef, onDismiss, className = '', children, minWidth }: { open: boolean; anchorRef: RefObject<HTMLElement>; onDismiss: () => void; className?: string; children: ReactNode; minWidth?: number }) {
   const [position, setPosition] = useState<Position | null>(null);
   const [menu, setMenu] = useState<HTMLDivElement | null>(null);
   const updatePosition = () => {
     const anchor = anchorRef.current;
     if (!anchor) return;
     const rect = anchor.getBoundingClientRect();
+    const width = Math.max(rect.width, minWidth ?? 0);
     const availableBelow = window.innerHeight - rect.bottom - 12;
     const availableAbove = rect.top - 12;
     const placeAbove = availableBelow < 160 && availableAbove > availableBelow;
     const maxHeight = Math.max(96, Math.min(220, placeAbove ? availableAbove : availableBelow));
-    setPosition({ top: placeAbove ? Math.max(8, rect.top - maxHeight - 6) : rect.bottom + 6, left: Math.max(8, Math.min(rect.left, window.innerWidth - Math.max(rect.width, 160) - 8)), width: rect.width, maxHeight });
+    setPosition({ top: placeAbove ? Math.max(8, rect.top - maxHeight - 6) : rect.bottom + 6, left: Math.max(8, Math.min(rect.left, window.innerWidth - width - 8)), width, maxHeight });
   };
 
   useLayoutEffect(() => { if (!open) return; updatePosition(); }, [open]);

@@ -2,14 +2,14 @@ import { ChangeEvent, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import DropdownPortal from '../components/Shared/DropdownPortal';
 
-type NavLink = { label: string; to: string };
+type NavLink = { label: string; to: string; description?: string; icon?: string };
 type NavGroup = { label: string; items: NavLink[] };
 
 const groups: NavGroup[] = [
-  { label: 'Finanzas', items: [{ label: 'Aportantes', to: '/smartplanner/contributors' }, { label: 'Proveedores', to: '/smartplanner/providers' }, { label: 'Facturación', to: '/smartplanner/invoices' }, { label: 'Contratos', to: '/smartplanner/contracts' }, { label: 'Materiales', to: '/smartplanner/materials' }, { label: 'Presupuesto', to: '/planning/budget' }] },
-  { label: 'Operación', items: [{ label: 'Mapa de Avanzada', to: '/smartplanner/operations' }, { label: 'Asignador de Cuadrillas', to: '/smartplanner/crews' }] },
-  { label: 'Crisis y Jurídico', items: [{ label: 'War Room', to: '/smartplanner/war-room' }, { label: 'Propuestas', to: '/smartplanner/promises' }, { label: 'Día D', to: '/smartplanner/election-day' }] },
-  { label: 'Comunicación', items: [{ label: 'Centro de Comunicaciones', to: '/smartplanner/comunicaciones' }, { label: 'Tickets', to: '/smartplanner/tickets' }] }
+  { label: 'Finanzas', items: [{ label: 'Aportantes', to: '/smartplanner/contributors', description: 'Aportes y seguimiento', icon: 'ph-hand-coins' }, { label: 'Proveedores', to: '/smartplanner/providers', description: 'Compras y proveedores', icon: 'ph-storefront' }, { label: 'Facturación', to: '/smartplanner/invoices', description: 'Facturas y vencimientos', icon: 'ph-receipt' }, { label: 'Contratos', to: '/smartplanner/contracts', description: 'Acuerdos y documentación', icon: 'ph-file-text' }, { label: 'Materiales', to: '/smartplanner/materials', description: 'Stock y recursos', icon: 'ph-package' }, { label: 'Presupuesto', to: '/planning/budget', description: 'Tope legal y presupuesto', icon: 'ph-chart-pie-slice' }] },
+  { label: 'Operación', items: [{ label: 'Mapa de Avanzada', to: '/smartplanner/operations', description: 'Operación territorial', icon: 'ph-map-trifold' }, { label: 'Asignador de Cuadrillas', to: '/smartplanner/crews', description: 'Equipos en acción', icon: 'ph-users-three' }] },
+  { label: 'Crisis y Jurídico', items: [{ label: 'War Room', to: '/smartplanner/war-room', description: 'Protocolos y respuesta', icon: 'ph-siren' }, { label: 'Propuestas', to: '/smartplanner/promises', description: 'Viabilidad jurídica', icon: 'ph-scales' }, { label: 'Día D', to: '/smartplanner/election-day', description: 'Jornada electoral', icon: 'ph-flag-checkered' }] },
+  { label: 'Comunicación', items: [{ label: 'Centro de Comunicaciones', to: '/smartplanner/comunicaciones', description: 'Canales y mensajes', icon: 'ph-chat-circle-text' }, { label: 'Tickets', to: '/smartplanner/tickets', description: 'Solicitudes internas', icon: 'ph-ticket' }] }
 ];
 
 const directLinks: NavLink[] = [{ label: 'Reportes', to: '/smartplanner/reports' }, { label: 'Personal', to: '/smartplanner/staff' }, { label: 'Configuración', to: '/smartplanner/settings' }];
@@ -24,8 +24,9 @@ function SmartPlannerNavGroup({ group, active, pathname }: { group: NavGroup; ac
   const triggerRef = useRef<HTMLButtonElement>(null);
   return <span className="sp-secondary-nav__group">
     <button ref={triggerRef} type="button" className={active ? 'is-active' : ''} aria-expanded={open} aria-haspopup="menu" onClick={() => setOpen((current) => !current)}>{group.label}<i className="ph-duotone ph-caret-down" aria-hidden="true" /></button>
-    <DropdownPortal open={open} anchorRef={triggerRef} onDismiss={() => setOpen(false)} className="sp-secondary-nav__menu">
-      {group.items.map((item) => <Link className={`sp-secondary-nav__item${matchesPath(pathname, item.to) ? ' is-active' : ''}`} to={item.to} key={item.to} onClick={() => setOpen(false)}>{item.label}</Link>)}
+    <DropdownPortal open={open} anchorRef={triggerRef} onDismiss={() => setOpen(false)} minWidth={group.items.length > 4 ? 560 : 440} className="sp-secondary-nav__menu">
+      <div className="sp-secondary-nav__menu-heading"><small>SMARTPLANNER</small><strong>{group.label}</strong></div>
+      {group.items.map((item) => <Link aria-label={item.label} className={`sp-secondary-nav__item${matchesPath(pathname, item.to) ? ' is-active' : ''}`} to={item.to} key={item.to} onClick={() => setOpen(false)}><i className={`ph-duotone ${item.icon ?? 'ph-arrow-right'}`} aria-hidden="true" /><span><strong>{item.label}</strong>{item.description && <small>{item.description}</small>}</span><i className="ph-duotone ph-caret-right sp-secondary-nav__item-arrow" aria-hidden="true" /></Link>)}
     </DropdownPortal>
   </span>;
 }
