@@ -1,6 +1,7 @@
 import { FieldValue } from 'firebase-admin/firestore';
 import { DecodedIdToken } from 'firebase-admin/auth';
-import { adminAuth, db } from '../config/firebase.js';
+import { randomUUID } from 'node:crypto';
+import { adminAuth, db, storage } from '../config/firebase.js';
 import { createNotification } from './notifications.service.js';
 import { appendAudit } from './audit.service.js';
 
@@ -178,4 +179,75 @@ export async function setSmartPlannerEnabled(user: DecodedIdToken, orgId: string
 
   await orgRef.set({ enabledAddons: { ...(organization.data()?.enabledAddons ?? {}), smartPlanner: enabled } }, { merge: true });
   return { enabledAddons: { smartPlanner: enabled } };
+}
+
+type GlobalConfigurationInput = { partyName?: unknown; partyAcronym?: unknown; address?: unknown; lat?: unknown; lng?: unknown };
+type GlobalConfiguration = { partyName: string; partyAcronym: string; partyLogoUrl: string | null; address: string; lat: number | null; lng: number | null };
+
+function canManageGlobalConfiguration(user: DecodedIdToken, orgId: string) {
+  if ((user.orgId !== orgId && user.role !== 'admin') || !['cliente', 'admin'].includes(String(user.role))) {
+    throw new ForbiddenError('Solo el Cliente o un administrador puede administrar la configuración global.');
+  }
+}
+
+function stringValue(value: unknown, max: number) {
+  if (value === undefined || value === null) return '';
+  if (typeof value !== 'string') throw new Error('Los datos de configuración no son válidos.');
+  return value.trim().slice(0, max);
+}
+
+function coordinate(value: unknown) {
+  if (value === undefined || value === null || value === '') return null;
+  const result = Number(value);
+  if (!Number.isFinite(result)) throw new Error('Las coordenadas no son válidas.');
+  return result;
+}
+
+function organizationConfig(data: Record<string, unknown> | undefined): GlobalConfiguration {
+  const config = (data?.globalConfiguration ?? {}) as Record<string, unknown>;
+  return {
+    partyName: typeof config.partyName === 'string' ? config.partyName : '',
+    partyAcronym: typeof config.partyAcronym === 'string' ? config.partyAcronym : '',
+    partyLogoUrl: typeof config.partyLogoUrl === 'string' ? config.partyLogoUrl : null,
+    address: typeof config.address === 'string' ? config.address : '',
+    lat: typeof config.lat === 'number' ? config.lat : null,
+    lng: typeof config.lng === 'number' ? config.lng : null
+  };
+}
+
+export async function getGlobalConfiguration(user: DecodedIdToken, orgId: string) {
+  if (user.orgId !== orgId && user.role !== 'admin') throw new ForbiddenError('No tenés acceso a esta organización.');
+  const snapshot = await db.collection('organizations').doc(orgId).get();
+  if (!snapshot.exists) throw new NotFoundError('La organización no existe.');
+  return organizationConfig(snapshot.data());
+}
+
+export async function updateGlobalConfiguration(user: DecodedIdToken, orgId: string, input: GlobalConfigurationInput) {
+  canManageGlobalConfiguration(user, orgId);
+  const ref = db.collection('organizations').doc(orgId); const snapshot = await ref.get();
+  if (!snapshot.exists) throw new NotFoundError('La organización no existe.');
+  const current = organizationConfig(snapshot.data());
+  const next = {
+    ...current,
+    partyName: stringValue(input.partyName, 120),
+    partyAcronym: stringValue(input.partyAcronym, 24),
+    address: stringValue(input.address, 240),
+    lat: coordinate(input.lat),
+    lng: coordinate(input.lng)
+  };
+  await ref.set({ globalConfiguration: { ...next, updatedAt: FieldValue.serverTimestamp(), updatedBy: user.uid } }, { merge: true });
+  return next;
+}
+
+export async function uploadPartyLogo(user: DecodedIdToken, orgId: string, file?: Express.Multer.File) {
+  canManageGlobalConfiguration(user, orgId);
+  if (!file?.buffer || !file.mimetype.startsWith('image/')) throw new Error('Seleccioná una imagen válida para el logo.');
+  const ref = db.collection('organizations').doc(orgId); const snapshot = await ref.get();
+  if (!snapshot.exists) throw new NotFoundError('La organización no existe.');
+  const extension = (file.originalname.split('.').pop() || 'png').replace(/[^a-zA-Z0-9]/g, '') || 'png';
+  const path = `organizations/${orgId}/party-logo-${Date.now()}.${extension}`; const token = randomUUID();
+  await storage.bucket().file(path).save(file.buffer, { resumable: false, contentType: file.mimetype, metadata: { metadata: { firebaseStorageDownloadTokens: token } } });
+  const partyLogoUrl = `https://firebasestorage.googleapis.com/v0/b/${storage.bucket().name}/o/${encodeURIComponent(path)}?alt=media&token=${encodeURIComponent(token)}`;
+  await ref.set({ globalConfiguration: { ...organizationConfig(snapshot.data()), partyLogoUrl, updatedAt: FieldValue.serverTimestamp(), updatedBy: user.uid } }, { merge: true });
+  return { partyLogoUrl };
 }

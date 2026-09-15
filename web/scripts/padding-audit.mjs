@@ -64,7 +64,7 @@ try {
     if (route === '/smartplanner/tickets') await page.getByRole('heading', { name: 'Tickets' }).waitFor({ state: 'visible' });
     if (route === '/smartplanner/reports') await page.getByRole('heading', { name: 'Reportes SmartPlanner' }).waitFor({ state: 'visible' });
     if (route === '/smartplanner/staff') await page.getByRole('heading', { name: 'Personal', exact: true }).waitFor({ state: 'visible' });
-    if (route === '/smartplanner/settings') await page.getByRole('heading', { name: 'Configuración' }).waitFor({ state: 'visible' });
+    if (route === '/smartplanner/settings') await page.getByRole('heading', { name: 'Configuración', exact: true }).waitFor({ state: 'visible' });
     await page.waitForTimeout(500);
     const audit = await page.evaluate(({ minPadding, minHeaderGap, minSiblingCardGap, maxCdCardContainerGap }) => {
       const visible = (element) => {

@@ -13,9 +13,11 @@ import PageContainer from '../../../components/Shared/PageContainer';
 import MapContainer from '../../../components/Planning/MapContainer';
 import GoogleMapCanvas from '../../../components/Shared/GoogleMapCanvas';
 import Stack from '../../../components/Shared/Stack';
+import CampaignLocationGlobe from '../../../components/Shared/CampaignLocationGlobe';
 
 type Summary = { totalVoters:number; visitedCount:number; convertedYes:number; convertedNo:number; undecidedCount:number; conversionRate:number; coverageRate:number; teamStats:Array<{teamName:string;conversionsCount:number}>; topMilitants:Array<{uid:string;name:string;visitsCount:number;conversionsCount:number;conversionRate:number}> };
 type MapVoter = { id:string; name:string; lat?:number | null; lng?:number | null; state:string };
+type GlobalConfiguration = { partyName: string; partyAcronym: string; partyLogoUrl: string | null; address: string; lat: number | null; lng: number | null };
 const empty: Summary = { totalVoters:0, visitedCount:0, convertedYes:0, convertedNo:0, undecidedCount:0, conversionRate:0, coverageRate:0, teamStats:[], topMilitants:[] };
 
 export default function CampaignDashboard() {
@@ -28,6 +30,8 @@ export default function CampaignDashboard() {
   const [to, setTo] = useState(new Date().toISOString().slice(0, 10));
   const votersPath = campaign ? `/api/organizations/${campaign.orgId}/campaigns/${campaign.campId}/voters` : null;
   const { data: votersData, loading: votersLoading, error: votersError } = useAuthenticatedQuery<MapVoter[]>(user, votersPath, [campaign?.orgId, campaign?.campId]);
+  const globalConfigPath = campaign ? `/api/organizations/${campaign.orgId}/global-configuration` : null;
+  const { data: globalConfiguration } = useAuthenticatedQuery<GlobalConfiguration>(user, globalConfigPath, [globalConfigPath]);
   const mapPoints = (votersData ?? []).filter((voter) => voter.lat != null && voter.lng != null) as Array<MapVoter & { lat:number; lng:number }>;
 
   const loadAnalytics = useCallback(() => {
@@ -68,9 +72,12 @@ export default function CampaignDashboard() {
       <KpiCard icon="help" iconColor="red" value={summary.convertedNo} label="Conversiones NO" caption="registradas" progress={noPercent} linkText="Conoce mejor a tu audiencia" />
       <KpiCard icon="help" iconColor="orange" value={summary.undecidedCount} label="Indecisos" caption="a re-visitar" progress={undecidedPercent} linkText="Oportunidades por trabajar" />
     </div>
-    <div className="cd-dashboard__main">
-      <Card icon="trend" title="Evolución de Conversiones" subtitle="Tendencia de conversiones en el período seleccionado." headerAction={<SelectControl label="Últimos 30 días" />}><div className={'cd-chart ' + (!hasTimeline ? 'cd-chart--empty' : '')}>{hasTimeline ? <Chart type="line" height={250} options={line.options} series={line.series} /> : <div className="cd-chart__empty"><EmptyState icon="bar-chart-2" title="Aún no hay datos de conversiones" description="Los gráficos se mostrarán cuando comiences a registrar visitas." /></div>}</div></Card>
-      <Card icon="pie" title="Estado de Conversión" subtitle="Distribución de los electores según su estado."><div className="cd-donut"><div className="cd-donut__circle"><div><strong>{summary.totalVoters}</strong><span className="d-block">Total<br />electores</span></div></div><div className="cd-donut__legend">{distribution.map((item) => <div className="cd-donut__legend-row" key={item.label}><i style={{ background:item.color }} /><span>{item.label}</span><b>{item.value}</b><small>{item.percent}%</small></div>)}</div></div>{!hasConversionData && <div className="cd-donut__notice"><span>i</span><div><strong>Aún no hay datos para mostrar</strong><p>Comienza a registrar visitas para ver la distribución.</p></div></div>}</Card>
+    <div className="cd-dashboard__overview">
+      <div className="cd-dashboard__main">
+        <Card icon="trend" title="Evolución de Conversiones" subtitle="Tendencia de conversiones en el período seleccionado." headerAction={<SelectControl label="Últimos 30 días" />}><div className={'cd-chart ' + (!hasTimeline ? 'cd-chart--empty' : '')}>{hasTimeline ? <Chart type="line" height={250} options={line.options} series={line.series} /> : <div className="cd-chart__empty"><EmptyState icon="bar-chart-2" title="Aún no hay datos de conversiones" description="Los gráficos se mostrarán cuando comiences a registrar visitas." /></div>}</div></Card>
+        <Card icon="pie" title="Estado de Conversión" subtitle="Distribución de los electores según su estado."><div className="cd-donut"><div className="cd-donut__circle"><div><strong>{summary.totalVoters}</strong><span className="d-block">Total<br />electores</span></div></div><div className="cd-donut__legend">{distribution.map((item) => <div className="cd-donut__legend-row" key={item.label}><i style={{ background:item.color }} /><span>{item.label}</span><b>{item.value}</b><small>{item.percent}%</small></div>)}</div></div>{!hasConversionData && <div className="cd-donut__notice"><span>i</span><div><strong>Aún no hay datos para mostrar</strong><p>Comienza a registrar visitas para ver la distribución.</p></div></div>}</Card>
+      </div>
+      <CampaignLocationGlobe location={globalConfiguration ?? undefined} partyName={globalConfiguration?.partyName} partyLogoUrl={globalConfiguration?.partyLogoUrl} />
     </div>
     <div className="cd-dashboard__lower">
       <Card icon="people" title="Conversiones por Equipo" subtitle="Compara el desempeño de tus equipos de campaña.">{summary.teamStats.length ? <Chart type="bar" height={240} options={{ xaxis:{ categories:summary.teamStats.map((team) => team.teamName) }, colors:['#2f6fe4'], dataLabels:{ enabled:false }, grid:{ borderColor:'#eef2f8' } }} series={[{ name:'SI', data:summary.teamStats.map((team) => team.conversionsCount) }]} /> : <EmptyState icon="users" title="Aún no hay equipos registrados" description="Asigna miembros a equipos para ver sus conversiones." ctaLabel="Crear primer equipo" />}</Card>

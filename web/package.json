@@ -74,6 +74,7 @@
     "test:e2e:smartplanner-tickets-ui": "node scripts/test-smartplanner-tickets-ui-e2e.mjs",
     "test:e2e:smartplanner-navigation": "node scripts/test-smartplanner-navigation-e2e.mjs",
     "test:e2e:smartplanner-communications": "node scripts/test-smartplanner-communications-e2e.mjs",
+    "test:e2e:global-configuration": "node scripts/test-global-configuration-e2e.mjs",
     "test:e2e:addons-launcher": "node scripts/test-addons-launcher-e2e.mjs"
   },
   "dependencies": {
@@ -111,6 +112,7 @@
     "chart.js": "^4.4.3",
     "cleave.js": "^1.6.0",
     "clipboard": "^2.0.11",
+    "cobe": "^2.0.1",
     "dexie": "^4.4.6",
     "feather-icons": "^4.29.1",
     "feather-icons-react": "^0.7.0",

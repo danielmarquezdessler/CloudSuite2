@@ -1,5 +1,13 @@
 import { Request, Response } from 'express';
-import { ConflictError, ForbiddenError, NotFoundError, bootstrapOrganization, getCurrentUserData, setSmartPlannerEnabled } from '../services/organizations.service.js';
+import { ConflictError, ForbiddenError, NotFoundError, bootstrapOrganization, getCurrentUserData, getGlobalConfiguration, setSmartPlannerEnabled, updateGlobalConfiguration, uploadPartyLogo } from '../services/organizations.service.js';
+
+const orgId = (request: Request) => Array.isArray(request.params.orgId) ? request.params.orgId[0] : request.params.orgId;
+const fail = (response: Response, error: unknown, fallback: string) => {
+  if (error instanceof ForbiddenError) return response.status(403).json({ message: error.message });
+  if (error instanceof NotFoundError) return response.status(404).json({ message: error.message });
+  if (error instanceof Error) return response.status(400).json({ message: error.message });
+  return response.status(500).json({ message: fallback });
+};
 
 export async function bootstrapOrganizationController(request: Request, response: Response) {
   try {
@@ -49,4 +57,19 @@ export async function setSmartPlannerAddonController(request: Request, response:
     }
     response.status(500).json({ message: 'No pudimos actualizar el add-on.' });
   }
+}
+
+export async function getGlobalConfigurationController(request: Request, response: Response) {
+  try { response.json(await getGlobalConfiguration(request.user!, orgId(request))); }
+  catch (error) { fail(response, error, 'No pudimos obtener la configuración global.'); }
+}
+
+export async function updateGlobalConfigurationController(request: Request, response: Response) {
+  try { response.json(await updateGlobalConfiguration(request.user!, orgId(request), request.body ?? {})); }
+  catch (error) { fail(response, error, 'No pudimos guardar la configuración global.'); }
+}
+
+export async function uploadPartyLogoController(request: Request, response: Response) {
+  try { response.status(201).json(await uploadPartyLogo(request.user!, orgId(request), request.file)); }
+  catch (error) { fail(response, error, 'No pudimos subir el logo del partido.'); }
 }
