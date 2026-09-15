@@ -16,7 +16,7 @@ const pages = [
   ['Territorio', '/planning/territory'], ['Metas', '/planning/goals'], ['Rutas', '/planning/routes'],
   ['Encuestas', '/planning/surveys'], ['Presupuesto', '/planning/budget'], ['Asesor', '/planning/advisor'],
   ['Visitas en vivo', '/execution/live'], ['Mapa de calor', '/execution/heatmap'], ['Indecisos', '/execution/undecided'], ['SmartPlanner', '/smartplanner'], ['Aportantes SmartPlanner', '/smartplanner/contributors'], ['Proveedores SmartPlanner', '/smartplanner/providers'], ['Facturación SmartPlanner', '/smartplanner/invoices'], ['Contratos SmartPlanner', '/smartplanner/contracts'], ['Materiales SmartPlanner', '/smartplanner/materials'], ['Mapa de Avanzada SmartPlanner', '/smartplanner/operations'], ['Sugerencias de cuadrilla SmartPlanner', '/smartplanner/crews'], ['Validación de mensajes SmartPlanner', '/smartplanner/messages']
-  ,['War Room SmartPlanner', '/smartplanner/war-room'], ['Viabilidad jurídica SmartPlanner', '/smartplanner/promises'], ['Panel Día D SmartPlanner', '/smartplanner/election-day'], ['Chat por área SmartPlanner', '/smartplanner/chat'], ['Tickets SmartPlanner', '/smartplanner/tickets'], ['Reportes SmartPlanner', '/smartplanner/reports'], ['Personal SmartPlanner', '/smartplanner/staff'], ['Configuración SmartPlanner', '/smartplanner/settings'], ['Tareas', '/execution/tasks'], ['Productividad', '/execution/productivity'], ['Incidencias', '/execution/incidents'], ['Resumen de jornada', '/execution/daily-summary'], ['Temas', '/execution/issues'], ['Administración de add-ons', '/system/addons']
+  ,['War Room SmartPlanner', '/smartplanner/war-room'], ['Viabilidad jurídica SmartPlanner', '/smartplanner/promises'], ['Panel Día D SmartPlanner', '/smartplanner/election-day'], ['Centro de Comunicaciones SmartPlanner', '/smartplanner/comunicaciones'], ['Tickets SmartPlanner', '/smartplanner/tickets'], ['Reportes SmartPlanner', '/smartplanner/reports'], ['Personal SmartPlanner', '/smartplanner/staff'], ['Configuración SmartPlanner', '/smartplanner/settings'], ['Tareas', '/execution/tasks'], ['Productividad', '/execution/productivity'], ['Incidencias', '/execution/incidents'], ['Resumen de jornada', '/execution/daily-summary'], ['Temas', '/execution/issues'], ['Administración de add-ons', '/system/addons']
 ];
 const minimumPadding = 12;
 const minimumHeaderGap = 16;
@@ -53,7 +53,7 @@ try {
     if (route === '/smartplanner/war-room') await page.getByRole('heading', { name: 'Motor de Crisis' }).waitFor({ state: 'visible' });
     if (route === '/smartplanner/promises') await page.getByRole('heading', { name: 'Propuestas de campaña' }).waitFor({ state: 'visible' });
     if (route === '/smartplanner/election-day') await page.getByRole('heading', { name: 'Panel del Día D' }).waitFor({ state: 'visible' });
-    if (route === '/smartplanner/chat') await page.locator('h1', { hasText: 'Chat por área' }).waitFor({ state: 'visible' });
+    if (route === '/smartplanner/comunicaciones') await page.getByRole('heading', { name: 'Centro de Comunicaciones' }).waitFor({ state: 'visible' });
     if (route === '/smartplanner/tickets') await page.getByRole('heading', { name: 'Tickets' }).waitFor({ state: 'visible' });
     if (route === '/smartplanner/reports') await page.getByRole('heading', { name: 'Reportes SmartPlanner' }).waitFor({ state: 'visible' });
     if (route === '/smartplanner/staff') await page.getByRole('heading', { name: 'Personal', exact: true }).waitFor({ state: 'visible' });
