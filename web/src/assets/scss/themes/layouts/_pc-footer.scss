@@ -4,7 +4,7 @@
 
 .pc-footer {
   position: relative;
-  z-index: 995;
+  z-index: $z-base;
   margin-left: $sidebar-width;
   margin-top: $header-height;
   padding: 15px 0;
