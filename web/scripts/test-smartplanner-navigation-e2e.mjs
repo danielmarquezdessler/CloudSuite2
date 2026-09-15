@@ -14,7 +14,7 @@ const smartPlannerRoutes = [
   '/smartplanner/contributors', '/smartplanner/providers', '/smartplanner/invoices', '/smartplanner/contracts',
   '/smartplanner/materials', '/smartplanner/operations', '/smartplanner/crews', '/smartplanner/messages',
   '/smartplanner/war-room', '/smartplanner/promises', '/smartplanner/election-day', '/smartplanner/tickets',
-  '/smartplanner/chat', '/smartplanner/staff', '/smartplanner/settings', '/smartplanner/reports'
+  '/smartplanner/chat', '/smartplanner/comunicaciones', '/smartplanner/staff', '/smartplanner/settings', '/smartplanner/reports'
 ];
 const parseEnv = (source) => Object.fromEntries(source.split(/\r?\n/).map((line) => line.trim()).filter((line) => line && !line.startsWith('#')).map((line) => { const index = line.indexOf('='); return [line.slice(0, index), line.slice(index + 1)]; }));
 const pause = (milliseconds) => new Promise((resolveWait) => setTimeout(resolveWait, milliseconds));
