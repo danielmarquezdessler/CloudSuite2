@@ -16,4 +16,7 @@ export const members = async(r:Request,s:Response)=>{try{s.json(await service.li
 export const createTask = async(r:Request,s:Response)=>{try{s.status(201).json(await service.saveTask(r.user!,...ids(r),null,r.body));}catch(e){fail(s,e)}};
 export const updateTask = async(r:Request,s:Response)=>{try{s.json(await service.saveTask(r.user!,...ids(r),String(r.params.taskId),r.body));}catch(e){fail(s,e)}};
 export const removeTask = async(r:Request,s:Response)=>{try{await service.deleteTask(r.user!,...ids(r),String(r.params.taskId));s.status(204).end();}catch(e){fail(s,e)}};
+export const taskComments = async(r:Request,s:Response)=>{try{s.json(await service.listTaskComments(r.user!,...ids(r),String(r.params.taskId)));}catch(e){fail(s,e)}};
+export const createTaskComment = async(r:Request,s:Response)=>{try{s.status(201).json(await service.createTaskComment(r.user!,...ids(r),String(r.params.taskId),r.body));}catch(e){fail(s,e)}};
+export const taskActivity = async(r:Request,s:Response)=>{try{s.json(await service.listTaskActivity(r.user!,...ids(r),String(r.params.taskId)));}catch(e){fail(s,e)}};
 export const role = async(r:Request,s:Response)=>{try{s.json(await service.setRole(r.user!,...ids(r),String(r.params.memberId),r.body?.smartPlannerRole));}catch(e){fail(s,e)}};

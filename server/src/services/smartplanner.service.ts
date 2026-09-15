@@ -15,6 +15,42 @@ const areaPosition = (area: Record<string, unknown>) => {
 const statuses = ['por_hacer', 'en_progreso', 'en_revision', 'completada'] as const;
 const priorities = ['baja', 'media', 'alta'] as const;
 const campaign = (orgId: string, campId: string) => db.collection('organizations').doc(orgId).collection('campaigns').doc(campId);
+type UserStory = { role: string; action: string; benefit: string };
+type AcceptanceCriterion = { id: string; description: string; given: string; when: string; then: string; useGivenWhenThen: boolean; completed: boolean };
+type ChecklistItem = { id: string; name: string; completed: boolean; responsible: string; dueDate: string };
+const text = (value: unknown, maximum = 500) => String(value ?? '').trim().slice(0, maximum);
+function cleanUserStory(value: unknown): UserStory | null {
+  if (!value || typeof value !== 'object') return null;
+  const story = value as Record<string, unknown>;
+  const cleaned = { role: text(story.role, 120), action: text(story.action, 300), benefit: text(story.benefit, 300) };
+  return cleaned.role || cleaned.action || cleaned.benefit ? cleaned : null;
+}
+function cleanAcceptanceCriteria(value: unknown): AcceptanceCriterion[] {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, 50).map((item, index) => {
+    const criterion = item && typeof item === 'object' ? item as Record<string, unknown> : {};
+    return { id: text(criterion.id, 100) || `ac-${index + 1}`, description: text(criterion.description, 500), given: text(criterion.given, 400), when: text(criterion.when, 400), then: text(criterion.then, 400), useGivenWhenThen: criterion.useGivenWhenThen === true, completed: criterion.completed === true };
+  }).filter((criterion) => criterion.description || criterion.given || criterion.when || criterion.then);
+}
+function cleanChecklist(value: unknown): ChecklistItem[] {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, 100).map((item, index) => {
+    const entry = item && typeof item === 'object' ? item as Record<string, unknown> : {};
+    return { id: text(entry.id, 100) || `check-${index + 1}`, name: text(entry.name, 300), completed: entry.completed === true, responsible: text(entry.responsible, 128), dueDate: text(entry.dueDate, 20) };
+  }).filter((entry) => entry.name);
+}
+async function activityName(user: DecodedIdToken) {
+  const profile = await db.collection('users').doc(user.uid).get();
+  return String(profile.data()?.displayName ?? user.name ?? user.email ?? 'Miembro');
+}
+async function writeTaskActivity(ref: FirebaseFirestore.DocumentReference, user: DecodedIdToken, previous: Record<string, unknown>, next: Record<string, unknown>) {
+  const labels: Array<[keyof typeof next, string]> = [['status', 'Estado'], ['assignedTo', 'Responsable'], ['priority', 'Prioridad'], ['categoryId', 'Categoría']];
+  const changed = labels.filter(([field]) => String(previous[field] ?? '') !== String(next[field] ?? ''));
+  if (!changed.length) return;
+  const changedByName = await activityName(user); const batch = db.batch();
+  changed.forEach(([field, label]) => batch.set(ref.collection('activity').doc(), { field, fieldLabel: label, oldValue: String(previous[field] ?? ''), newValue: String(next[field] ?? ''), changedBy: user.uid, changedByName, changedAt: FieldValue.serverTimestamp() }));
+  await batch.commit();
+}
 export async function nextPbiDisplayId(orgId: string, campId: string) {
   const counter = campaign(orgId, campId).collection('spMeta').doc('pbiCounter');
   return db.runTransaction(async (transaction) => {
@@ -121,7 +157,12 @@ export async function saveTask(user: DecodedIdToken, orgId: string, campId: stri
   if (id && !canManage && existing?.data()?.assignedTo !== user.uid) throw new ForbiddenError('Solo podés mover tus propias tareas.');
   const status = String(input.status ?? existing?.data()?.status ?? 'por_hacer');
   if (!statuses.includes(status as typeof statuses[number])) throw new ValidationError('El estado no es válido.');
-  if (!canManage) { await ref.update({ status, completedAt: status === 'completada' ? FieldValue.serverTimestamp() : null, updatedAt: FieldValue.serverTimestamp() }); return { id, status }; }
+  if (!canManage) {
+    const previous = existing?.data() ?? {};
+    await ref.update({ status, completedAt: status === 'completada' ? FieldValue.serverTimestamp() : null, updatedAt: FieldValue.serverTimestamp() });
+    await writeTaskActivity(ref, user, previous, { ...previous, status });
+    return { id, status };
+  }
   const title = String(input.title ?? '').trim();
   if (!title) throw new ValidationError('El título de la tarea es obligatorio.');
   const priority = String(input.priority ?? 'media');
@@ -129,12 +170,48 @@ export async function saveTask(user: DecodedIdToken, orgId: string, campId: stri
   const parsedCost = Number(input.cost ?? 0); const cost = Number.isFinite(parsedCost) ? Math.max(0, parsedCost) : 0;
   const categoryId = String(input.categoryId ?? existing?.data()?.categoryId ?? '').trim();
   if (categoryId && !(await campaign(orgId, campId).collection('spCategories').doc(categoryId).get()).exists) throw new ValidationError('La categoría seleccionada no existe.');
+  const parentPbiId = String(input.parentPbiId ?? existing?.data()?.parentPbiId ?? '').trim();
+  if (parentPbiId) {
+    if (parentPbiId === ref.id) throw new ValidationError('Un PBI no puede ser subtarea de sí mismo.');
+    if (!(await campaign(orgId, campId).collection('spTasks').doc(parentPbiId).get()).exists) throw new ValidationError('El PBI padre seleccionado no existe.');
+  }
   const displayId = String(existing?.data()?.displayId ?? await nextPbiDisplayId(orgId, campId));
-  const data = { title, description: String(input.description ?? ''), areaId: String(input.areaId ?? ''), assignedTo: String(input.assignedTo ?? ''), categoryId, displayId, status, priority, startDate: String(input.startDate ?? ''), dueDate: String(input.dueDate ?? ''), cost };
+  const userStory = cleanUserStory(input.userStory ?? existing?.data()?.userStory);
+  const acceptanceCriteria = cleanAcceptanceCriteria(input.acceptanceCriteria ?? existing?.data()?.acceptanceCriteria);
+  const checklist = cleanChecklist(input.checklist ?? existing?.data()?.checklist);
+  const data = { title, description: String(input.description ?? ''), areaId: String(input.areaId ?? ''), assignedTo: String(input.assignedTo ?? ''), categoryId, parentPbiId, displayId, userStory, acceptanceCriteria, checklist, status, priority, startDate: String(input.startDate ?? ''), dueDate: String(input.dueDate ?? ''), cost };
   if (!data.areaId || !data.assignedTo || !data.dueDate) throw new ValidationError('Área, responsable y fecha límite son obligatorios.');
   await ref.set({ ...data, ...(id ? { updatedAt: FieldValue.serverTimestamp() } : { createdAt: FieldValue.serverTimestamp(), createdBy: user.uid }), ...(status === 'completada' ? { completedAt: FieldValue.serverTimestamp() } : {}) }, { merge: true });
+  if (existing?.exists) await writeTaskActivity(ref, user, existing.data() ?? {}, data);
   if (data.assignedTo !== user.uid && data.assignedTo !== existing?.data()?.assignedTo) await createNotification(data.assignedTo, { type: 'smartplanner_task_assigned', title: 'Nueva tarea asignada', message: data.title, metadata: { path: '/smartplanner', orgId, campId, taskId: ref.id } });
   return { id: ref.id, ...data };
 }
 export async function deleteTask(user: DecodedIdToken, orgId: string, campId: string, id: string) { await manager(user, orgId, campId); await campaign(orgId, campId).collection('spTasks').doc(id).delete(); }
+async function taskRefFor(user: DecodedIdToken, orgId: string, campId: string, taskId: string) {
+  await addon(user, orgId, campId);
+  const ref = campaign(orgId, campId).collection('spTasks').doc(taskId);
+  if (!(await ref.get()).exists) throw new NotFoundError('El PBI no existe.');
+  return ref;
+}
+export async function listTaskComments(user: DecodedIdToken, orgId: string, campId: string, taskId: string) {
+  const ref = await taskRefFor(user, orgId, campId, taskId);
+  return (await ref.collection('comments').orderBy('createdAt', 'asc').limit(250).get()).docs.map(serialize);
+}
+export async function createTaskComment(user: DecodedIdToken, orgId: string, campId: string, taskId: string, input: Record<string, unknown>) {
+  const ref = await taskRefFor(user, orgId, campId, taskId); const body = text(input.text, 3000);
+  if (!body) throw new ValidationError('Escribí un comentario.');
+  const requested = Array.isArray(input.mentionedIds) ? input.mentionedIds : [];
+  const mentionIds = Array.from(new Set(requested.map(String).filter((uid) => uid && uid !== user.uid))).slice(0, 20);
+  const validMentionIds: string[] = [];
+  for (const uid of mentionIds) if ((await campaign(orgId, campId).collection('members').doc(uid).get()).exists) validMentionIds.push(uid);
+  const authorName = await activityName(user); const comment = ref.collection('comments').doc();
+  await comment.set({ text: body, authorId: user.uid, authorName, mentions: validMentionIds, createdAt: FieldValue.serverTimestamp() });
+  const path = `/smartplanner/pbi/${encodeURIComponent(taskId)}?comment=${encodeURIComponent(comment.id)}`;
+  await Promise.all(validMentionIds.map((uid) => createNotification(uid, { type: 'smartplanner_pbi_mention', title: `${authorName} te mencionó en un PBI`, message: body, metadata: { path, orgId, campId, taskId, commentId: comment.id } })));
+  return { id: comment.id, text: body, authorId: user.uid, authorName, mentions: validMentionIds, createdAt: null };
+}
+export async function listTaskActivity(user: DecodedIdToken, orgId: string, campId: string, taskId: string) {
+  const ref = await taskRefFor(user, orgId, campId, taskId);
+  return (await ref.collection('activity').orderBy('changedAt', 'desc').limit(250).get()).docs.map((document) => ({ id: document.id, ...document.data(), changedAt: document.data().changedAt?.toDate?.().toISOString?.() ?? null }));
+}
 export async function setRole(user: DecodedIdToken, orgId: string, campId: string, uid: string, smartPlannerRole: unknown) { if (user.role !== 'cliente' && user.role !== 'admin') throw new ForbiddenError('Solo Cliente o admin puede asignar roles de SmartPlanner.'); await addon(user, orgId, campId); const role = String(smartPlannerRole ?? 'miembro'); if (!['contador', 'pm', 'miembro'].includes(role)) throw new ValidationError('El rol de SmartPlanner no es válido.'); const ref = campaign(orgId, campId).collection('members').doc(uid); if (!(await ref.get()).exists) throw new NotFoundError('El miembro no existe.'); await ref.update({ smartPlannerRole: role, updatedAt: FieldValue.serverTimestamp() }); return { uid, smartPlannerRole: role }; }

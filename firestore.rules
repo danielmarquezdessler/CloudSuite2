@@ -31,6 +31,9 @@ service cloud.firestore {
     // Every mutation still goes through the Node API/Admin SDK.
     match /organizations/{orgId}/campaigns/{campId}/spElectionDayTasks/{taskId} { allow read: if campaignMember(orgId, campId); allow write: if false; }
     match /organizations/{orgId}/campaigns/{campId}/spAreas/{areaId}/messages/{messageId} { allow read: if campaignMember(orgId, campId); allow write: if false; }
+    // PBI comments are the sole SmartPlanner task feed read directly by the browser for live discussion.
+    // The API/Admin SDK remains the only writer.
+    match /organizations/{orgId}/campaigns/{campId}/spTasks/{taskId}/comments/{commentId} { allow read: if campaignMember(orgId, campId); allow write: if false; }
     match /organizations/{orgId}/campaigns/{campId}/auditLog/{logId} { allow read: if isCliente(orgId) && canAccessCampaign(campId); allow write: if false; }
     match /organizations/{orgId}/campaigns/{campId}/{document=**} { allow read, write: if false; }
     match /users/{uid} { allow read, update: if signedIn() && request.auth.uid == uid; allow create, delete: if false; }
