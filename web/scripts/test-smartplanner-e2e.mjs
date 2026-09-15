@@ -64,7 +64,7 @@ try {
   await orgRef.set({ enabledAddons: { ...(originalAddons ?? {}), smartPlanner: true } }, { merge: true });
   await page.reload({ waitUntil: 'domcontentloaded' });
   await page.getByRole('heading', { name: 'Cuartel de campaña', exact: true }).waitFor();
-  for (const title of ['Plan de trabajo', 'Estado de la campaña', 'Próximas entregas', 'Cuartel de campaña', 'Control de tope legal y presupuesto', 'Jornada electoral', 'Chat del área', 'Roles SmartPlanner']) await page.getByRole('heading', { name: title, exact: true }).last().waitFor();
+  for (const title of ['Plan de trabajo', 'Estado de la campaña', 'Próximas entregas', 'Cuartel de campaña', 'Control de tope legal y presupuesto', 'Jornada electoral', 'Centro de Comunicaciones', 'Roles SmartPlanner']) await page.getByRole('heading', { name: title, exact: true }).last().waitFor();
   const homeAudit = await page.evaluate(() => {
     const visible = (element) => { const box = element.getBoundingClientRect(); const style = getComputedStyle(element); return box.width > 0 && box.height > 0 && style.display !== 'none' && style.visibility !== 'hidden'; };
     const cards = [...document.querySelectorAll('[data-card="true"]')].filter(visible); const headers = [...document.querySelectorAll('[data-card-header="true"]')].filter(visible);
@@ -73,6 +73,10 @@ try {
   if (homeAudit.paddingFailures || homeAudit.headerGapFailures) throw new Error(`Padding audit SmartPlanner Home falló: ${JSON.stringify(homeAudit)}`);
   console.log(`Padding audit SmartPlanner Home OK: cards=${homeAudit.cards}, headers=${homeAudit.headers}, paddingFailures=0, headerGapFailures=0.`);
   for (const defaultArea of ['Estrategia', 'Comunicación', 'Avanzada y Logística', 'Finanzas', 'Jurídico']) await page.getByRole('button', { name: new RegExp(defaultArea) }).first().waitFor();
+  const areaOrder = await page.locator('.sp-home__area-title strong').allTextContents();
+  const expectedAreaOrder = ['Estrategia', 'Comunicación', 'Avanzada y Logística', 'Finanzas', 'Jurídico'];
+  if (areaOrder.slice(0, expectedAreaOrder.length).join('|') !== expectedAreaOrder.join('|')) throw new Error(`El orden de los tableros no es fijo: ${areaOrder.join(', ')}.`);
+  console.log('Orden real OK: Estrategia, Comunicación, Avanzada y Logística, Finanzas y Jurídico.');
   const seeded = await orgRef.collection('campaigns').doc(campId).collection('spAreas').get();
   if (seeded.size !== 5) throw new Error(`Se esperaban 5 áreas iniciales; Firestore devolvió ${seeded.size}.`);
   console.log('Seed real OK: las cinco áreas estratégicas quedaron creadas en Firestore.');
@@ -85,17 +89,32 @@ try {
   await page.getByRole('button', { name: 'Crear tarea', exact: true }).click();
   const creationResponse = await creation;
   if (creationResponse.status() !== 201) throw new Error('La API no creó la tarea de SmartPlanner.');
+  const toast = page.getByRole('status').filter({ hasText: 'Tarea creada en el cuartel.' });
+  await toast.waitFor({ state: 'visible' });
+  const toastBox = await toast.boundingBox();
+  if (!toastBox || toastBox.y > 180) throw new Error(`El toast no se mostró arriba a la derecha: ${JSON.stringify(toastBox)}.`);
+  await toast.waitFor({ state: 'hidden', timeout: 6_000 });
+  console.log('Toast real OK: aparece arriba a la derecha y se cierra automáticamente.');
   await page.getByText(title, { exact: true }).first().waitFor();
   const createdTask = await creationResponse.json();
   const task = await orgRef.collection('campaigns').doc(campId).collection('spTasks').doc(createdTask.id).get();
   if (!task.exists || task.data()?.title !== title) throw new Error('La tarea creada no llegó a Firestore.');
   createdTaskIds.push(task.id);
-  await page.getByLabel(`Mover ${title}`).click();
   const move = page.waitForResponse((response) => response.request().method() === 'PUT' && response.url().includes(`/smartplanner/tasks/${task.id}`));
-  await page.locator('.dropdown-menu.show .dropdown-item').filter({ hasText: 'En progreso' }).click();
+  const draggableTask = page.locator(`[data-kanban-task="${task.id}"]`);
+  const inProgressColumn = page.locator('[data-kanban-column="en_progreso"]');
+  await draggableTask.scrollIntoViewIfNeeded();
+  await inProgressColumn.scrollIntoViewIfNeeded();
+  const sourceBox = await draggableTask.boundingBox(); const targetBox = await inProgressColumn.boundingBox();
+  if (!sourceBox || !targetBox) throw new Error('No pudimos ubicar la tarjeta o la columna para el arrastre real.');
+  await page.mouse.move(sourceBox.x + sourceBox.width / 2, sourceBox.y + sourceBox.height / 3);
+  await page.mouse.down();
+  await page.mouse.move(sourceBox.x + sourceBox.width / 2 + 12, sourceBox.y + sourceBox.height / 3 + 12, { steps: 4 });
+  await page.mouse.move(targetBox.x + targetBox.width / 2, targetBox.y + targetBox.height / 2, { steps: 16 });
+  await page.mouse.up();
   if (!(await move).ok()) throw new Error('No se pudo mover la tarea en la API real.');
   if ((await task.ref.get()).data()?.status !== 'en_progreso') throw new Error('El estado movido no persistió en Firestore.');
-  console.log('Kanban real OK: tarea creada y movida a En progreso, con persistencia en Firestore.');
+  console.log('Kanban real OK: tarea arrastrada con mouse a En progreso, con persistencia en Firestore.');
 
   await page.getByRole('button', { name: /Estrategia/ }).first().click();
   await page.locator('#smartplanner-board').scrollIntoViewIfNeeded();
@@ -104,12 +123,12 @@ try {
 
   const roleSelect = page.getByLabel(`Rol de ${memberLabel}`);
   await roleSelect.click();
-  await page.locator('.dropdown-menu.show .dropdown-item').filter({ hasText: 'Project Manager' }).click();
+  await page.getByRole('option', { name: 'Project Manager', exact: true }).click();
   await page.waitForFunction(() => document.body.textContent?.includes('Rol actualizado.'));
   if ((await memberRef.get()).data()?.smartPlannerRole !== 'pm') throw new Error('El rol PM no se persistió en Firestore.');
   console.log('Roles reales OK: el rol Project Manager se guardó y se reflejó en la UI.');
   await page.goto(`${webUrl}/smartplanner/tickets`, { waitUntil: 'domcontentloaded' });
-  await page.getByRole('link', { name: '← Volver a SmartPlanner', exact: true }).waitFor();
+  await page.getByLabel('Regresar a inicio').last().waitFor();
   console.log('E2E SmartPlanner OK: gate, seed, Home, Kanban, roles y regreso verificadas contra Firebase y la API reales.');
 } finally {
   await browser?.close();

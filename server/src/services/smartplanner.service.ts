@@ -7,6 +7,11 @@ import { createNotification } from './notifications.service.js';
 const defaults = [
   ['Estrategia', 'Dirección política y prioridades de campaña.', '#0060F0'], ['Comunicación', 'Mensajes, prensa y contenidos.', '#7C3AED'], ['Avanzada y Logística', 'Operación territorial y recursos.', '#F97316'], ['Finanzas', 'Presupuesto, compras y rendición.', '#10B981'], ['Jurídico', 'Cumplimiento y documentación electoral.', '#EF4444']
 ] as const;
+const canonicalAreaOrder = new Map(defaults.map(([name], index) => [name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(), index]));
+const areaPosition = (area: Record<string, unknown>) => {
+  const name = String(area.name ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  return canonicalAreaOrder.get(name) ?? 1000 + Number(area.order ?? Number.MAX_SAFE_INTEGER);
+};
 const statuses = ['por_hacer', 'en_progreso', 'en_revision', 'completada'] as const;
 const priorities = ['baja', 'media', 'alta'] as const;
 const campaign = (orgId: string, campId: string) => db.collection('organizations').doc(orgId).collection('campaigns').doc(campId);
@@ -38,7 +43,8 @@ async function manager(user: DecodedIdToken, orgId: string, campId: string) {
 export async function listAreas(user: DecodedIdToken, orgId: string, campId: string) {
   await addon(user, orgId, campId); const ref = campaign(orgId, campId).collection('spAreas'); let snap = await ref.orderBy('order').get();
   if (snap.empty) { const batch = db.batch(); defaults.forEach(([name, description, color], order) => batch.set(ref.doc(), { name, description, color, order, createdAt: FieldValue.serverTimestamp() })); await batch.commit(); snap = await ref.orderBy('order').get(); }
-  return snap.docs.map(serialize);
+  const areas = snap.docs.map(serialize) as Array<Record<string, unknown>>;
+  return areas.sort((left, right) => areaPosition(left) - areaPosition(right) || String(left.name ?? '').localeCompare(String(right.name ?? '')));
 }
 export async function saveArea(user: DecodedIdToken, orgId: string, campId: string, id: string | null, input: Record<string, unknown>) { await manager(user, orgId, campId); const name = String(input.name ?? '').trim(); if (!name) throw new ValidationError('El nombre del área es obligatorio.'); const ref = id ? campaign(orgId, campId).collection('spAreas').doc(id) : campaign(orgId, campId).collection('spAreas').doc(); if (id && !(await ref.get()).exists) throw new NotFoundError('El área no existe.'); const data = { name, description: String(input.description ?? '').trim(), color: String(input.color ?? '#0060F0'), order: Number(input.order ?? Date.now()) }; await ref.set({ ...data, ...(id ? { updatedAt: FieldValue.serverTimestamp() } : { createdAt: FieldValue.serverTimestamp() }) }, { merge: true }); return { id: ref.id, ...data }; }
 export async function deleteArea(user: DecodedIdToken, orgId: string, campId: string, id: string) { await manager(user, orgId, campId); await campaign(orgId, campId).collection('spAreas').doc(id).delete(); }

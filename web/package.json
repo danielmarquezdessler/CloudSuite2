@@ -83,6 +83,7 @@
     "@ckeditor/ckeditor5-build-decoupled-document": "^41.3.1",
     "@ckeditor/ckeditor5-build-inline": "^41.3.1",
     "@ckeditor/ckeditor5-react": "^6.2.0",
+    "@dnd-kit/core": "^6.3.1",
     "@fullcalendar/bootstrap": "^6.1.11",
     "@fullcalendar/core": "^6.1.11",
     "@fullcalendar/daygrid": "^6.1.11",
