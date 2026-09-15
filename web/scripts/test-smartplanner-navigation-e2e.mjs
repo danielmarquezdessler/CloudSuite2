@@ -102,24 +102,27 @@ async function expectSecondaryNavigation(page) {
   for (const visit of visits) {
     const toggle = navigation.getByRole('button', { name: visit.group, exact: true });
     await toggle.click();
-    const menu = navigation.locator('.sp-secondary-nav__menu.show');
+    const menu = page.locator('[data-dropdown-portal].sp-secondary-nav__menu');
     await menu.waitFor({ state: 'visible' });
-    const layering = await page.evaluate(() => {
+    const layering = await page.evaluate((group) => {
       const nav = document.querySelector('[data-smartplanner-nav]');
       const desktop = nav?.querySelector('.sp-secondary-nav__desktop');
-      const menu = nav?.querySelector('.sp-secondary-nav__menu.show');
-      if (!nav || !desktop || !menu) return null;
+      const menu = document.querySelector('[data-dropdown-portal].sp-secondary-nav__menu');
+      const toggle = Array.from(nav?.querySelectorAll('button') ?? []).find((button) => button.textContent?.trim().startsWith(group));
+      if (!nav || !desktop || !menu || !toggle) return null;
       const box = menu.getBoundingClientRect();
+      const toggleBox = toggle.getBoundingClientRect();
       const point = document.elementFromPoint(box.left + Math.min(18, box.width / 2), box.top + Math.min(18, box.height / 2));
       return {
         navZIndex: Number.parseInt(getComputedStyle(nav).zIndex, 10),
         menuZIndex: Number.parseInt(getComputedStyle(menu).zIndex, 10),
-        desktopOverflowY: getComputedStyle(desktop).overflowY,
         menuVisible: box.width > 0 && box.height > 0 && box.bottom <= window.innerHeight,
-        menuOnTop: Boolean(point?.closest('.sp-secondary-nav__menu'))
+        menuOnTop: Boolean(point?.closest('[data-dropdown-portal].sp-secondary-nav__menu')),
+        horizontalOffset: Math.round(Math.abs(box.left - toggleBox.left)),
+        verticalOffset: Math.round(box.top - toggleBox.bottom)
       };
-    });
-    if (!layering || layering.navZIndex < 1000 || layering.menuZIndex < 1000 || layering.desktopOverflowY === 'hidden' || !layering.menuVisible || !layering.menuOnTop) throw new Error(`${visit.group}: el dropdown quedó recortado o detrás del contenido: ${JSON.stringify(layering)}.`);
+    }, visit.group);
+    if (!layering || layering.navZIndex < 1000 || layering.menuZIndex < 1000 || !layering.menuVisible || !layering.menuOnTop || layering.horizontalOffset > 2 || layering.verticalOffset < 0 || layering.verticalOffset > 8) throw new Error(`${visit.group}: el dropdown quedó recortado, detrás del contenido o fuera de su trigger: ${JSON.stringify(layering)}.`);
     await menu.getByRole('link', { name: visit.item, exact: true }).click();
     await page.waitForURL(`${webUrl}${visit.path}`);
     if (!await toggle.evaluate((element) => element.classList.contains('is-active'))) {
@@ -196,18 +199,17 @@ try {
   await page.getByLabel(/Rol de /).first().click();
   const layering = await page.evaluate(() => {
     const dropdown = document.querySelector('.cd-select-dropdown.is-open');
-    const menu = dropdown?.querySelector('.dropdown-menu.show');
+    const menu = document.querySelector('[data-dropdown-portal]');
     if (!dropdown || !menu) return null;
     const box = menu.getBoundingClientRect();
     const point = document.elementFromPoint(box.left + Math.min(16, box.width / 2), box.top + Math.min(16, box.height / 2));
     return {
-      wrapperZIndex: Number.parseInt(getComputedStyle(dropdown).zIndex, 10),
       menuZIndex: Number.parseInt(getComputedStyle(menu).zIndex, 10),
-      topElementIsMenu: Boolean(point?.closest('.dropdown-menu'))
+      topElementIsMenu: Boolean(point?.closest('[data-dropdown-portal]'))
     };
   });
-  if (!layering || layering.wrapperZIndex < 1000 || layering.menuZIndex < 1000 || !layering.topElementIsMenu) throw new Error(`El SelectControl de Roles quedó detrás de su card: ${JSON.stringify(layering)}.`);
-  console.log(`SelectControl Roles OK: menú por encima de la card (wrapper=${layering.wrapperZIndex}, menú=${layering.menuZIndex}).`);
+  if (!layering || layering.menuZIndex < 1000 || !layering.topElementIsMenu) throw new Error(`El SelectControl de Roles quedó detrás de su card: ${JSON.stringify(layering)}.`);
+  console.log(`SelectControl Roles OK: menú por encima de la card (menú=${layering.menuZIndex}).`);
 } finally {
   await browser?.close();
   await restore?.();

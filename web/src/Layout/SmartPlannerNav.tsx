@@ -1,6 +1,6 @@
-import { ChangeEvent } from 'react';
-import { Dropdown } from 'react-bootstrap';
+import { ChangeEvent, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import DropdownPortal from '../components/Shared/DropdownPortal';
 
 type NavLink = { label: string; to: string };
 type NavGroup = { label: string; items: NavLink[] };
@@ -17,6 +17,17 @@ const allLinks = [{ label: 'Home', to: '/smartplanner' }, { label: 'Cuartel', to
 
 function matchesPath(pathname: string, to: string) {
   return to === '/smartplanner' ? pathname === to : pathname === to || pathname.startsWith(`${to}/`);
+}
+
+function SmartPlannerNavGroup({ group, active, pathname }: { group: NavGroup; active: boolean; pathname: string }) {
+  const [open, setOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  return <span className="sp-secondary-nav__group">
+    <button ref={triggerRef} type="button" className={active ? 'is-active' : ''} aria-expanded={open} aria-haspopup="menu" onClick={() => setOpen((current) => !current)}>{group.label}<i className="ph-duotone ph-caret-down" aria-hidden="true" /></button>
+    <DropdownPortal open={open} anchorRef={triggerRef} onDismiss={() => setOpen(false)} className="sp-secondary-nav__menu">
+      {group.items.map((item) => <Link className={`sp-secondary-nav__item${matchesPath(pathname, item.to) ? ' is-active' : ''}`} to={item.to} key={item.to} onClick={() => setOpen(false)}>{item.label}</Link>)}
+    </DropdownPortal>
+  </span>;
 }
 
 export default function SmartPlannerNav() {
@@ -36,12 +47,7 @@ export default function SmartPlannerNav() {
       <Link to="/smartplanner#smartplanner-board" className={cuartelActive ? 'is-active' : ''}>Cuartel</Link>
       {groups.map((group) => {
         const active = group.items.some((item) => matchesPath(location.pathname, item.to)) || (group.label === 'Comunicación' && location.pathname === '/smartplanner/chat');
-        return <Dropdown as="span" key={group.label} className="sp-secondary-nav__group">
-          <Dropdown.Toggle as="button" type="button" className={active ? 'is-active' : ''}>{group.label}<i className="ph-duotone ph-caret-down" aria-hidden="true" /></Dropdown.Toggle>
-          <Dropdown.Menu className="sp-secondary-nav__menu" popperConfig={{ strategy: 'fixed' }}>
-            {group.items.map((item) => <Dropdown.Item as={Link} to={item.to} key={item.to} active={matchesPath(location.pathname, item.to)}>{item.label}</Dropdown.Item>)}
-          </Dropdown.Menu>
-        </Dropdown>;
+        return <SmartPlannerNavGroup key={group.label} group={group} active={active} pathname={location.pathname} />;
       })}
       {directLinks.map((item) => <Link to={item.to} key={item.to} className={matchesPath(location.pathname, item.to) ? 'is-active' : ''}>{item.label}</Link>)}
     </div>
