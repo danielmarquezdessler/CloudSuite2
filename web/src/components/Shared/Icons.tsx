@@ -1,6 +1,6 @@
 import { ReactNode } from 'react';
 
-type IconName = 'people' | 'map' | 'cal' | 'bell' | 'pin' | 'target' | 'check' | 'clock' | 'gear' | 'home' | 'bars' | 'pulse' | 'list' | 'doc' | 'award' | 'search' | 'chevron-down' | 'chevron-right' | 'plus' | 'help' | 'trend' | 'pie' | 'info';
+type IconName = 'people' | 'map' | 'cal' | 'bell' | 'pin' | 'target' | 'check' | 'clock' | 'gear' | 'home' | 'bars' | 'pulse' | 'list' | 'doc' | 'award' | 'search' | 'chevron-down' | 'chevron-left' | 'chevron-right' | 'plus' | 'help' | 'trend' | 'pie' | 'info';
 
 const paths: Record<IconName, ReactNode> = {
   people: <><circle cx="9" cy="9" r="3" /><circle cx="17" cy="10" r="2.2" /><path d="M3 18.5c0-2.9 2.7-4.6 6-4.6s6 1.7 6 4.6" /><path d="M16.2 14.4c2.9 0 4.8 1.5 4.8 4.1" /></>,
@@ -20,6 +20,7 @@ const paths: Record<IconName, ReactNode> = {
   award: <><path d="M7 4h10v5a5 5 0 0 1-10 0z" /><path d="M7 5.5H4.5V7A3.5 3.5 0 0 0 8 10.5M17 5.5h2.5V7A3.5 3.5 0 0 1 16 10.5M12 14v3M8.5 20h7l-.7-3h-5.6z" /></>,
   search: <><circle cx="11" cy="11" r="6.5" /><path d="M16 16l4 4" /></>,
   'chevron-down': <path d="M6 9.5l6 6 6-6" />,
+  'chevron-left': <path d="M15 5l-7 7 7 7" />,
   'chevron-right': <path d="M9 5l7 7-7 7" />,
   plus: <path d="M12 5v14M5 12h14" />,
   help: <><path d="M8.8 8.6a3.4 3.4 0 1 1 4.6 3.2c-1 .4-1.5 1.2-1.5 2.2v.5" /><path d="M12 18.6v.2" /></>,
