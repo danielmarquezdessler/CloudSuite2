@@ -23,6 +23,7 @@ const pages = selectedRoutes.size ? allPages.filter(([, route]) => selectedRoute
 const minimumPadding = 12;
 const minimumHeaderGap = 16;
 const minimumSiblingCardGap = 8;
+const maximumCdCardContainerGap = 0.5;
 
 function formatBox(box) {
   return `top:${box.top}px right:${box.right}px bottom:${box.bottom}px left:${box.left}px`;
@@ -35,6 +36,7 @@ const failures = [];
 const headerFailures = [];
 const ghosts = [];
 const siblingCardFailures = [];
+const duplicateCardSpacingFailures = [];
 let cardsAudited = 0;
 let headersAudited = 0;
 let cardContainersAudited = 0;
@@ -64,7 +66,7 @@ try {
     if (route === '/smartplanner/staff') await page.getByRole('heading', { name: 'Personal', exact: true }).waitFor({ state: 'visible' });
     if (route === '/smartplanner/settings') await page.getByRole('heading', { name: 'Configuración' }).waitFor({ state: 'visible' });
     await page.waitForTimeout(500);
-    const audit = await page.evaluate(({ minPadding, minHeaderGap, minSiblingCardGap }) => {
+    const audit = await page.evaluate(({ minPadding, minHeaderGap, minSiblingCardGap, maxCdCardContainerGap }) => {
       const visible = (element) => {
         const box = element.getBoundingClientRect();
         const style = getComputedStyle(element);
@@ -72,7 +74,7 @@ try {
       };
       const selectorFor = (element) => {
         if (element.id) return `#${element.id}`;
-        const classes = [...element.classList].filter((name) => name.startsWith('cd-') || name.startsWith('planning-')).slice(0, 2);
+        const classes = [...element.classList].filter((name) => !name.startsWith('col-') && !name.startsWith('row')).slice(0, 3);
         return `${element.tagName.toLowerCase()}${classes.map((name) => `.${name}`).join('')}` || element.tagName.toLowerCase();
       };
       const cards = [...document.querySelectorAll('[data-card="true"]')].filter(visible).map((element) => {
@@ -105,7 +107,16 @@ try {
         }
         const relevantGaps = gaps.filter((gap) => gap >= -0.5);
         const minimumGap = relevantGaps.length ? Math.min(...relevantGaps) : null;
-        return { selector: selectorFor(element), cards: directCards.length, minimumGap, failed: minimumGap !== null && minimumGap + 0.5 < minSiblingCardGap };
+        const cdCards = directCards.filter((card) => card.matches('.cd-card'));
+        const style = getComputedStyle(element);
+        const rowGap = Number.parseFloat(style.rowGap) || 0;
+        const columnGap = Number.parseFloat(style.columnGap) || 0;
+        return {
+          selector: selectorFor(element), cards: directCards.length, minimumGap,
+          rowGap, columnGap, cdCards: cdCards.length,
+          failed: minimumGap !== null && minimumGap + 0.5 < minSiblingCardGap,
+          duplicateSpacing: cdCards.length >= 2 && (rowGap > maxCdCardContainerGap || columnGap > maxCdCardContainerGap)
+        };
       });
       const ignoredGhosts = ['cd-hero', 'cd-page-controls', 'cd-search-input', 'cd-native-select', 'cd-select-control', 'cd-table-scroll', 'cd-map-stage', 'cd-map-notice', 'cd-state-pill', 'cd-user-identity'];
       const ghostCandidates = [...document.querySelectorAll('article, section, div')].filter((element) => {
@@ -117,7 +128,7 @@ try {
         return hasBorder && radius >= 8 && box.width >= 180 && box.height >= 88;
       }).map((element) => selectorFor(element));
       return { cards, headers, siblingCardContainers, ghosts: [...new Set(ghostCandidates)] };
-    }, { minPadding: minimumPadding, minHeaderGap: minimumHeaderGap, minSiblingCardGap: minimumSiblingCardGap });
+    }, { minPadding: minimumPadding, minHeaderGap: minimumHeaderGap, minSiblingCardGap: minimumSiblingCardGap, maxCdCardContainerGap: maximumCdCardContainerGap });
 
     cardsAudited += audit.cards.length;
     headersAudited += audit.headers.length;
@@ -131,10 +142,12 @@ try {
     }
     for (const container of audit.siblingCardContainers) {
       if (container.failed) siblingCardFailures.push(`${name} (${route}) — ${container.selector} — ${container.cards} cards, gap:${container.minimumGap.toFixed(1)}px`);
+      if (container.duplicateSpacing) duplicateCardSpacingFailures.push(`${name} (${route}) — ${container.selector} — ${container.cdCards} .cd-card hermanas, row-gap:${container.rowGap.toFixed(1)}px, column-gap:${container.columnGap.toFixed(1)}px`);
     }
     for (const container of audit.siblingCardContainers.filter((item) => item.failed)) console.error(`[${name}] SIBLING CARD GAP: ${container.selector} = ${container.minimumGap.toFixed(1)}px`);
+    for (const container of audit.siblingCardContainers.filter((item) => item.duplicateSpacing)) console.error(`[${name}] DUPLICATE CD-CARD SPACING: ${container.selector} = row ${container.rowGap.toFixed(1)}px / column ${container.columnGap.toFixed(1)}px`);
     for (const header of audit.headers.filter((item) => item.failed)) console.error(`[${name}] HEADER GAP: ${header.selector} = ${header.gap.toFixed(1)}px`);
-    console.log(`[${name}] cards=${audit.cards.length}, paddingFailures=${audit.cards.filter((card) => card.failed).length}, headers=${audit.headers.length}, headerGapFailures=${audit.headers.filter((header) => header.failed).length}, cardContainers=${audit.siblingCardContainers.length}, siblingGapFailures=${audit.siblingCardContainers.filter((container) => container.failed).length}, ghostWarnings=${audit.ghosts.length}`);
+    console.log(`[${name}] cards=${audit.cards.length}, paddingFailures=${audit.cards.filter((card) => card.failed).length}, headers=${audit.headers.length}, headerGapFailures=${audit.headers.filter((header) => header.failed).length}, cardContainers=${audit.siblingCardContainers.length}, siblingGapFailures=${audit.siblingCardContainers.filter((container) => container.failed).length}, duplicateCdCardSpacingFailures=${audit.siblingCardContainers.filter((container) => container.duplicateSpacing).length}, ghostWarnings=${audit.ghosts.length}`);
   }
 
   // The active-campaign selector is rendered by the shared navbar, so open it
@@ -172,12 +185,13 @@ try {
   }
   console.log(`[Launcher Addons] cards=${launcherAudit.length}, paddingFailures=${launcherAudit.filter((card) => card.failed).length}`);
 
-  console.log(`\nPADDING AUDIT SUMMARY\nCards audited: ${cardsAudited}\nPadding failures: ${failures.length}\nCardHeaders audited: ${headersAudited}\nHeader-gap failures: ${headerFailures.length}\nSibling-card containers audited: ${cardContainersAudited}\nSibling-card gap failures: ${siblingCardFailures.length}\nGhost-card warnings: ${ghosts.length}`);
+  console.log(`\nPADDING AUDIT SUMMARY\nCards audited: ${cardsAudited}\nPadding failures: ${failures.length}\nCardHeaders audited: ${headersAudited}\nHeader-gap failures: ${headerFailures.length}\nSibling-card containers audited: ${cardContainersAudited}\nSibling-card gap failures: ${siblingCardFailures.length}\nDuplicate .cd-card spacing failures: ${duplicateCardSpacingFailures.length}\nGhost-card warnings: ${ghosts.length}`);
   if (failures.length) console.error(`\nPADDING FAILURES\n${failures.join('\n')}`);
   if (headerFailures.length) console.error(`\nHEADER-GAP FAILURES\n${headerFailures.join('\n')}`);
   if (siblingCardFailures.length) console.error(`\nSIBLING-CARD GAP FAILURES\n${siblingCardFailures.join('\n')}`);
+  if (duplicateCardSpacingFailures.length) console.error(`\nDUPLICATE .CD-CARD SPACING FAILURES\n${duplicateCardSpacingFailures.join('\n')}`);
   if (ghosts.length) console.warn(`\nGHOST-CARD WARNINGS\n${ghosts.join('\n')}`);
-  if (failures.length || headerFailures.length || siblingCardFailures.length) process.exitCode = 1;
+  if (failures.length || headerFailures.length || siblingCardFailures.length || duplicateCardSpacingFailures.length) process.exitCode = 1;
 } finally {
   await browser.close();
 }
