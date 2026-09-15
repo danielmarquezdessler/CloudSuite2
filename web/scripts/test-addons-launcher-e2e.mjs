@@ -74,6 +74,13 @@ try {
   for (const name of names) await launcher.getByText(name, { exact: true }).waitFor();
   await page.waitForFunction(() => [...document.querySelectorAll('.cloudsuite-launcher-card')].some((card) => card.textContent?.includes('SmartPlanner') && !card.classList.contains('is-disabled')));
   if (await launcher.locator('.cloudsuite-launcher-card').count() !== 7) throw new Error('El launcher no muestra exactamente siete addons.');
+  const desktopGrid = await launcher.locator('.cloudsuite-launcher-card').evaluateAll((cards) => cards.map((card) => {
+    const box = card.getBoundingClientRect();
+    return { x: Math.round(box.x), y: Math.round(box.y) };
+  }));
+  if (new Set(desktopGrid.slice(0, 4).map((card) => card.y)).size !== 1 || desktopGrid[4]?.y <= desktopGrid[0]?.y) {
+    throw new Error(`El launcher desktop debe distribuirse en cuatro columnas y dos filas: ${JSON.stringify(desktopGrid)}.`);
+  }
   const comingSoonCount = await launcher.locator('.badge').count();
   if (comingSoonCount !== 1) {
     const states = await launcher.locator('.cloudsuite-launcher-card').evaluateAll((cards) => cards.map((card) => ({ label: card.textContent?.trim(), disabled: card.classList.contains('is-disabled') })));
@@ -81,7 +88,7 @@ try {
   }
   await verifyExternalAddon(page, 'http://apolo.politicfy.com/');
   await verifyExternalAddon(page, 'https://lazzarusapp.com/');
-  console.log('Addons OK: se muestran 7 ítems; Apolo y Lazzarus abren en pestañas externas protegidas.');
+  console.log('Addons OK: 7 ítems en cuatro columnas desktop; Apolo y Lazzarus abren en pestañas externas protegidas.');
 } finally {
   await browser?.close();
   await restore?.();
