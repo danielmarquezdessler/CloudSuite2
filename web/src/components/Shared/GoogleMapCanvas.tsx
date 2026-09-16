@@ -20,15 +20,32 @@ type GoogleMapCanvasProps = {
 type MapsWindow = Window & { google?: any; gm_authFailure?: () => void; __cloudSuiteGoogleMapsReady?: () => void };
 let mapsPromise: Promise<any> | null = null;
 
+async function withPlacesLibrary(maps: any) {
+  if (maps?.places?.Autocomplete) return maps;
+
+  // A previous screen (or a stale development bundle after HMR) can leave the
+  // Maps base API on window without the Places library. Returning that partial
+  // object made callers silently skip Autocomplete forever.
+  if (typeof maps?.importLibrary === 'function') {
+    const places = await maps.importLibrary('places');
+    if (places?.Autocomplete) {
+      if (!maps.places) maps.places = places;
+      return maps;
+    }
+  }
+
+  throw new Error('Google Maps se cargó sin la biblioteca Places. Recargá la aplicación para volver a cargarla.');
+}
+
 function loadGoogleMaps(apiKey: string) {
   const mapsWindow = window as MapsWindow;
-  if (mapsWindow.google?.maps) return Promise.resolve(mapsWindow.google.maps);
+  if (mapsWindow.google?.maps) return withPlacesLibrary(mapsWindow.google.maps);
   if (mapsPromise) return mapsPromise;
   mapsPromise = new Promise((resolve, reject) => {
     const callbackName = '__cloudSuiteGoogleMapsReady';
     const timeout = window.setTimeout(() => reject(new Error('Google Maps tardó demasiado en responder.')), 15000);
     const previousAuthFailure = mapsWindow.gm_authFailure;
-    (mapsWindow as any)[callbackName] = () => { window.clearTimeout(timeout); resolve(mapsWindow.google?.maps); };
+    (mapsWindow as any)[callbackName] = () => { window.clearTimeout(timeout); void withPlacesLibrary(mapsWindow.google?.maps).then(resolve, reject); };
     mapsWindow.gm_authFailure = () => { window.clearTimeout(timeout); reject(new Error('Google Maps rechazó la clave o su restricción de origen.')); previousAuthFailure?.(); };
     const script = document.createElement('script');
     script.id = 'cloudsuite-google-maps'; script.async = true; script.defer = true;
