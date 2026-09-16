@@ -1,4 +1,4 @@
-import { ReactNode, createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { ReactNode, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from './AuthContext';
 import { authenticatedRequest } from '../lib/api';
 
@@ -43,24 +43,37 @@ export function CampaignProvider({ children }: { children: ReactNode }) {
   const [activeCampaignId, setActiveId] = useState<string | null>(null);
   const [loading, setLoading] = useState(Boolean(user));
   const [error, setError] = useState('');
+  const latestReload = useRef(0);
+  const activeCampaignIdRef = useRef<string | null>(null);
+
+  useEffect(() => { activeCampaignIdRef.current = activeCampaignId; }, [activeCampaignId]);
 
   const reload = useCallback(async () => {
+    const reloadId = ++latestReload.current;
+    const isCurrent = () => latestReload.current === reloadId;
     if (!user) {
+      if (!isCurrent()) return;
       setOrganizationId(null); setRole(''); setEnabledAddonsState(defaultEnabledAddons); setCampaigns([]); setActiveId(null); setError(''); setLoading(false);
       return;
     }
     setLoading(true);
     const me = await authenticatedRequest<Me>(user, '/api/me');
+    if (!isCurrent()) return;
     if (me.error || !me.data?.organization?.id || !me.data.campaigns?.length) {
       const cached = storedSnapshot(user.uid);
-      if (!navigator.onLine && cached) {
+      // A local API restart or a transient network timeout must not turn a
+      // previously enabled add-on into “Próximamente”. The backend remains the
+      // authorization authority; this only preserves the last verified UI
+      // state while the live profile is retried.
+      if (cached) {
         const storedId = localStorage.getItem(storageKey(user.uid));
-        const nextId = cached.campaigns.some(campaign => campaign.id === activeCampaignId)
-          ? activeCampaignId
+        const currentActiveId = activeCampaignIdRef.current;
+        const nextId = cached.campaigns.some(campaign => campaign.id === currentActiveId)
+          ? currentActiveId
           : cached.campaigns.some(campaign => campaign.id === storedId)
             ? storedId
             : cached.campaigns[0].id;
-        setOrganizationId(cached.organizationId); setRole(cached.role); setEnabledAddonsState(cached.enabledAddons ?? defaultEnabledAddons); setCampaigns(cached.campaigns); setActiveId(nextId); setError(''); setLoading(false);
+        setOrganizationId(cached.organizationId); setRole(cached.role); setEnabledAddonsState(cached.enabledAddons ?? defaultEnabledAddons); setCampaigns(cached.campaigns); setActiveId(nextId); setError(me.error?.message ?? 'No pudimos actualizar la campaña; se conserva el último estado verificado.'); setLoading(false);
         return;
       }
       setOrganizationId(null); setRole(''); setEnabledAddonsState(defaultEnabledAddons); setCampaigns([]); setActiveId(null);
@@ -76,11 +89,13 @@ export function CampaignProvider({ children }: { children: ReactNode }) {
     setRole(me.data.role ?? '');
     setEnabledAddonsState(nextEnabledAddons);
     const details = await authenticatedRequest<CampaignOption[]>(user, `/api/organizations/${orgId}/campaigns`);
+    if (!isCurrent()) return;
     const available = details.data?.filter((item) => me.data!.campaigns!.some((campaign) => campaign.id === item.id))
       ?? me.data.campaigns.map((campaign) => ({ ...campaign, memberCount: 0, voterCount: 0 }));
     const storedId = localStorage.getItem(storageKey(user.uid));
-    const nextId = available.some((campaign) => campaign.id === activeCampaignId)
-      ? activeCampaignId
+    const currentActiveId = activeCampaignIdRef.current;
+    const nextId = available.some((campaign) => campaign.id === currentActiveId)
+      ? currentActiveId
       : available.some((campaign) => campaign.id === storedId)
         ? storedId
         : available[0]?.id ?? null;
@@ -88,7 +103,7 @@ export function CampaignProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(snapshotKey(user.uid), JSON.stringify({ organizationId: orgId, role: me.data.role ?? '', campaigns: available, enabledAddons: nextEnabledAddons }));
     if (nextId) localStorage.setItem(storageKey(user.uid), nextId);
     setError(details.error?.message ?? ''); setLoading(false);
-  }, [activeCampaignId, user]);
+  }, [user]);
 
   useEffect(() => { void reload(); }, [reload]);
 

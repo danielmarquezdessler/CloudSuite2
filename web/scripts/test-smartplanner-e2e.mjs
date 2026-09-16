@@ -52,6 +52,7 @@ try {
   page.setDefaultTimeout(25_000);
   page.on('console', (message) => { if (message.type() === 'error') console.error(`[browser] ${message.text()}`); });
   page.on('pageerror', (error) => console.error(`[pageerror] ${error.message}`));
+  page.on('response', (response) => { if (response.status() >= 400) console.error(`[http ${response.status()}] ${response.request().method()} ${response.url()}`); });
   await page.goto(webUrl);
   await page.getByLabel('Email').fill(env.E2E_EMAIL);
   await page.getByLabel('Contraseña').fill(env.E2E_PASSWORD);
@@ -64,6 +65,8 @@ try {
   await orgRef.set({ enabledAddons: { ...(originalAddons ?? {}), smartPlanner: true } }, { merge: true });
   await page.reload({ waitUntil: 'domcontentloaded' });
   await page.getByRole('heading', { name: 'Cuartel de campaña', exact: true }).waitFor();
+  if (await page.getByText('Este addon no está habilitado en tu plan').count()) throw new Error('El contexto conservó un gate obsoleto después de que Firestore habilitó SmartPlanner.');
+  await page.locator('.cloudsuite-sidebar-addon.is-enabled a[href="/smartplanner"]').waitFor();
   for (const title of ['Plan de trabajo', 'Estado de la campaña', 'Próximas entregas', 'Cuartel de campaña', 'Control de tope legal y presupuesto', 'Jornada electoral', 'Centro de Comunicaciones', 'Roles SmartPlanner']) await page.getByRole('heading', { name: title, exact: true }).last().waitFor();
   const homeAudit = await page.evaluate(() => {
     const visible = (element) => { const box = element.getBoundingClientRect(); const style = getComputedStyle(element); return box.width > 0 && box.height > 0 && style.display !== 'none' && style.visibility !== 'hidden'; };
