@@ -1,5 +1,5 @@
-import { CSSProperties, FormEvent, useEffect, useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { CSSProperties, FormEvent, PointerEvent as ReactPointerEvent, useEffect, useMemo, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Modal } from 'react-bootstrap';
 import { DndContext, DragEndEvent, PointerSensor, useDraggable, useDroppable, useSensor, useSensors } from '@dnd-kit/core';
 import { useAuth } from '../../../context/AuthContext';
@@ -40,7 +40,9 @@ const formatDate = (value?: string) => value ? new Date(value).toLocaleDateStrin
 
 function KanbanCard({ pbi, onMove }: { pbi: Pbi; onMove: (pbi: Pbi, status: Status) => void }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: pbi.id, data: { pbi } }); const style = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` } : undefined;
-  return <article ref={setNodeRef} style={style} className={`sp-task${isDragging ? ' is-dragging' : ''}`} data-kanban-task={pbi.id} {...attributes} {...listeners}><span className={`sp-task__priority ${pbi.priority}`} /><Link to={`/smartplanner/pbi/${pbi.id}`}><strong>{pbi.displayId ?? 'PBI'} · {pbi.title}</strong></Link><small>Vence {formatDate(pbi.dueDate)}</small><SelectControl ariaLabel={`Mover ${pbi.title}`} label="Mover" value={pbi.status} onChange={(status) => onMove(pbi, status as Status)} options={columns.map((status) => ({ value: status, label: statusLabels[status] }))} /></article>;
+  const navigate = useNavigate();
+  const stopDrag = (event: ReactPointerEvent) => event.stopPropagation();
+  return <article ref={setNodeRef} style={style} className={`sp-task${isDragging ? ' is-dragging' : ''}`} data-kanban-task={pbi.id} {...attributes} {...listeners}><span className={`sp-task__priority ${pbi.priority}`} /><Inline gap="xs" className="sp-task__heading"><strong>{pbi.displayId ?? 'PBI'} · {pbi.title}</strong><button type="button" className="sp-task__view" aria-label={`Ver detalle de ${pbi.title}`} onPointerDown={stopDrag} onClick={(event) => { event.stopPropagation(); navigate(`/smartplanner/pbi/${pbi.id}`); }}><i className="ph-duotone ph-eye" /></button></Inline><small>Vence {formatDate(pbi.dueDate)}</small><div className="sp-task__move" onPointerDown={stopDrag}><SelectControl ariaLabel={`Mover ${pbi.title}`} label="Mover" value={pbi.status} onChange={(status) => onMove(pbi, status as Status)} options={columns.map((status) => ({ value: status, label: statusLabels[status] }))} /></div></article>;
 }
 function KanbanColumn({ status, pbis, onMove }: { status: Status; pbis: Pbi[]; onMove: (pbi: Pbi, status: Status) => void }) {
   const { isOver, setNodeRef } = useDroppable({ id: `status:${status}` });
