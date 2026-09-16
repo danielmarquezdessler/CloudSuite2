@@ -61,6 +61,7 @@
     "test:e2e:smartplanner": "node scripts/test-smartplanner-e2e.mjs",
     "test:e2e:smartplanner-addon-gate": "node scripts/test-smartplanner-addon-gate-e2e.mjs",
     "test:e2e:smartplanner-pbi": "node scripts/test-smartplanner-pbi-e2e.mjs",
+    "test:e2e:smartplanner-brief66": "node scripts/test-smartplanner-brief66-e2e.mjs",
     "test:e2e:smartplanner-finance": "node scripts/test-smartplanner-finance-e2e.mjs",
     "test:e2e:smartplanner-materials": "node scripts/test-smartplanner-materials-e2e.mjs",
     "test:e2e:smartplanner-operations": "node scripts/test-smartplanner-operations-e2e.mjs",
