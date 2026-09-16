@@ -55,8 +55,7 @@ const Header = ({ themeMode }: { themeMode: string }) => {
           <Card className="pc-user-card cloudsuite-party-footer" data-party-sidebar-footer>
             <CardBody>
               <Stack gap="xs" className="cloudsuite-party-footer__content">
-                {brand?.partyLogoUrl ? <img src={brand.partyLogoUrl} alt={`Logo de ${brand.partyName || 'partido'}`} className="cloudsuite-party-footer__logo" /> : <span className="cloudsuite-party-footer__placeholder" aria-label="Logo del partido no configurado"><i className="ph-duotone ph-flag" /></span>}
-                <small className="cloudsuite-party-footer__name">{brand?.partyName || 'Partido sin configurar'}</small>
+                {brand?.partyLogoUrl ? <img src={brand.partyLogoUrl} alt={`Logo de ${brand.partyName || 'partido'}`} className="cloudsuite-party-footer__logo" /> : brand?.partyName ? <small className="cloudsuite-party-footer__name">{brand.partyName}</small> : <Link to="/settings" className="cloudsuite-party-footer__configure" aria-label="Configurar información de partido"><i className="ph-duotone ph-gear-six" /><span>Configurar información de partido</span></Link>}
               </Stack>
             </CardBody>
           </Card>

@@ -26,18 +26,6 @@
   background: #fff;
 }
 
-.cloudsuite-party-footer__placeholder {
-  display: grid;
-  width: 72px;
-  height: 72px;
-  place-items: center;
-  border: 1px dashed #b8c9e0;
-  border-radius: 14px;
-  background: #f5f8fc;
-  color: #6f87aa;
-  font-size: 28px;
-}
-
 .cloudsuite-party-footer__name {
   display: block;
   max-width: 100%;
@@ -48,6 +36,21 @@
   letter-spacing: .02em;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.cloudsuite-party-footer__configure {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #6f87aa;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.cloudsuite-party-footer__configure i {
+  margin-right: 6px;
+  font-size: 17px;
 }
 
 .cs-topbar__profile .pc-head-link {

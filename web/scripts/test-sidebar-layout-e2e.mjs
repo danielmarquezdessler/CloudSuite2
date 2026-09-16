@@ -59,7 +59,7 @@ try {
   const partyFooter = page.locator('[data-party-sidebar-footer]');
   await partyFooter.waitFor({ state: 'visible' });
   if (await partyFooter.getByText('Cerrar sesión', { exact: true }).count()) throw new Error('El bloque de usuario sigue apareciendo en el pie del sidebar.');
-  if (await partyFooter.locator('.cloudsuite-party-footer__logo, .cloudsuite-party-footer__placeholder').count() !== 1) throw new Error('El pie del sidebar no tiene logo de partido ni placeholder.');
+  if (await partyFooter.locator('.cloudsuite-party-footer__logo, .cloudsuite-party-footer__name, .cloudsuite-party-footer__configure').count() !== 1) throw new Error('El pie del sidebar no tiene exactamente uno de los estados de marca esperados.');
   console.log(`Perfil/navbar y marca del sidebar OK: avatar=${avatarMode}; bloque de usuario removido.`);
 
   for (const [name, route] of pages) {
