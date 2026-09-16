@@ -48,6 +48,20 @@ try {
   await page.getByRole('button', { name: 'Ingresar', exact: true }).click();
   await page.waitForURL(/dashboard/);
 
+  const profileTrigger = page.getByLabel('Perfil');
+  await profileTrigger.locator('[data-profile-avatar]').waitFor({ state: 'visible' });
+  const avatarMode = await profileTrigger.locator('[data-profile-avatar]').getAttribute('data-profile-avatar');
+  if (!['image', 'initials'].includes(avatarMode ?? '')) throw new Error('El trigger de perfil no mostró ni foto ni iniciales.');
+  await profileTrigger.click();
+  await page.getByText('Cerrar sesión', { exact: true }).waitFor({ state: 'visible' });
+  await page.keyboard.press('Escape');
+  if (await page.locator('.cloudsuite-party-brand').count()) throw new Error('El partido todavía aparece arriba del sidebar.');
+  const partyFooter = page.locator('[data-party-sidebar-footer]');
+  await partyFooter.waitFor({ state: 'visible' });
+  if (await partyFooter.getByText('Cerrar sesión', { exact: true }).count()) throw new Error('El bloque de usuario sigue apareciendo en el pie del sidebar.');
+  if (await partyFooter.locator('.cloudsuite-party-footer__logo, .cloudsuite-party-footer__placeholder').count() !== 1) throw new Error('El pie del sidebar no tiene logo de partido ni placeholder.');
+  console.log(`Perfil/navbar y marca del sidebar OK: avatar=${avatarMode}; bloque de usuario removido.`);
+
   for (const [name, route] of pages) {
     await page.goto(`${app}${route}`, { waitUntil: 'domcontentloaded' });
     await page.locator('.pc-sidebar').waitFor({ state: 'visible' });

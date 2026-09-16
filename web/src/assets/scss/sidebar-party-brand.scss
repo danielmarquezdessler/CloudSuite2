@@ -1,0 +1,77 @@
+.cloudsuite-party-footer {
+  margin: 0;
+  border: 0;
+  border-top: 1px solid #e6edf7;
+  border-radius: 0;
+  background: #fff;
+  box-shadow: none;
+}
+
+.cloudsuite-party-footer .card-body {
+  padding: 16px 20px 18px;
+}
+
+.cloudsuite-party-footer__content {
+  align-items: center;
+  text-align: center;
+}
+
+.cloudsuite-party-footer__logo {
+  display: block;
+  width: min(100%, 156px);
+  max-height: 84px;
+  border: 1px solid #e3ebf6;
+  border-radius: 12px;
+  object-fit: contain;
+  background: #fff;
+}
+
+.cloudsuite-party-footer__placeholder {
+  display: grid;
+  width: 72px;
+  height: 72px;
+  place-items: center;
+  border: 1px dashed #b8c9e0;
+  border-radius: 14px;
+  background: #f5f8fc;
+  color: #6f87aa;
+  font-size: 28px;
+}
+
+.cloudsuite-party-footer__name {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  color: #536b91;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .02em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cs-topbar__profile .pc-head-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.cs-topbar__profile-avatar {
+  display: inline-grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  flex: 0 0 34px;
+  overflow: hidden;
+  border: 2px solid #e2ebf8;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #fff;
+  color: #1f5fbf;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.cs-topbar__profile-avatar--fallback {
+  background: #eaf2ff;
+}

@@ -1,37 +1,33 @@
 import React, { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 //import images
 
 import cloudsuiteLogo from '../assets/images/cloudsuite.svg';
 import SimpleBar from "simplebar-react";
 import { menuItems } from "./MenuData";
 import NestedMenu from "./NestedMenu";
-import { Card, CardBody, Dropdown } from "react-bootstrap";
+import { Card, CardBody } from "react-bootstrap";
 import { useAuth } from '../context/AuthContext';
-import { authenticatedRequest } from '../lib/api';
+import { useAuthenticatedQuery } from '../lib/api';
 import { useActiveCampaign } from '../context/CampaignContext';
+import Stack from '../components/Shared/Stack';
 
 const Header = ({ themeMode }: { themeMode: string }) => {
-  const { user, logout } = useAuth();
-  const { organizationId, role: campaignRole } = useActiveCampaign();
-  const navigate = useNavigate();
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  const [avatarFailed, setAvatarFailed] = useState(false);
+  const { user } = useAuth();
+  const { organizationId } = useActiveCampaign();
+  const [brandOverride, setBrandOverride] = useState<{ partyName: string; partyLogoUrl: string | null } | null>(null);
+  const globalConfigurationPath = organizationId ? `/api/organizations/${organizationId}/global-configuration` : null;
+  const { data: globalConfiguration } = useAuthenticatedQuery<{ partyName: string; partyLogoUrl: string | null }>(user, globalConfigurationPath, [globalConfigurationPath]);
 
   useEffect(() => {
-    if (!user || !organizationId) { setAvatarUrl(user?.photoURL ?? null); return; }
-    void authenticatedRequest<Array<{ uid: string; photoURL?: string | null }>>(user, `/api/organizations/${organizationId}/users`)
-      .then((result) => setAvatarUrl(result.data?.find((person) => person.uid === user.uid)?.photoURL ?? user.photoURL ?? null));
-  }, [organizationId, user]);
+    const updateBrand = (event: Event) => setBrandOverride((event as CustomEvent<{ partyName: string; partyLogoUrl: string | null }>).detail);
+    window.addEventListener('cloudsuite:global-configuration', updateBrand);
+    return () => window.removeEventListener('cloudsuite:global-configuration', updateBrand);
+  }, []);
 
-  useEffect(() => { setAvatarFailed(false); }, [avatarUrl]);
+  useEffect(() => { setBrandOverride(null); }, [organizationId]);
 
-  const handleLogout = async () => {
-    await logout();
-    navigate('/');
-  };
-
-  const userName = user?.displayName ?? user?.email ?? 'Usuario';
+  const brand = brandOverride ?? globalConfiguration;
   return (
     <React.Fragment>
       <nav className="pc-sidebar" id="pc-sidebar-hide" data-theme-mode={themeMode}>
@@ -56,43 +52,12 @@ const Header = ({ themeMode }: { themeMode: string }) => {
               </CardBody>
             </Card>
           </SimpleBar>
-          <Card className="pc-user-card">
+          <Card className="pc-user-card cloudsuite-party-footer" data-party-sidebar-footer>
             <CardBody>
-              <div className="d-flex align-items-center">
-                <div className="flex-shrink-0">
-                  {avatarUrl && !avatarFailed
-                    ? <img src={avatarUrl} alt={`Foto de ${userName}`} className="user-avtar wid-45 rounded-circle cloudsuite-sidebar-avatar" width={45} onError={() => setAvatarFailed(true)} />
-                    : <span className="user-avtar wid-45 rounded-circle cloudsuite-sidebar-avatar cloudsuite-sidebar-avatar--fallback" aria-label={`Avatar de ${userName}`}>{userName.slice(0, 2).toUpperCase()}</span>}
-                </div>
-                <div className="flex-grow-1 ms-3">
-                  <Link to="#" className="arrow-none dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" data-bs-offset="0,20"></Link>
-                  <div className="d-flex align-items-center">
-                    <div className="flex-grow-1">
-                      <h6 className="mb-0 text-truncate">{userName}</h6>
-                      <small className="d-block text-truncate">{user?.email}</small>
-                      <small>{campaignRole || 'Cliente'}</small>
-                    </div>
-
-                    <Dropdown>
-                      <Dropdown.Toggle
-                        variant="a"
-                        className="btn btn-icon btn-link-secondary avtar arrow-none"
-                        data-bs-offset="0,20"
-                      >
-                        <i className="ph-duotone ph-windows-logo"></i>
-                      </Dropdown.Toggle>
-                      <Dropdown.Menu>
-                        <ul>
-                          <li><Dropdown.Item className="pc-user-links" onClick={handleLogout}>
-                            <i className="ph-duotone ph-power"></i>
-                            <span>Cerrar sesión</span>
-                          </Dropdown.Item></li>
-                        </ul>
-                      </Dropdown.Menu>
-                    </Dropdown>
-                  </div>
-                </div>
-              </div>
+              <Stack gap="xs" className="cloudsuite-party-footer__content">
+                {brand?.partyLogoUrl ? <img src={brand.partyLogoUrl} alt={`Logo de ${brand.partyName || 'partido'}`} className="cloudsuite-party-footer__logo" /> : <span className="cloudsuite-party-footer__placeholder" aria-label="Logo del partido no configurado"><i className="ph-duotone ph-flag" /></span>}
+                <small className="cloudsuite-party-footer__name">{brand?.partyName || 'Partido sin configurar'}</small>
+              </Stack>
             </CardBody>
           </Card>
         </div>
