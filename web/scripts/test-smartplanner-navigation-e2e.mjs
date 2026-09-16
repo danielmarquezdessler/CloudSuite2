@@ -88,7 +88,7 @@ async function expectSecondaryNavigation(page) {
   const stickyTop = await navigation.evaluate((element) => Math.round(element.getBoundingClientRect().top));
   if (stickyTop !== navigationStyles.headerBottom) throw new Error(`El submenú dejó de estar fijo al hacer scroll (top=${stickyTop}).`);
   console.log('Submenú visual OK: pegado al header, fijo y con los atributos CSS solicitados.');
-  for (const label of ['Home', 'Cuartel', 'Finanzas', 'Operación', 'Crisis y Jurídico', 'Comunicación', 'Reportes', 'Personal', 'Configuración']) {
+  for (const label of ['Home', 'Backlog de Campaña', 'Finanzas', 'Operación', 'Crisis y Jurídico', 'Comunicación', 'Reportes', 'Personal', 'Configuración']) {
     await navigation.getByText(label, { exact: true }).first().waitFor({ state: 'visible' });
   }
 
@@ -122,7 +122,7 @@ async function expectSecondaryNavigation(page) {
         verticalOffset: Math.round(box.top - toggleBox.bottom)
       };
     }, visit.group);
-    if (!layering || layering.navZIndex < 1000 || layering.menuZIndex < 1000 || !layering.menuVisible || !layering.menuOnTop || layering.horizontalOffset > 2 || layering.verticalOffset < 0 || layering.verticalOffset > 8) throw new Error(`${visit.group}: el dropdown quedó recortado, detrás del contenido o fuera de su trigger: ${JSON.stringify(layering)}.`);
+    if (!layering || layering.navZIndex !== 100 || layering.menuZIndex < 1000 || !layering.menuVisible || !layering.menuOnTop || layering.horizontalOffset > 2 || layering.verticalOffset < 0 || layering.verticalOffset > 8) throw new Error(`${visit.group}: el dropdown quedó recortado, detrás del contenido o fuera de su trigger: ${JSON.stringify(layering)}.`);
     await menu.getByRole('link', { name: visit.item, exact: true }).click();
     await page.waitForURL(`${webUrl}${visit.path}`);
     if (!await toggle.evaluate((element) => element.classList.contains('is-active'))) {
@@ -139,6 +139,30 @@ async function expectSecondaryNavigation(page) {
   if ((await mobileSelect.inputValue()) !== '/smartplanner/reports') throw new Error('El selector móvil no refleja la ruta activa.');
   await page.setViewportSize({ width: 1440, height: 980 });
   console.log('Submenú móvil OK: selector compacto navega a Reportes.');
+}
+
+async function expectProfileLayering(page) {
+  await page.getByLabel('Perfil').click();
+  const menu = page.locator('.cs-topbar__profile .dropdown-menu.show');
+  await menu.getByText('Cerrar sesión', { exact: true }).waitFor({ state: 'visible' });
+  const layering = await page.evaluate(() => {
+    const header = document.querySelector('.cs-topbar');
+    const nav = document.querySelector('[data-smartplanner-nav]');
+    const menu = document.querySelector('.cs-topbar__profile .dropdown-menu.show');
+    if (!header || !nav || !menu) return null;
+    const box = menu.getBoundingClientRect();
+    const point = document.elementFromPoint(box.left + Math.min(18, box.width / 2), box.top + Math.min(18, box.height / 2));
+    return {
+      headerZIndex: Number.parseInt(getComputedStyle(header).zIndex, 10),
+      navZIndex: Number.parseInt(getComputedStyle(nav).zIndex, 10),
+      menuZIndex: Number.parseInt(getComputedStyle(menu).zIndex, 10),
+      menuVisible: box.width > 0 && box.height > 0,
+      menuOnTop: Boolean(point?.closest('.cs-topbar__profile .dropdown-menu'))
+    };
+  });
+  if (!layering || layering.headerZIndex < 1000 || layering.navZIndex !== 100 || layering.menuZIndex < 1000 || !layering.menuVisible || !layering.menuOnTop) throw new Error(`El menú global de perfil quedó detrás de la navegación secundaria: ${JSON.stringify(layering)}.`);
+  await page.getByLabel('Perfil').click();
+  console.log(`Perfil global OK: header=${layering.headerZIndex}, menú=${layering.menuZIndex}, barra secundaria=${layering.navZIndex}.`);
 }
 
 try {
@@ -179,6 +203,7 @@ try {
   await page.reload({ waitUntil: 'domcontentloaded' });
   await addonsLoaded;
   await page.getByRole('heading', { name: 'Cuartel de campaña', exact: true }).waitFor();
+  await expectProfileLayering(page);
   await expectSecondaryNavigation(page);
 
   for (const route of smartPlannerRoutes) {

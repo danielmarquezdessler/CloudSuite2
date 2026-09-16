@@ -1,0 +1,12 @@
+@import './settings/color-variables';
+
+// The global header owns profile/account menus. Keep it above module-level
+// sticky navigation so its local Bootstrap dropdown can never be occluded.
+.pc-header.cs-topbar { z-index:$z-dropdown; }
+.cs-topbar__profile .pc-h-dropdown { --bs-dropdown-zindex:#{$z-dropdown}; z-index:$z-dropdown; }
+
+// SmartPlanner's bar is structural/sticky, not a floating menu. Its portal
+// submenus retain the canonical dropdown layer through DropdownPortal.
+.sp-secondary-nav { z-index:$z-sticky-header; }
+.sp-secondary-nav__group { z-index:$z-base; }
+.sp-secondary-nav__menu { z-index:$z-dropdown !important; }
