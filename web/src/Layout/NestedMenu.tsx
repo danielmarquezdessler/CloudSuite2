@@ -18,6 +18,7 @@ interface MenuItem {
   submenu?: MenuItem[];
   addon?: 'smartPlanner' | 'voteStream';
   agentOnly?: boolean;
+  managerOnly?: boolean;
   adminOnly?: boolean;
 }
 
@@ -63,6 +64,7 @@ const NestedMenu: React.FC<{ menuItems: any }> = ({ menuItems }) => {
   return <>
     {menuItems.map((item: MenuItem) => {
       if (item.adminOnly && role !== 'admin') return null;
+      if (item.managerOnly && role !== 'admin' && role !== 'cliente') return null;
       if (item.agentOnly && (!agentStreams.data || agentStreams.data.length === 0)) return null;
       if (item.type === 'HEADER') return <li key={item.label} className="pc-item pc-caption"><label>{t(item.label)}</label></li>;
       if (item.addon) {
