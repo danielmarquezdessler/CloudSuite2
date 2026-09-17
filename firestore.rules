@@ -45,6 +45,9 @@ service cloud.firestore {
     match /organizations/{orgId}/campaigns/{campId}/voteStreams/{voteStreamId}/subLocations/{subLocationId} { allow read: if assignedVoteStreamAgent(orgId, campId, voteStreamId); allow write: if false; }
     match /organizations/{orgId}/campaigns/{campId}/voteStreams/{voteStreamId}/genderOptions/{genderId} { allow read: if assignedVoteStreamAgent(orgId, campId, voteStreamId); allow write: if false; }
     match /organizations/{orgId}/campaigns/{campId}/voteStreams/{voteStreamId}/ageRanges/{ageRangeId} { allow read: if assignedVoteStreamAgent(orgId, campId, voteStreamId); allow write: if false; }
+    // Public sharing deliberately exposes only the aggregate ranking document;
+    // submissions and agent assignments are never readable without authentication.
+    match /organizations/{orgId}/campaigns/{campId}/publicVoteRankings/{voteStreamId} { allow read: if resource.data.public == true || campaignMember(orgId, campId); allow write: if false; }
     match /organizations/{orgId}/campaigns/{campId}/auditLog/{logId} { allow read: if isCliente(orgId) && canAccessCampaign(campId); allow write: if false; }
     match /organizations/{orgId}/campaigns/{campId}/{document=**} { allow read, write: if false; }
     match /users/{uid} { allow read, update: if signedIn() && request.auth.uid == uid; allow create, delete: if false; }

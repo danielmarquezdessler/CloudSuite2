@@ -227,6 +227,8 @@ const routes = [
     { path: "/system/addons", component: <AddonsAdmin /> },
     { path: "/vote-stream", component: <VoteStreamList /> },
     { path: "/vote-stream/mi-panel", component: <VoteStreamAgentPanel /> },
+    { path: "/vote-stream/agente", component: <VoteStreamAgentPanel /> },
+    { path: "/vote-stream/:voteStreamId/data-entry", component: <VoteStreamAgentPanel /> },
     { path: "/vote-stream/:voteStreamId", component: <VoteStreamDetail /> },
     { path: "/smartplanner", component: <SmartPlanner /> },
     { path: "/smartplanner/backlog", component: <Backlog /> },

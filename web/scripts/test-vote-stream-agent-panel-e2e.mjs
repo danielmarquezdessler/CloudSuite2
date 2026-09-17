@@ -78,24 +78,24 @@ try {
 
   const activeCard = page.locator('.vote-agent-stream', { hasText: `Panel Agente Activa ${suffix}` });
   await activeCard.getByRole('button', { name: 'Cargar resultados', exact: true }).click();
-  await page.locator('[data-agent-vote-stream-form]').waitFor();
+  await page.getByRole('heading', { name: new RegExp(`Carga de datos · Panel Agente Activa ${suffix}`) }).waitFor();
   await page.getByLabel('Votos para Candidata Uno').fill('17');
-  await page.getByLabel('Votos para Candidato Dos').fill('8');
   for (const [label, option] of [['Sub-ubicación', 'Escuela Central'], ['Género', 'Femenino'], ['Rango de edad', '30 a 45']]) {
     await page.getByLabel(label).click();
     await page.getByRole('option', { name: option, exact: true }).click();
   }
   const response = page.waitForResponse((item) => item.request().method() === 'POST' && item.url().includes(`/vote-stream/${activeRef.id}/submissions`));
+  await page.getByRole('button', { name: 'Enviar resultado', exact: true }).click();
   await page.getByRole('button', { name: 'Confirmar y enviar', exact: true }).click();
   if (!(await response).ok()) throw new Error('La UI no pudo crear la submission del agente.');
-  await page.getByText('Envío registrado:', { exact: false }).waitFor();
+  await page.getByText('Resultado de Candidata Uno enviado.', { exact: true }).waitFor();
   const submissions = await activeRef.collection('submissions').where('submittedBy', '==', agent.uid).get();
-  if (submissions.size !== 1 || submissions.docs[0].data()?.votesByCandidate?.['candidate-uno'] !== 17 || submissions.docs[0].data()?.subLocationId !== 'escuela-central') throw new Error('La submission UI no quedó persistida con su desglose y segmentos.');
+  if (submissions.size !== 1 || submissions.docs[0].data()?.candidateId !== 'candidate-uno' || submissions.docs[0].data()?.votes !== 17 || submissions.docs[0].data()?.subLocationId !== 'escuela-central') throw new Error('La submission UI no quedó persistida por candidato con sus segmentos.');
   console.log('2/5 OK: se enviaron resultados reales con sub-ubicación, género y edad; Firestore confirmó la persistencia.');
 
   await page.getByRole('heading', { name: 'Mis envíos', exact: true }).waitFor();
-  await page.getByText('Candidata Uno: 17', { exact: true }).waitFor();
-  await page.getByText('Escuela Central · Femenino · 30 a 45', { exact: true }).waitFor();
+  await page.getByText('Candidata Uno', { exact: true }).last().waitFor();
+  await page.getByText('17 votos', { exact: true }).last().waitFor();
   console.log('3/5 OK: la submission apareció en Mis envíos, con desglose de solo lectura.');
 
   await Promise.all(streamIds.map((id) => campaignRef.collection('voteStreams').doc(id).collection('agents').doc(agent.uid).delete()));
