@@ -19,6 +19,7 @@ export const tasks = async(r:Request,s:Response)=>{try{s.json(await service.list
 export const members = async(r:Request,s:Response)=>{try{s.json(await service.listMembers(r.user!,...ids(r)));}catch(e){fail(s,e)}};
 export const createTask = async(r:Request,s:Response)=>{try{s.status(201).json(await service.saveTask(r.user!,...ids(r),null,r.body));}catch(e){fail(s,e)}};
 export const updateTask = async(r:Request,s:Response)=>{try{s.json(await service.saveTask(r.user!,...ids(r),String(r.params.taskId),r.body));}catch(e){fail(s,e)}};
+export const patchTask = async(r:Request,s:Response)=>{try{s.json(await service.patchTask(r.user!,...ids(r),String(r.params.taskId),r.body));}catch(e){fail(s,e)}};
 export const removeTask = async(r:Request,s:Response)=>{try{await service.deleteTask(r.user!,...ids(r),String(r.params.taskId));s.status(204).end();}catch(e){fail(s,e)}};
 export const uploadTaskAttachment = async(r:Request,s:Response)=>{try{s.status(201).json(await service.uploadTaskAttachment(r.user!,...ids(r),String(r.params.taskId),r.file));}catch(e){fail(s,e)}};
 export const taskComments = async(r:Request,s:Response)=>{try{s.json(await service.listTaskComments(r.user!,...ids(r),String(r.params.taskId)));}catch(e){fail(s,e)}};

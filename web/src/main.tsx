@@ -5,6 +5,7 @@ import './assets/scss/sidebar-party-brand.scss'
 import './assets/scss/vote-stream.scss'
 import './assets/scss/vote-stream-agent.scss'
 import './assets/scss/global-loading-bar.scss'
+import './assets/scss/pbi-autosave.scss'
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom';
