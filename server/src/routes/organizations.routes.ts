@@ -1,6 +1,6 @@
 import { NextFunction, Request, Response, Router } from 'express';
 import multer from 'multer';
-import { bootstrapOrganizationController, getGlobalConfigurationController, getMeController, setSmartPlannerAddonController, updateGlobalConfigurationController, uploadPartyLogoController } from '../controllers/organizations.controller.js';
+import { bootstrapOrganizationController, getGlobalConfigurationController, getMeController, setSmartPlannerAddonController, setVoteStreamAddonController, updateGlobalConfigurationController, uploadPartyLogoController } from '../controllers/organizations.controller.js';
 import { requireAuth } from '../middleware/requireAuth.js';
 
 export const organizationsRouter = Router();
@@ -13,6 +13,7 @@ const partyLogoUpload = (request: Request, response: Response, next: NextFunctio
 organizationsRouter.post('/organizations/bootstrap', requireAuth, bootstrapOrganizationController);
 organizationsRouter.get('/me', requireAuth, getMeController);
 organizationsRouter.put('/organizations/:orgId/addons/smart-planner', requireAuth, setSmartPlannerAddonController);
+organizationsRouter.put('/organizations/:orgId/addons/vote-stream', requireAuth, setVoteStreamAddonController);
 organizationsRouter.get('/organizations/:orgId/global-configuration', requireAuth, getGlobalConfigurationController);
 organizationsRouter.put('/organizations/:orgId/global-configuration', requireAuth, updateGlobalConfigurationController);
 organizationsRouter.post('/organizations/:orgId/global-configuration/party-logo', requireAuth, partyLogoUpload, uploadPartyLogoController);

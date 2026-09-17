@@ -3,7 +3,7 @@ import { useAuth } from './AuthContext';
 import { authenticatedRequest } from '../lib/api';
 
 export type CampaignOption = { id: string; nombre: string; memberCount: number; voterCount: number };
-export type EnabledAddons = { smartPlanner: boolean };
+export type EnabledAddons = { smartPlanner: boolean; voteStream: boolean };
 type Me = { organization?: { id: string; nombre?: string; enabledAddons?: Partial<EnabledAddons> }; campaigns?: Array<{ id: string; nombre: string }>; role?: string };
 type CampaignContextValue = {
   organizationId: string | null;
@@ -25,7 +25,7 @@ const CampaignContext = createContext<CampaignContextValue | undefined>(undefine
 const storageKey = (uid: string) => `cloudsuite.activeCampaign.${uid}`;
 const snapshotKey = (uid: string) => `cloudsuite.campaignSnapshot.${uid}`;
 type CampaignSnapshot = { organizationId: string; role: string; campaigns: CampaignOption[]; enabledAddons?: EnabledAddons };
-const defaultEnabledAddons: EnabledAddons = { smartPlanner: false };
+const defaultEnabledAddons: EnabledAddons = { smartPlanner: false, voteStream: false };
 
 function storedSnapshot(uid: string): CampaignSnapshot | null {
   try {
@@ -81,7 +81,7 @@ export function CampaignProvider({ children }: { children: ReactNode }) {
       return;
     }
     const orgId = me.data.organization.id;
-    const nextEnabledAddons: EnabledAddons = { smartPlanner: me.data.organization.enabledAddons?.smartPlanner === true };
+    const nextEnabledAddons: EnabledAddons = { smartPlanner: me.data.organization.enabledAddons?.smartPlanner === true, voteStream: me.data.organization.enabledAddons?.voteStream === true };
     // El acceso a add-ons depende exclusivamente de /api/me. Aplicarlo antes de
     // la consulta secundaria evita mostrar un estado de plan obsoleto mientras
     // se actualiza el detalle de campañas.

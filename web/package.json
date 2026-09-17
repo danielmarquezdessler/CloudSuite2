@@ -79,7 +79,8 @@
     "test:e2e:smartplanner-communications": "node scripts/test-smartplanner-communications-e2e.mjs",
     "test:e2e:global-configuration": "node scripts/test-global-configuration-e2e.mjs",
     "test:e2e:global-configuration-places": "node scripts/test-global-configuration-places-e2e.mjs",
-    "test:e2e:addons-launcher": "node scripts/test-addons-launcher-e2e.mjs"
+    "test:e2e:addons-launcher": "node scripts/test-addons-launcher-e2e.mjs",
+    "test:e2e:vote-stream": "node scripts/test-vote-stream-e2e.mjs"
   },
   "dependencies": {
     "@ckeditor/ckeditor5-build-balloon": "^41.3.1",

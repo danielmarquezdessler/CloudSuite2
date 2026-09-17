@@ -405,6 +405,7 @@ const menuItems = [
         ]
     },
     { id: 'smart-planner', label: 'SmartPlanner', icon: 'ph-duotone ph-sparkle', addon: 'smartPlanner', link: '/smartplanner' },
+    { id: 'vote-stream', label: 'Vote Stream', icon: 'ph-duotone ph-ballot', addon: 'voteStream', link: '/vote-stream' },
     {
         type: 'HASHMENU', id: 'electoral-conversion', label: 'Electores',
         submenu: [

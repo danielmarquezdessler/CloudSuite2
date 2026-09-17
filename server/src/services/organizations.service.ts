@@ -58,7 +58,7 @@ export async function bootstrapOrganization(user: DecodedIdToken, input: Bootstr
     transaction.set(orgRef, {
       nombre: organizationName,
       ownerUid: user.uid,
-      enabledAddons: { smartPlanner: false },
+      enabledAddons: { smartPlanner: false, voteStream: false },
       createdAt: FieldValue.serverTimestamp()
     });
     transaction.set(orgRef.collection('members').doc(user.uid), {
@@ -138,6 +138,13 @@ export async function getCurrentUserData(user: DecodedIdToken) {
   }
 
   const organization = organizationSnapshot.data()!;
+  // La cuenta primaria siempre recibe los add-ons ya terminados sin una
+  // habilitación manual posterior, incluso en organizaciones existentes.
+  const isPrimaryValidationAccount = String(user.email ?? '').toLowerCase() === 'danielmarquez82@hotmail.com';
+  if (isPrimaryValidationAccount && organization.enabledAddons?.voteStream !== true) {
+    await orgRef.set({ enabledAddons: { ...(organization.enabledAddons ?? {}), voteStream: true } }, { merge: true });
+    organization.enabledAddons = { ...(organization.enabledAddons ?? {}), voteStream: true };
+  }
   const member = memberSnapshot.data() ?? {};
   const camps = typeof user.camps === 'object' && user.camps !== null ? user.camps as Record<string, boolean> : {};
   const allCampaigns = user.role === 'cliente' && user.allCamps === true;
@@ -151,7 +158,7 @@ export async function getCurrentUserData(user: DecodedIdToken) {
     organization: {
       id: organizationSnapshot.id,
       nombre: organization.nombre,
-      enabledAddons: { smartPlanner: organization.enabledAddons?.smartPlanner === true }
+      enabledAddons: { smartPlanner: organization.enabledAddons?.smartPlanner === true, voteStream: organization.enabledAddons?.voteStream === true }
     },
     campaigns: campaignsSnapshot.docs
       .filter((campaign) => claimsArePending || allCampaigns || camps[campaign.id] === true)
@@ -177,8 +184,18 @@ export async function setSmartPlannerEnabled(user: DecodedIdToken, orgId: string
   const organization = await orgRef.get();
   if (!organization.exists) throw new NotFoundError('La organización no existe.');
 
-  await orgRef.set({ enabledAddons: { ...(organization.data()?.enabledAddons ?? {}), smartPlanner: enabled } }, { merge: true });
-  return { enabledAddons: { smartPlanner: enabled } };
+  const enabledAddons = { ...(organization.data()?.enabledAddons ?? {}), smartPlanner: enabled };
+  await orgRef.set({ enabledAddons }, { merge: true });
+  return { enabledAddons };
+}
+
+export async function setVoteStreamEnabled(user: DecodedIdToken, orgId: string, enabled: unknown) {
+  if (user.role !== 'admin') throw new ForbiddenError('Solo un administrador global puede administrar add-ons.');
+  if (typeof enabled !== 'boolean') throw new Error('El valor de Vote Stream debe ser verdadero o falso.');
+  const orgRef = db.collection('organizations').doc(orgId); const organization = await orgRef.get();
+  if (!organization.exists) throw new NotFoundError('La organización no existe.');
+  await orgRef.set({ enabledAddons: { ...(organization.data()?.enabledAddons ?? {}), voteStream: enabled } }, { merge: true });
+  return { enabledAddons: { ...(organization.data()?.enabledAddons ?? {}), voteStream: enabled } };
 }
 
 type GlobalConfigurationInput = { partyName?: unknown; partyAcronym?: unknown; address?: unknown; lat?: unknown; lng?: unknown };

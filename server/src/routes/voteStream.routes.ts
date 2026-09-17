@@ -1,0 +1,14 @@
+import { Router } from 'express';
+import { requireAuth } from '../middleware/requireAuth.js';
+import { requireAddon } from '../middleware/requireAddon.js';
+import * as controller from '../controllers/voteStream.controller.js';
+export const voteStreamRouter = Router();
+const base = '/organizations/:orgId/campaigns/:campId/vote-streams';
+const guarded = [requireAuth, requireAddon('voteStream')] as const;
+voteStreamRouter.get(base, ...guarded, controller.list);
+voteStreamRouter.post(base, ...guarded, controller.create);
+voteStreamRouter.get(`${base}/:voteStreamId`, ...guarded, controller.get);
+voteStreamRouter.put(`${base}/:voteStreamId`, ...guarded, controller.update);
+voteStreamRouter.post(`${base}/:voteStreamId/activate`, ...guarded, controller.activate);
+voteStreamRouter.post(`${base}/:voteStreamId/close`, ...guarded, controller.close);
+voteStreamRouter.delete(`${base}/:voteStreamId`, ...guarded, controller.remove);

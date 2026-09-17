@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { ConflictError, ForbiddenError, NotFoundError, bootstrapOrganization, getCurrentUserData, getGlobalConfiguration, setSmartPlannerEnabled, updateGlobalConfiguration, uploadPartyLogo } from '../services/organizations.service.js';
+import { ConflictError, ForbiddenError, NotFoundError, bootstrapOrganization, getCurrentUserData, getGlobalConfiguration, setSmartPlannerEnabled, setVoteStreamEnabled, updateGlobalConfiguration, uploadPartyLogo } from '../services/organizations.service.js';
 
 const orgId = (request: Request) => Array.isArray(request.params.orgId) ? request.params.orgId[0] : request.params.orgId;
 const fail = (response: Response, error: unknown, fallback: string) => {
@@ -57,6 +57,13 @@ export async function setSmartPlannerAddonController(request: Request, response:
     }
     response.status(500).json({ message: 'No pudimos actualizar el add-on.' });
   }
+}
+
+export async function setVoteStreamAddonController(request: Request, response: Response) {
+  try {
+    const orgId = Array.isArray(request.params.orgId) ? request.params.orgId[0] : request.params.orgId;
+    response.json(await setVoteStreamEnabled(request.user!, orgId, request.body?.enabled));
+  } catch (error) { return fail(response, error, 'No pudimos actualizar el add-on.'); }
 }
 
 export async function getGlobalConfigurationController(request: Request, response: Response) {

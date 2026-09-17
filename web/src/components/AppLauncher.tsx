@@ -5,11 +5,11 @@ import Card from './Shared/Card';
 import Inline from './Shared/Inline';
 import Stack from './Shared/Stack';
 
-type Addon = { label: string; subtitle: string; icon: string; accent: string; path?: string; href?: string; comingSoon?: boolean; gated?: 'smartPlanner' };
+type Addon = { label: string; subtitle: string; icon: string; accent: string; path?: string; href?: string; comingSoon?: boolean; gated?: 'smartPlanner' | 'voteStream' };
 
 const addons: Addon[] = [
   { label: 'SmartPlanner', subtitle: 'Planificación profesional', icon: 'ph-sparkle', accent: 'var(--bs-primary)', path: '/smartplanner', gated: 'smartPlanner' },
-  { label: 'Ballot Box', subtitle: 'Sistema de boca de urna en tiempo real', icon: 'ph-ballot', accent: 'var(--bs-secondary)', comingSoon: true },
+  { label: 'Vote Stream', subtitle: 'Resultados electorales en tiempo real', icon: 'ph-ballot', accent: 'var(--bs-secondary)', path: '/vote-stream', gated: 'voteStream' },
   { label: 'Civica Pulse', subtitle: 'Software de Inteligencia Política profesional', icon: 'ph-activity', accent: 'var(--bs-success)', href: 'https://civicapulse.com/' },
   { label: 'Governo Hub', subtitle: 'Sistema de gestión de gobiernos locales', icon: 'ph-buildings', accent: 'var(--bs-primary)', href: 'http://governohub.com/' },
   { label: 'Termómetro Comunitario', subtitle: 'Sistema de medición de opinión pública y focus group', icon: 'ph-thermometer', accent: 'var(--bs-warning)', href: 'https://termometrocomunitario.programascomunitarios.org' },
@@ -25,7 +25,7 @@ export default function AppLauncher() {
     <Dropdown.Menu className="dropdown-menu-end pc-h-dropdown p-2 cloudsuite-launcher-menu">
       <Inline gap="sm" className="cloudsuite-launcher__header justify-content-between align-items-center"><strong>Addons</strong><small className="text-muted">Productos Politicfy</small></Inline>
       <div className="cloudsuite-launcher-grid d-grid gap-2">{addons.map((addon) => {
-        const comingSoon = addon.gated === 'smartPlanner' ? !enabledAddons.smartPlanner : Boolean(addon.comingSoon);
+        const comingSoon = addon.gated ? !enabledAddons[addon.gated] : Boolean(addon.comingSoon);
         const content = <Stack gap="xs" className="cloudsuite-launcher-item__content"><span className="cloudsuite-launcher-icon" style={{ color: addon.accent }}><i className={`ph-duotone ${addon.icon}`} /></span><Stack gap="xs" className="cloudsuite-launcher-item__copy"><Inline gap="xs" className="align-items-center cloudsuite-launcher-item__title"><span>{addon.label}</span>{addon.href && <i className="ph-duotone ph-arrow-square-out" aria-label="Abre en una pestaña nueva" />}</Inline><small className="text-muted">{addon.subtitle}</small></Stack></Stack>;
         return <Card key={addon.label} className={`cloudsuite-launcher-card h-100 ${comingSoon ? 'is-disabled' : ''}`}>{comingSoon ? <button type="button" disabled aria-disabled="true" className="cloudsuite-launcher-item" title={`${addon.label} estará disponible próximamente.`}>{content}<small className="badge text-bg-secondary">Próximamente</small></button> : addon.href ? <a className="cloudsuite-launcher-item" href={addon.href} target="_blank" rel="noopener noreferrer">{content}</a> : <button type="button" className="cloudsuite-launcher-item" onClick={() => addon.path && navigate(addon.path)}>{content}</button>}</Card>;
       })}</div>

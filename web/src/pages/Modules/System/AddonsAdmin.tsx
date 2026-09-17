@@ -13,40 +13,46 @@ import { authenticatedRequest } from '../../../lib/api';
 export default function AddonsAdmin() {
   const { user } = useAuth();
   const { organizationId, role, enabledAddons, updateEnabledAddons, reload } = useActiveCampaign();
-  const [saving, setSaving] = useState(false);
+  const [saving, setSaving] = useState<'smartPlanner' | 'voteStream' | null>(null);
   const [notice, setNotice] = useState('');
   const isGlobalAdmin = role === 'admin';
 
-  const updateSmartPlanner = async () => {
+  const updateAddon = async (addon: 'smartPlanner' | 'voteStream') => {
     if (!user || !organizationId || !isGlobalAdmin) return;
-    setSaving(true);
+    setSaving(addon);
     setNotice('');
-    const result = await authenticatedRequest<{ enabledAddons: { smartPlanner: boolean } }>(user, `/api/organizations/${organizationId}/addons/smart-planner`, {
+    const result = await authenticatedRequest<{ enabledAddons: typeof enabledAddons }>(user, `/api/organizations/${organizationId}/addons/${addon === 'smartPlanner' ? 'smart-planner' : 'vote-stream'}`, {
       method: 'PUT',
-      body: JSON.stringify({ enabled: !enabledAddons.smartPlanner })
+      body: JSON.stringify({ enabled: !enabledAddons[addon] })
     });
     if (result.error) {
       setNotice(result.error.message);
     } else {
       await reload();
-      const nextEnabledAddons = result.data?.enabledAddons ?? { smartPlanner: false };
+      const nextEnabledAddons = result.data?.enabledAddons ?? enabledAddons;
       updateEnabledAddons(nextEnabledAddons);
-      setNotice(nextEnabledAddons.smartPlanner ? 'SmartPlanner quedó habilitado para esta organización.' : 'SmartPlanner quedó deshabilitado para esta organización.');
+      setNotice(nextEnabledAddons[addon] ? `${addon === 'smartPlanner' ? 'SmartPlanner' : 'Vote Stream'} quedó habilitado para esta organización.` : `${addon === 'smartPlanner' ? 'SmartPlanner' : 'Vote Stream'} quedó deshabilitado para esta organización.`);
     }
-    setSaving(false);
+    setSaving(null);
   };
 
-  return <PageContainer>
+  return <PageContainer><Stack gap="lg">
     <HeroBanner icon="settings" title="Administración de add-ons" subtitle="Gestioná los módulos habilitados para esta organización." tags={[{ icon: 'settings', label: 'Administrador global' }]} />
     <ContentPanel icon="settings" title="SmartPlanner" subtitle="Habilitá el acceso al módulo según el plan contratado.">
       {!isGlobalAdmin ? <EmptyState icon="award" title="Acceso restringido" description="Solo un administrador global puede modificar los add-ons de una organización." /> : <Stack gap="md">
         <p className="mb-0">Al habilitarlo, SmartPlanner deja de mostrarse como “Próximamente” en el sidebar de esta organización.</p>
         <Inline gap="md" wrap>
           <span className={`cd-state-pill ${enabledAddons.smartPlanner ? 'is-success' : ''}`}>{enabledAddons.smartPlanner ? 'Habilitado' : 'Deshabilitado'}</span>
-          <PrimaryButton icon={enabledAddons.smartPlanner ? 'check' : 'plus'} onClick={() => void updateSmartPlanner()} disabled={saving}>{saving ? 'Guardando…' : enabledAddons.smartPlanner ? 'Deshabilitar SmartPlanner' : 'Habilitar SmartPlanner'}</PrimaryButton>
+          <PrimaryButton icon={enabledAddons.smartPlanner ? 'check' : 'plus'} onClick={() => void updateAddon('smartPlanner')} disabled={Boolean(saving)}>{saving === 'smartPlanner' ? 'Guardando…' : enabledAddons.smartPlanner ? 'Deshabilitar SmartPlanner' : 'Habilitar SmartPlanner'}</PrimaryButton>
         </Inline>
         {notice && <p className="mb-0" role="status">{notice}</p>}
       </Stack>}
     </ContentPanel>
-  </PageContainer>;
+    <ContentPanel icon="target" title="Vote Stream" subtitle="Resultados electorales y boca de urna en tiempo real.">
+      {!isGlobalAdmin ? <EmptyState icon="award" title="Acceso restringido" description="Solo un administrador global puede modificar los add-ons de una organización." /> : <Stack gap="md">
+        <p className="mb-0">Al habilitarlo, Vote Stream queda disponible en el sidebar y en el lanzador de productos.</p>
+        <Inline gap="md" wrap><span className={`cd-state-pill ${enabledAddons.voteStream ? 'is-success' : ''}`}>{enabledAddons.voteStream ? 'Habilitado' : 'Deshabilitado'}</span><PrimaryButton icon={enabledAddons.voteStream ? 'check' : 'plus'} onClick={() => void updateAddon('voteStream')} disabled={Boolean(saving)}>{saving === 'voteStream' ? 'Guardando…' : enabledAddons.voteStream ? 'Deshabilitar Vote Stream' : 'Habilitar Vote Stream'}</PrimaryButton></Inline>
+      </Stack>}
+    </ContentPanel>
+  </Stack></PageContainer>;
 }

@@ -9,6 +9,7 @@ import { planningRouter } from './routes/planning.routes.js';
 import { executionRouter } from './routes/execution.routes.js';
 import { mapRouter } from './routes/map.routes.js';
 import { smartplannerRouter } from './routes/smartplanner.routes.js';
+import { voteStreamRouter } from './routes/voteStream.routes.js';
 import { getFirestoreStartupDiagnostic, verifyFirestoreReachability } from './config/firebase.js';
 
 const app = express();
@@ -35,6 +36,7 @@ app.use('/api', planningRouter);
 app.use('/api', executionRouter);
 app.use('/api', mapRouter);
 app.use('/api', smartplannerRouter);
+app.use('/api', voteStreamRouter);
 
 async function startServer() {
   try {
