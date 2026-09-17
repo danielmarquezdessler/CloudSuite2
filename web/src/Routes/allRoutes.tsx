@@ -39,6 +39,7 @@ import Backlog from '../pages/Modules/SmartPlanner/Backlog';
 import PbiDetail from '../pages/Modules/SmartPlanner/PbiDetail';
 import VoteStreamList, { VoteStreamDetail } from '../pages/Modules/VoteStream';
 import VoteStreamAgentPanel from '../pages/Modules/VoteStreamAgentPanel';
+import PublicVoteStreamRanking from '../pages/PublicVoteStreamRanking';
 import LiveVisits from '../pages/Modules/Execution/LiveVisits';
 import Heatmap from '../pages/Modules/Execution/Heatmap';
 import Undecided from '../pages/Modules/Execution/Undecided';
@@ -453,6 +454,8 @@ const routes = [
 ];
 
 const nonAuthRoutes = [
+
+    { path: "/vote-stream/public/:orgId/:campId/:voteStreamId", component: <PublicVoteStreamRanking /> },
 
     { path: "/", component: <LoginV2 /> },
     { path: "/register", component: <Register /> },
