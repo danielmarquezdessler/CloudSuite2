@@ -90,16 +90,7 @@ export default function VoterProfile() {
       setSaving(false);
     }
   };
-  if (profile.loading)
-    return (
-      <PageContainer>
-        <EmptyState
-          icon="users"
-          title="Cargando perfil del elector"
-          description="Estamos reuniendo su historial y datos de contacto."
-        />
-      </PageContainer>
-    );
+  if (profile.loading) return <PageContainer aria-busy="true" aria-label="Perfil del elector" />;
   if (profile.error || !data)
     return (
       <PageContainer>

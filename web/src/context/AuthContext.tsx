@@ -1,6 +1,7 @@
 import { ReactNode, createContext, useContext, useEffect, useState } from 'react';
 import { User, onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth } from '../lib/firebase';
+import { useLoadingBar } from './LoadingBarContext';
 
 interface AuthContextValue {
   user: User | null;
@@ -13,6 +14,9 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const { beginLoading } = useLoadingBar();
+
+  useEffect(() => loading ? beginLoading() : undefined, [beginLoading, loading]);
 
   useEffect(() => {
     // Exclusivo para la captura visual automatizada de desarrollo; nunca se incluye en producción.

@@ -1,5 +1,6 @@
 import { DependencyList, useCallback, useEffect, useState } from 'react';
 import { User } from 'firebase/auth';
+import { useLoadingBar } from '../context/LoadingBarContext';
 
 export const apiBaseUrl = import.meta.env.VITE_FIREBASE_API_URL ?? 'http://127.0.0.1:8080';
 
@@ -65,12 +66,18 @@ export function publicRequest<T>(path: string, init: RequestInit = {}) {
 /** A safe query hook: rendering code always receives data, error and loading. */
 export function useAuthenticatedQuery<T>(user: User | null, path: string | null, dependencies: DependencyList = []): ApiQueryState<T> {
   const [state, setState] = useState<Omit<ApiQueryState<T>, 'reload'>>({ data: null, error: null, loading: Boolean(user && path) });
+  const { beginLoading } = useLoadingBar();
   const load = useCallback(async () => {
     if (!user || !path) { setState({ data: null, error: null, loading: false }); return; }
+    const finishLoading = beginLoading();
     setState(current => ({ ...current, loading: true, error: null }));
-    const result = await authenticatedRequest<T>(user, path);
-    setState({ ...result, loading: false });
-  }, [user, path, ...dependencies]);
+    try {
+      const result = await authenticatedRequest<T>(user, path);
+      setState({ ...result, loading: false });
+    } finally {
+      finishLoading();
+    }
+  }, [beginLoading, user, path, ...dependencies]);
 
   useEffect(() => { void load(); }, [load]);
   return { ...state, reload: load };

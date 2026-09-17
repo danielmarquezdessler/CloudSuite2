@@ -5,7 +5,9 @@ import Layout from '../Layout'
 import NonLayout from '../Layout/NonLayout'
 import { useAuth } from '../context/AuthContext'
 
-const LoadingScreen = () => <div className="min-vh-100 d-flex align-items-center justify-content-center">Cargando sesión…</div>
+// Session bootstrap is represented by the global loading bar, avoiding a
+// blocking text screen between a route and its authenticated layout.
+const LoadingScreen = () => null
 
 const RequireAuth = ({ children }: { children: ReactNode }) => {
     const { user, loading } = useAuth()

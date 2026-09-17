@@ -1,6 +1,7 @@
 import { ReactNode, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from './AuthContext';
 import { authenticatedRequest } from '../lib/api';
+import { useLoadingBar } from './LoadingBarContext';
 
 export type CampaignOption = { id: string; nombre: string; memberCount: number; voterCount: number };
 export type EnabledAddons = { smartPlanner: boolean; voteStream: boolean };
@@ -36,6 +37,7 @@ function storedSnapshot(uid: string): CampaignSnapshot | null {
 
 export function CampaignProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
+  const { beginLoading } = useLoadingBar();
   const [organizationId, setOrganizationId] = useState<string | null>(null);
   const [role, setRole] = useState('');
   const [enabledAddons, setEnabledAddonsState] = useState<EnabledAddons>(defaultEnabledAddons);
@@ -45,6 +47,8 @@ export function CampaignProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState('');
   const latestReload = useRef(0);
   const activeCampaignIdRef = useRef<string | null>(null);
+
+  useEffect(() => loading ? beginLoading() : undefined, [beginLoading, loading]);
 
   useEffect(() => { activeCampaignIdRef.current = activeCampaignId; }, [activeCampaignId]);
 
