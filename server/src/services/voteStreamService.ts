@@ -18,8 +18,44 @@ async function access(user: DecodedIdToken, orgId: string, campId: string, write
   if (write && !['cliente', 'admin'].includes(String(user.role))) throw new ForbiddenError('Solo Cliente o administrador puede administrar Vote Stream.');
 }
 
+async function assignedAgentAccess(user: DecodedIdToken, orgId: string) {
+  if (user.orgId !== orgId) throw new ForbiddenError('No tenés acceso a esta organización.');
+  const [organization, membership] = await Promise.all([
+    db.collection('organizations').doc(orgId).get(),
+    db.collection('organizations').doc(orgId).collection('members').doc(user.uid).get()
+  ]);
+  if (!membership.exists) throw new ForbiddenError('No pertenecés a esta organización.');
+  if (organization.data()?.enabledAddons?.voteStream !== true) throw new ValidationError('Vote Stream no está habilitado en el plan de esta organización.');
+}
+
+async function assignableAgents(user: DecodedIdToken, orgId: string, campId: string) {
+  await access(user, orgId, campId, true);
+  const [members, profiles] = await Promise.all([
+    db.collection('organizations').doc(orgId).collection('members').get(),
+    db.collection('users').where('orgIds', 'array-contains', orgId).get()
+  ]);
+  const profileByUid = new Map(profiles.docs.map((profile) => [profile.id, profile.data()]));
+  const candidates = new Map<string, { uid: string; displayName?: string; email: string }>();
+  members.docs.forEach((member) => {
+    const profile = profileByUid.get(member.id) ?? {}; const data = member.data();
+    candidates.set(member.id, { uid: member.id, displayName: String(profile.displayName ?? data.displayName ?? '') || undefined, email: String(profile.email ?? data.email ?? '') });
+  });
+  profiles.docs.forEach((profile) => {
+    const data = profile.data();
+    if (!candidates.has(profile.id)) candidates.set(profile.id, { uid: profile.id, displayName: String(data.displayName ?? '') || undefined, email: String(data.email ?? '') });
+  });
+  return [...candidates.values()].sort((left, right) => (left.displayName ?? left.email).localeCompare(right.displayName ?? right.email));
+}
+
+async function validAgentIds(user: DecodedIdToken, orgId: string, campId: string, input: unknown) {
+  const ids = Array.isArray(input) ? [...new Set(input.filter((uid): uid is string => typeof uid === 'string' && uid.trim().length > 0).map((uid) => uid.trim()))].slice(0, 100) : [];
+  const allowed = new Set((await assignableAgents(user, orgId, campId)).map((agent) => agent.uid));
+  if (ids.some((uid) => !allowed.has(uid))) throw new ValidationError('Cada agente debe pertenecer a la organización de esta campaña.');
+  return ids;
+}
+
 async function agentStream(user: DecodedIdToken, orgId: string, campId: string, id: string) {
-  await access(user, orgId, campId);
+  await assignedAgentAccess(user, orgId);
   const ref = campaign(orgId, campId).collection('voteStreams').doc(id);
   const [stream, agent] = await Promise.all([ref.get(), ref.collection('agents').doc(user.uid).get()]);
   if (!stream.exists) throw new NotFoundError('La Vote Stream no existe.');
@@ -87,15 +123,16 @@ function margin(value: unknown) {
   if (populationSize < 2 || sampleSize < 1 || sampleSize > populationSize) throw new ValidationError('La muestra debe ser mayor a cero y no superar la población.');
   const confidenceLevel = Number(item.confidenceLevel ?? 95); const z = ({ 80: 1.28, 85: 1.44, 90: 1.64, 95: 1.96, 99: 2.58 } as Record<number, number>)[confidenceLevel];
   if (!z) throw new ValidationError('El nivel de confianza no es válido.');
-  const computedMargin = Math.round(Math.sqrt(0.25 / sampleSize) * z * Math.sqrt((populationSize - sampleSize) / (populationSize - 1)) * 100);
+  const computedMargin = Math.round(Math.sqrt(0.25 / sampleSize) * z * Math.sqrt((populationSize - sampleSize) / (populationSize - 1)) * 10_000) / 100;
   return { enabled: true, populationSize, confidenceLevel, sampleSize, computedMargin };
 }
 
 export async function listVoteStreams(user: DecodedIdToken, orgId: string, campId: string) { await access(user, orgId, campId, true); const snapshot = await campaign(orgId, campId).collection('voteStreams').orderBy('createdAt', 'desc').get(); return snapshot.docs.map(serialize); }
+export async function listAssignableAgents(user: DecodedIdToken, orgId: string, campId: string) { return assignableAgents(user, orgId, campId); }
 export async function getVoteStream(user: DecodedIdToken, orgId: string, campId: string, id: string) { await access(user, orgId, campId, true); const ref = campaign(orgId, campId).collection('voteStreams').doc(id); const snapshot = await ref.get(); if (!snapshot.exists) throw new NotFoundError('La Vote Stream no existe.'); const [configuration, agents, submissions] = await Promise.all([voteStreamConfiguration(ref, snapshot), ref.collection('agents').get(), ref.collection('submissions').get()]); return { ...configuration, agents: agents.docs.map(serialize), submissions: submissions.docs.map(serializeSubmission) }; }
 
 export async function listMyVoteStreams(user: DecodedIdToken, orgId: string, campId: string) {
-  await access(user, orgId, campId);
+  await assignedAgentAccess(user, orgId);
   const streams = await campaign(orgId, campId).collection('voteStreams').get();
   if (streams.empty) return [];
   const assignments = await db.getAll(...streams.docs.map((stream) => stream.ref.collection('agents').doc(user.uid)));
@@ -143,9 +180,9 @@ export async function listMySubmissions(user: DecodedIdToken, orgId: string, cam
 
 export async function createVoteStream(user: DecodedIdToken, orgId: string, campId: string, input: Record<string, unknown>) {
   await access(user, orgId, campId, true); const electoralSystem = String(input.electoralSystem) as ElectoralSystem; if (!systems.includes(electoralSystem)) throw new ValidationError('Elegí un sistema electoral válido.');
-  const candidates = normalizeCandidates(input.candidates); const linked = candidates.find((candidate) => candidate.linkedToPrincipal); if (linked) Object.assign(linked, await principalCandidate(orgId, campId));
+  const candidates = normalizeCandidates(input.candidates); const agentIds = await validAgentIds(user, orgId, campId, input.agentIds); const linked = candidates.find((candidate) => candidate.linkedToPrincipal); if (linked) Object.assign(linked, await principalCandidate(orgId, campId));
   const ref = campaign(orgId, campId).collection('voteStreams').doc(); const candidateEntries = candidates.map((candidate) => ({ ref: ref.collection('candidates').doc(), candidate })); const batch = db.batch(); const created = { name: text(input.name, 'El nombre', 160, true), electoralSystem, location: text(input.location, 'La localización', 200, true), date: text(input.date, 'La fecha', 20, true), status: 'pendiente', totalElectorsOrEstimatedVotes: number(input.totalElectorsOrEstimatedVotes, 'El total de votantes'), marginOfError: margin(input.marginOfError), createdBy: user.uid, createdAt: FieldValue.serverTimestamp(), closedAt: null, winnerCandidateId: null, liveResults: { totals: Object.fromEntries(candidateEntries.map(({ ref: candidateRef }) => [candidateRef.id, 0])), totalVotes: 0, updatedAt: FieldValue.serverTimestamp() } };
-  batch.set(ref, created); candidateEntries.forEach(({ ref: candidateRef, candidate }) => batch.set(candidateRef, candidate)); normalizeOptions(input.subLocations, 'La sub ubicación').forEach((name) => batch.set(ref.collection('subLocations').doc(), { name })); normalizeOptions(input.genderOptions, 'El género').forEach((name) => batch.set(ref.collection('genderOptions').doc(), { name })); normalizeOptions(input.ageRanges, 'El rango de edad').forEach((name) => batch.set(ref.collection('ageRanges').doc(), { name })); Array.isArray(input.agentIds) && input.agentIds.filter((uid): uid is string => typeof uid === 'string' && uid.trim().length > 0).slice(0, 100).forEach((uid) => batch.set(ref.collection('agents').doc(uid), { assignedAt: FieldValue.serverTimestamp(), assignedBy: user.uid })); await batch.commit(); return getVoteStream(user, orgId, campId, ref.id);
+  batch.set(ref, created); candidateEntries.forEach(({ ref: candidateRef, candidate }) => batch.set(candidateRef, candidate)); normalizeOptions(input.subLocations, 'La sub ubicación').forEach((name) => batch.set(ref.collection('subLocations').doc(), { name })); normalizeOptions(input.genderOptions, 'El género').forEach((name) => batch.set(ref.collection('genderOptions').doc(), { name })); normalizeOptions(input.ageRanges, 'El rango de edad').forEach((name) => batch.set(ref.collection('ageRanges').doc(), { name })); agentIds.forEach((uid) => batch.set(ref.collection('agents').doc(uid), { assignedAt: FieldValue.serverTimestamp(), assignedBy: user.uid })); await batch.commit(); return getVoteStream(user, orgId, campId, ref.id);
 }
 
 export async function updateVoteStream(user: DecodedIdToken, orgId: string, campId: string, id: string, input: Record<string, unknown>) {
@@ -153,7 +190,7 @@ export async function updateVoteStream(user: DecodedIdToken, orgId: string, camp
   if ('totalElectorsOrEstimatedVotes' in input) next.totalElectorsOrEstimatedVotes = number(input.totalElectorsOrEstimatedVotes, 'El total de votantes'); if ('marginOfError' in input) next.marginOfError = margin(input.marginOfError); if ('name' in input) next.name = text(input.name, 'El nombre', 160, true); if ('location' in input) next.location = text(input.location, 'La localización', 200, true); if ('date' in input) next.date = text(input.date, 'La fecha', 20, true); if ('electoralSystem' in input) { const electoralSystem = String(input.electoralSystem) as ElectoralSystem; if (!systems.includes(electoralSystem)) throw new ValidationError('Elegí un sistema electoral válido.'); next.electoralSystem = electoralSystem; }
   const collections = [{ key: 'subLocations', collection: 'subLocations', label: 'La sub ubicación' }, { key: 'genderOptions', collection: 'genderOptions', label: 'El género' }, { key: 'ageRanges', collection: 'ageRanges', label: 'El rango de edad' }] as const;
   for (const item of collections) if (item.key in input) { const existing = await ref.collection(item.collection).get(); const batch = db.batch(); existing.docs.forEach((document) => batch.delete(document.ref)); normalizeOptions(input[item.key], item.label).forEach((name) => batch.set(ref.collection(item.collection).doc(), { name })); await batch.commit(); }
-  if ('agentIds' in input) { const existing = await ref.collection('agents').get(); const batch = db.batch(); existing.docs.forEach((document) => batch.delete(document.ref)); if (Array.isArray(input.agentIds)) input.agentIds.filter((uid): uid is string => typeof uid === 'string' && uid.trim().length > 0).slice(0, 100).forEach((uid) => batch.set(ref.collection('agents').doc(uid), { assignedAt: FieldValue.serverTimestamp(), assignedBy: user.uid })); await batch.commit(); }
+  if ('agentIds' in input) { const agentIds = await validAgentIds(user, orgId, campId, input.agentIds); const existing = await ref.collection('agents').get(); const batch = db.batch(); existing.docs.forEach((document) => batch.delete(document.ref)); agentIds.forEach((uid) => batch.set(ref.collection('agents').doc(uid), { assignedAt: FieldValue.serverTimestamp(), assignedBy: user.uid })); await batch.commit(); }
   if ('candidates' in input) { const candidates = normalizeCandidates(input.candidates); const linked = candidates.find((candidate) => candidate.linkedToPrincipal); if (linked) Object.assign(linked, await principalCandidate(orgId, campId)); const existing = await ref.collection('candidates').get(); const batch = db.batch(); existing.docs.forEach((document) => batch.delete(document.ref)); candidates.forEach((candidate) => batch.set(ref.collection('candidates').doc(), candidate)); await batch.commit(); }
   await ref.update(next); return getVoteStream(user, orgId, campId, id);
 }

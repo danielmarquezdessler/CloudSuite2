@@ -36,7 +36,7 @@ service cloud.firestore {
     match /organizations/{orgId}/campaigns/{campId}/spTasks/{taskId}/comments/{commentId} { allow read: if campaignMember(orgId, campId); allow write: if false; }
     // Assigned Vote Stream agents may read just the configuration required for
     // their capture form. Submissions always pass through the Node API/Admin SDK.
-    function assignedVoteStreamAgent(orgId, campId, voteStreamId) { return campaignMember(orgId, campId) && exists(/databases/$(database)/documents/organizations/$(orgId)/campaigns/$(campId)/voteStreams/$(voteStreamId)/agents/$(request.auth.uid)); }
+    function assignedVoteStreamAgent(orgId, campId, voteStreamId) { return belongsToOrganization(orgId) && exists(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)) && exists(/databases/$(database)/documents/organizations/$(orgId)/campaigns/$(campId)/voteStreams/$(voteStreamId)/agents/$(request.auth.uid)); }
     // The stream root carries high-level metadata plus the live aggregate, but
     // never individual submissions. Campaign clients can observe totals while
     // agents still need an assignment to read the capture configuration.

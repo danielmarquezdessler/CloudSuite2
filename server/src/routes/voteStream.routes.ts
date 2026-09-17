@@ -11,6 +11,7 @@ voteStreamRouter.post(`${agentBase}/:voteStreamId/submissions`, ...guarded, cont
 voteStreamRouter.get(`${agentBase}/:voteStreamId/my-submissions`, ...guarded, controller.listMySubmissions);
 voteStreamRouter.get(base, ...guarded, controller.list);
 voteStreamRouter.post(base, ...guarded, controller.create);
+voteStreamRouter.get(`${base}/agents`, ...guarded, controller.agents);
 voteStreamRouter.get(`${base}/:voteStreamId`, ...guarded, controller.get);
 voteStreamRouter.put(`${base}/:voteStreamId`, ...guarded, controller.update);
 voteStreamRouter.post(`${base}/:voteStreamId/activate`, ...guarded, controller.activate);
