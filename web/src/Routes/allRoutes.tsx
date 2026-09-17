@@ -38,6 +38,7 @@ import Reports from '../pages/Modules/SmartPlanner/Reports';
 import Backlog from '../pages/Modules/SmartPlanner/Backlog';
 import PbiDetail from '../pages/Modules/SmartPlanner/PbiDetail';
 import VoteStreamList, { VoteStreamDetail } from '../pages/Modules/VoteStream';
+import VoteStreamAgentPanel from '../pages/Modules/VoteStreamAgentPanel';
 import LiveVisits from '../pages/Modules/Execution/LiveVisits';
 import Heatmap from '../pages/Modules/Execution/Heatmap';
 import Undecided from '../pages/Modules/Execution/Undecided';
@@ -225,6 +226,7 @@ const routes = [
     { path: "/control-de-revision", component: <AuditLog /> },
     { path: "/system/addons", component: <AddonsAdmin /> },
     { path: "/vote-stream", component: <VoteStreamList /> },
+    { path: "/vote-stream/mi-panel", component: <VoteStreamAgentPanel /> },
     { path: "/vote-stream/:voteStreamId", component: <VoteStreamDetail /> },
     { path: "/smartplanner", component: <SmartPlanner /> },
     { path: "/smartplanner/backlog", component: <Backlog /> },

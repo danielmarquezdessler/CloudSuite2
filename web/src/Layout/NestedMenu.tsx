@@ -4,6 +4,8 @@ import React, { useEffect, useState } from 'react';
 import FeatherIcon from 'feather-icons-react';
 import { useTranslation } from 'react-i18next';
 import { useActiveCampaign } from '../context/CampaignContext';
+import { useAuth } from '../context/AuthContext';
+import { useAuthenticatedQuery } from '../lib/api';
 
 interface MenuItem {
   id?: string;
@@ -15,6 +17,7 @@ interface MenuItem {
   dataPage?: string;
   submenu?: MenuItem[];
   addon?: 'smartPlanner' | 'voteStream';
+  agentOnly?: boolean;
   adminOnly?: boolean;
 }
 
@@ -39,7 +42,12 @@ function readOpenModule() {
 const NestedMenu: React.FC<{ menuItems: any }> = ({ menuItems }) => {
   const router = useLocation();
   const { t } = useTranslation();
-  const { enabledAddons, role } = useActiveCampaign();
+  const { user } = useAuth();
+  const { enabledAddons, role, organizationId, activeCampaignId } = useActiveCampaign();
+  const agentStreamsPath = enabledAddons.voteStream && organizationId && activeCampaignId
+    ? `/api/organizations/${organizationId}/campaigns/${activeCampaignId}/vote-stream/mine`
+    : null;
+  const agentStreams = useAuthenticatedQuery<Array<{ id: string }>>(user, agentStreamsPath, [agentStreamsPath]);
   const [openModule, setOpenModule] = useState<string | null>(readOpenModule);
 
   useEffect(() => {
@@ -55,6 +63,7 @@ const NestedMenu: React.FC<{ menuItems: any }> = ({ menuItems }) => {
   return <>
     {menuItems.map((item: MenuItem) => {
       if (item.adminOnly && role !== 'admin') return null;
+      if (item.agentOnly && (!agentStreams.data || agentStreams.data.length === 0)) return null;
       if (item.type === 'HEADER') return <li key={item.label} className="pc-item pc-caption"><label>{t(item.label)}</label></li>;
       if (item.addon) {
         const enabled = enabledAddons[item.addon];
