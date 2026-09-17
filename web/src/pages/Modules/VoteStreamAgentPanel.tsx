@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { doc, onSnapshot } from 'firebase/firestore';
 import { useAuth } from '../../context/AuthContext';
 import { useActiveCampaign } from '../../context/CampaignContext';
 import { authenticatedFetch, useAuthenticatedQuery } from '../../lib/api';
@@ -11,6 +12,7 @@ import PageContainer from '../../components/Shared/PageContainer';
 import PrimaryButton from '../../components/Shared/PrimaryButton';
 import SelectControl from '../../components/Shared/SelectControl';
 import Stack from '../../components/Shared/Stack';
+import { firestore } from '../../lib/firebase';
 
 type Option = { id: string; name: string };
 type Candidate = { id: string; name: string; party?: string | null; photoUrl?: string | null };
@@ -35,6 +37,7 @@ type Submission = {
   ageRangeId?: string;
 };
 type Notice = { message: string; variant: 'success' | 'error' };
+type LiveResults = { totals?: Record<string, number>; totalVotes?: number };
 
 const statusCopy: Record<AgentVoteStream['status'], { title: string; description: string }> = {
   activa: { title: 'Activas', description: 'Podés enviar resultados en este momento.' },
@@ -66,6 +69,14 @@ function StreamGroup({ status, streams, onSelect }: { status: AgentVoteStream['s
 
 function optionItems(options: Option[]) { return [{ value: '', label: 'Sin especificar' }, ...options.map((option) => ({ value: option.id, label: option.name }))]; }
 
+function QuickRanking({ stream, totals, onClose }: { stream: AgentVoteStream; totals: Record<string, number>; onClose: () => void }) {
+  const totalVotes = Object.values(totals).reduce((sum, value) => sum + value, 0);
+  const ranking = [...stream.candidates].sort((left, right) => (totals[right.id] ?? 0) - (totals[left.id] ?? 0));
+  return <ContentPanel icon="bar-chart-2" title={`Ranking actual · ${stream.name}`} subtitle="Solo lectura. Se actualiza en tiempo real con los envíos de los agentes.">
+    <Stack gap="sm"><div className="vote-agent-ranking" aria-live="polite">{ranking.map((candidate, index) => { const votes = totals[candidate.id] ?? 0; const percentage = totalVotes ? Math.round(votes / totalVotes * 100) : 0; return <Inline gap="sm" className="vote-agent-ranking__row" key={candidate.id}><span className="vote-agent-ranking__position">#{index + 1}</span><CandidateAvatar candidate={candidate} /><Stack gap="xs" className="vote-agent-ranking__name"><strong>{candidate.name}</strong><small className="text-muted">{candidate.party || 'Partido no informado'}</small></Stack><Stack gap="xs" className="vote-agent-ranking__metric"><strong>{percentage}%</strong><small>{votes} votos</small></Stack></Inline>; })}</div><Inline gap="sm" wrap className="justify-content-between align-items-center"><small className="text-muted">{totalVotes ? `${totalVotes} votos reportados` : 'Todavía no hay votos reportados'}</small><button type="button" className="btn btn-outline-secondary btn-sm" onClick={onClose}>Ocultar ranking</button></Inline></Stack>
+  </ContentPanel>;
+}
+
 export default function VoteStreamAgentPanel() {
   const { user } = useAuth();
   const { organizationId, activeCampaignId, enabledAddons } = useActiveCampaign();
@@ -80,6 +91,8 @@ export default function VoteStreamAgentPanel() {
   const [ageRangeId, setAgeRangeId] = useState('');
   const [sending, setSending] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
+  const [rankingOpen, setRankingOpen] = useState(false);
+  const [liveResults, setLiveResults] = useState<LiveResults | null>(null);
 
   useEffect(() => {
     if (!selected) return;
@@ -87,7 +100,15 @@ export default function VoteStreamAgentPanel() {
     setSubLocationId('');
     setGenderId('');
     setAgeRangeId('');
+    setRankingOpen(false);
   }, [selected]);
+
+  useEffect(() => {
+    if (!organizationId || !activeCampaignId || !selected) { setLiveResults(null); return; }
+    return onSnapshot(doc(firestore, 'organizations', organizationId, 'campaigns', activeCampaignId, 'voteStreams', selected.id), (snapshot) => {
+      setLiveResults((snapshot.data()?.liveResults as LiveResults | undefined) ?? null);
+    }, () => setLiveResults(null));
+  }, [activeCampaignId, organizationId, selected?.id]);
 
   const streams = streamsQ.data ?? [];
   const grouped = (status: AgentVoteStream['status']) => streams.filter((stream) => stream.status === status);
@@ -108,6 +129,7 @@ export default function VoteStreamAgentPanel() {
       setGenderId('');
       setAgeRangeId('');
       await submissionsQ.reload();
+      setRankingOpen(true);
       setNotice({ message: `Envío registrado: ${summary}. Podés cargar una nueva tanda.`, variant: 'success' });
     } catch (error) {
       setNotice({ message: error instanceof Error ? error.message : 'No pudimos enviar los resultados.', variant: 'error' });
@@ -137,9 +159,10 @@ export default function VoteStreamAgentPanel() {
             {selected.genderOptions.length > 0 && <Stack gap="xs"><label className="form-label mb-0">Género</label><SelectControl ariaLabel="Género" label="Género" value={genderId} onChange={setGenderId} options={optionItems(selected.genderOptions)} /></Stack>}
             {selected.ageRanges.length > 0 && <Stack gap="xs"><label className="form-label mb-0">Rango de edad</label><SelectControl ariaLabel="Rango de edad" label="Rango de edad" value={ageRangeId} onChange={setAgeRangeId} options={optionItems(selected.ageRanges)} /></Stack>}
           </Inline>
-          <Inline gap="sm" wrap className="align-items-center"><PrimaryButton icon="check" type="submit" disabled={sending}>{sending ? 'Enviando…' : 'Confirmar y enviar'}</PrimaryButton><button type="button" className="btn btn-outline-secondary" onClick={() => setSelectedId(null)} disabled={sending}>Cerrar formulario</button></Inline>
+          <Inline gap="sm" wrap className="align-items-center vote-agent-submit-actions"><PrimaryButton icon="check" type="submit" disabled={sending}>{sending ? 'Enviando…' : 'Confirmar y enviar'}</PrimaryButton><button type="button" className="btn btn-outline-primary" onClick={() => setRankingOpen(true)}>Ver ranking actual</button><button type="button" className="btn btn-outline-secondary" onClick={() => setSelectedId(null)} disabled={sending}>Cerrar formulario</button></Inline>
         </Stack></form>
       </ContentPanel>
+      {rankingOpen && <QuickRanking stream={selected} totals={liveResults?.totals ?? {}} onClose={() => setRankingOpen(false)} />}
       <ContentPanel icon="calendar" title="Mis envíos" subtitle="Solo vos podés consultar este historial de carga.">
         {submissionsQ.loading ? <div aria-busy="true" /> : submissionsQ.data?.length ? <Stack gap="sm">{submissionsQ.data.map((submission) => <article className="vote-agent-submission" key={submission.id} data-card="true"><Stack gap="xs"><small className="text-muted">{new Date(submission.submittedAt ?? submission.createdAt ?? '').toLocaleString('es-AR')}</small><Inline gap="xs" wrap>{Object.entries(submission.votesByCandidate ?? {}).map(([candidateId, amount]) => <span className="vote-agent-submission__vote" key={candidateId}>{selected.candidates.find((candidate) => candidate.id === candidateId)?.name ?? 'Candidato'}: <strong>{amount}</strong></span>)}</Inline><small className="text-muted">{[selected.subLocations.find((option) => option.id === submission.subLocationId)?.name, selected.genderOptions.find((option) => option.id === submission.genderId)?.name, selected.ageRanges.find((option) => option.id === submission.ageRangeId)?.name].filter(Boolean).join(' · ') || 'Sin segmentación adicional'}</small></Stack></article>)}</Stack> : <EmptyState icon="calendar" title="Todavía no enviaste resultados" description="Tu historial aparecerá aquí después del primer envío." />}
       </ContentPanel>

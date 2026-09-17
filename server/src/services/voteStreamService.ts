@@ -111,13 +111,27 @@ export async function createSubmission(user: DecodedIdToken, orgId: string, camp
   if (subLocationId && !subLocations.docs.some((item) => item.id === subLocationId)) throw new ValidationError('La sub ubicación no pertenece a esta Vote Stream.');
   if (genderId && !genders.docs.some((item) => item.id === genderId)) throw new ValidationError('El género no pertenece a esta Vote Stream.');
   if (ageRangeId && !ageRanges.docs.some((item) => item.id === ageRangeId)) throw new ValidationError('El rango de edad no pertenece a esta Vote Stream.');
+  const votesByCandidate = votes(input.votesByCandidate, new Set(candidates.docs.map((item) => item.id)));
   const submission = {
     submittedBy: user.uid,
     submittedAt: FieldValue.serverTimestamp(),
-    votesByCandidate: votes(input.votesByCandidate, new Set(candidates.docs.map((item) => item.id))),
+    votesByCandidate,
     ...(subLocationId ? { subLocationId } : {}), ...(genderId ? { genderId } : {}), ...(ageRangeId ? { ageRangeId } : {})
   };
-  const submissionRef = await ref.collection('submissions').add(submission);
+  // Only this aggregate is exposed live to agents. Individual submissions stay
+  // backend-only, so an agent never learns who sent another agent's results.
+  const historicalSubmissions = await ref.collection('submissions').get();
+  const historicalTotals = Object.fromEntries(candidates.docs.map((candidate) => [candidate.id, 0])) as Record<string, number>;
+  historicalSubmissions.docs.forEach((existing) => Object.entries(existing.data().votesByCandidate ?? {}).forEach(([candidateId, count]) => { historicalTotals[candidateId] = (historicalTotals[candidateId] ?? 0) + (Number(count) || 0); }));
+  const submissionRef = ref.collection('submissions').doc();
+  await db.runTransaction(async (transaction) => {
+    const current = await transaction.get(ref);
+    const existingLive = current.data()?.liveResults?.totals as Record<string, unknown> | undefined;
+    const totals = Object.fromEntries(candidates.docs.map((candidate) => [candidate.id, Number(existingLive?.[candidate.id] ?? historicalTotals[candidate.id] ?? 0)])) as Record<string, number>;
+    Object.entries(votesByCandidate).forEach(([candidateId, count]) => { totals[candidateId] = (totals[candidateId] ?? 0) + count; });
+    transaction.set(submissionRef, submission);
+    transaction.update(ref, { liveResults: { totals, totalVotes: Object.values(totals).reduce((sum, count) => sum + count, 0), updatedAt: FieldValue.serverTimestamp() } });
+  });
   return serializeSubmission(await submissionRef.get());
 }
 
@@ -130,8 +144,8 @@ export async function listMySubmissions(user: DecodedIdToken, orgId: string, cam
 export async function createVoteStream(user: DecodedIdToken, orgId: string, campId: string, input: Record<string, unknown>) {
   await access(user, orgId, campId, true); const electoralSystem = String(input.electoralSystem) as ElectoralSystem; if (!systems.includes(electoralSystem)) throw new ValidationError('Elegí un sistema electoral válido.');
   const candidates = normalizeCandidates(input.candidates); const linked = candidates.find((candidate) => candidate.linkedToPrincipal); if (linked) Object.assign(linked, await principalCandidate(orgId, campId));
-  const ref = campaign(orgId, campId).collection('voteStreams').doc(); const batch = db.batch(); const created = { name: text(input.name, 'El nombre', 160, true), electoralSystem, location: text(input.location, 'La localización', 200, true), date: text(input.date, 'La fecha', 20, true), status: 'pendiente', totalElectorsOrEstimatedVotes: number(input.totalElectorsOrEstimatedVotes, 'El total de votantes'), marginOfError: margin(input.marginOfError), createdBy: user.uid, createdAt: FieldValue.serverTimestamp(), closedAt: null, winnerCandidateId: null };
-  batch.set(ref, created); candidates.forEach((candidate) => batch.set(ref.collection('candidates').doc(), candidate)); normalizeOptions(input.subLocations, 'La sub ubicación').forEach((name) => batch.set(ref.collection('subLocations').doc(), { name })); normalizeOptions(input.genderOptions, 'El género').forEach((name) => batch.set(ref.collection('genderOptions').doc(), { name })); normalizeOptions(input.ageRanges, 'El rango de edad').forEach((name) => batch.set(ref.collection('ageRanges').doc(), { name })); Array.isArray(input.agentIds) && input.agentIds.filter((uid): uid is string => typeof uid === 'string' && uid.trim().length > 0).slice(0, 100).forEach((uid) => batch.set(ref.collection('agents').doc(uid), { assignedAt: FieldValue.serverTimestamp(), assignedBy: user.uid })); await batch.commit(); return getVoteStream(user, orgId, campId, ref.id);
+  const ref = campaign(orgId, campId).collection('voteStreams').doc(); const candidateEntries = candidates.map((candidate) => ({ ref: ref.collection('candidates').doc(), candidate })); const batch = db.batch(); const created = { name: text(input.name, 'El nombre', 160, true), electoralSystem, location: text(input.location, 'La localización', 200, true), date: text(input.date, 'La fecha', 20, true), status: 'pendiente', totalElectorsOrEstimatedVotes: number(input.totalElectorsOrEstimatedVotes, 'El total de votantes'), marginOfError: margin(input.marginOfError), createdBy: user.uid, createdAt: FieldValue.serverTimestamp(), closedAt: null, winnerCandidateId: null, liveResults: { totals: Object.fromEntries(candidateEntries.map(({ ref: candidateRef }) => [candidateRef.id, 0])), totalVotes: 0, updatedAt: FieldValue.serverTimestamp() } };
+  batch.set(ref, created); candidateEntries.forEach(({ ref: candidateRef, candidate }) => batch.set(candidateRef, candidate)); normalizeOptions(input.subLocations, 'La sub ubicación').forEach((name) => batch.set(ref.collection('subLocations').doc(), { name })); normalizeOptions(input.genderOptions, 'El género').forEach((name) => batch.set(ref.collection('genderOptions').doc(), { name })); normalizeOptions(input.ageRanges, 'El rango de edad').forEach((name) => batch.set(ref.collection('ageRanges').doc(), { name })); Array.isArray(input.agentIds) && input.agentIds.filter((uid): uid is string => typeof uid === 'string' && uid.trim().length > 0).slice(0, 100).forEach((uid) => batch.set(ref.collection('agents').doc(uid), { assignedAt: FieldValue.serverTimestamp(), assignedBy: user.uid })); await batch.commit(); return getVoteStream(user, orgId, campId, ref.id);
 }
 
 export async function updateVoteStream(user: DecodedIdToken, orgId: string, campId: string, id: string, input: Record<string, unknown>) {

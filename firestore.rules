@@ -37,7 +37,10 @@ service cloud.firestore {
     // Assigned Vote Stream agents may read just the configuration required for
     // their capture form. Submissions always pass through the Node API/Admin SDK.
     function assignedVoteStreamAgent(orgId, campId, voteStreamId) { return campaignMember(orgId, campId) && exists(/databases/$(database)/documents/organizations/$(orgId)/campaigns/$(campId)/voteStreams/$(voteStreamId)/agents/$(request.auth.uid)); }
-    match /organizations/{orgId}/campaigns/{campId}/voteStreams/{voteStreamId} { allow read: if assignedVoteStreamAgent(orgId, campId, voteStreamId); allow write: if false; }
+    // The stream root carries high-level metadata plus the live aggregate, but
+    // never individual submissions. Campaign clients can observe totals while
+    // agents still need an assignment to read the capture configuration.
+    match /organizations/{orgId}/campaigns/{campId}/voteStreams/{voteStreamId} { allow read: if assignedVoteStreamAgent(orgId, campId, voteStreamId) || isCliente(orgId); allow write: if false; }
     match /organizations/{orgId}/campaigns/{campId}/voteStreams/{voteStreamId}/candidates/{candidateId} { allow read: if assignedVoteStreamAgent(orgId, campId, voteStreamId); allow write: if false; }
     match /organizations/{orgId}/campaigns/{campId}/voteStreams/{voteStreamId}/subLocations/{subLocationId} { allow read: if assignedVoteStreamAgent(orgId, campId, voteStreamId); allow write: if false; }
     match /organizations/{orgId}/campaigns/{campId}/voteStreams/{voteStreamId}/genderOptions/{genderId} { allow read: if assignedVoteStreamAgent(orgId, campId, voteStreamId); allow write: if false; }
