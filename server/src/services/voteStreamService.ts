@@ -1,12 +1,13 @@
 import { DecodedIdToken } from 'firebase-admin/auth';
 import { FieldValue } from 'firebase-admin/firestore';
 import { db } from '../config/firebase.js';
-import { assertCampaignAccess, NotFoundError, ValidationError } from './access.service.js';
+import { assertCampaignAccess, ForbiddenError, NotFoundError, ValidationError } from './access.service.js';
 
 const systems = ['mayoritario_uninominal', 'votacion_bloque', 'segunda_vuelta', 'proporcional_plurinominal', 'orden_preferencia', 'mixto'] as const;
 type ElectoralSystem = typeof systems[number];
 const campaign = (orgId: string, campId: string) => db.collection('organizations').doc(orgId).collection('campaigns').doc(campId);
 const serialize = (doc: FirebaseFirestore.QueryDocumentSnapshot | FirebaseFirestore.DocumentSnapshot) => ({ id: doc.id, ...doc.data(), createdAt: doc.data()?.createdAt?.toDate?.().toISOString?.() ?? null, closedAt: doc.data()?.closedAt?.toDate?.().toISOString?.() ?? null });
+const serializeSubmission = (doc: FirebaseFirestore.QueryDocumentSnapshot | FirebaseFirestore.DocumentSnapshot) => ({ id: doc.id, ...doc.data(), submittedAt: doc.data()?.submittedAt?.toDate?.().toISOString?.() ?? null });
 const text = (value: unknown, label: string, max = 160, required = false) => { const valueText = typeof value === 'string' ? value.trim() : ''; if (required && !valueText) throw new ValidationError(`${label} es obligatorio.`); return valueText.slice(0, max); };
 const number = (value: unknown, label: string, required = false) => { if (value === undefined || value === null || value === '') { if (required) throw new ValidationError(`${label} es obligatorio.`); return null; } const parsed = Number(value); if (!Number.isFinite(parsed) || parsed < 0) throw new ValidationError(`${label} debe ser un número válido.`); return parsed; };
 
@@ -14,7 +15,44 @@ async function access(user: DecodedIdToken, orgId: string, campId: string, write
   assertCampaignAccess(user, orgId, campId);
   const organization = await db.collection('organizations').doc(orgId).get();
   if (organization.data()?.enabledAddons?.voteStream !== true) throw new ValidationError('Vote Stream no está habilitado en el plan de esta organización.');
-  if (write && !['cliente', 'admin'].includes(String(user.role))) throw new ValidationError('Solo Cliente o administrador puede administrar Vote Stream.');
+  if (write && !['cliente', 'admin'].includes(String(user.role))) throw new ForbiddenError('Solo Cliente o administrador puede administrar Vote Stream.');
+}
+
+async function agentStream(user: DecodedIdToken, orgId: string, campId: string, id: string) {
+  await access(user, orgId, campId);
+  const ref = campaign(orgId, campId).collection('voteStreams').doc(id);
+  const [stream, agent] = await Promise.all([ref.get(), ref.collection('agents').doc(user.uid).get()]);
+  if (!stream.exists) throw new NotFoundError('La Vote Stream no existe.');
+  if (!agent.exists) throw new ForbiddenError('No estás asignado como agente de sondeo en esta Vote Stream.');
+  return { ref, stream };
+}
+
+async function voteStreamConfiguration(ref: FirebaseFirestore.DocumentReference, stream?: FirebaseFirestore.DocumentSnapshot) {
+  const snapshot = stream ?? await ref.get();
+  if (!snapshot.exists) throw new NotFoundError('La Vote Stream no existe.');
+  const [candidates, subLocations, genders, ageRanges] = await Promise.all([
+    ref.collection('candidates').orderBy('order').get(), ref.collection('subLocations').get(), ref.collection('genderOptions').get(), ref.collection('ageRanges').get()
+  ]);
+  return { ...serialize(snapshot), candidates: candidates.docs.map(serialize), subLocations: subLocations.docs.map(serialize), genderOptions: genders.docs.map(serialize), ageRanges: ageRanges.docs.map(serialize) };
+}
+
+function optionalOptionId(value: unknown, label: string) {
+  if (value === undefined || value === null || value === '') return null;
+  if (typeof value !== 'string' || !value.trim()) throw new ValidationError(`${label} no es válido.`);
+  return value.trim();
+}
+
+function votes(value: unknown, candidateIds: Set<string>) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new ValidationError('Indicá votos por candidato.');
+  const entries = Object.entries(value as Record<string, unknown>);
+  if (!entries.length) throw new ValidationError('Indicá al menos un candidato con votos.');
+  if (entries.length > candidateIds.size) throw new ValidationError('La submission contiene candidatos no válidos.');
+  return Object.fromEntries(entries.map(([candidateId, rawVotes]) => {
+    if (!candidateIds.has(candidateId)) throw new ValidationError('La submission contiene un candidato que no pertenece a esta Vote Stream.');
+    const count = Number(rawVotes);
+    if (!Number.isInteger(count) || count < 0) throw new ValidationError('Los votos por candidato deben ser números enteros positivos o cero.');
+    return [candidateId, count];
+  }));
 }
 
 function normalizeOptions(items: unknown, label: string) {
@@ -53,8 +91,41 @@ function margin(value: unknown) {
   return { enabled: true, populationSize, confidenceLevel, sampleSize, computedMargin };
 }
 
-export async function listVoteStreams(user: DecodedIdToken, orgId: string, campId: string) { await access(user, orgId, campId); const snapshot = await campaign(orgId, campId).collection('voteStreams').orderBy('createdAt', 'desc').get(); return snapshot.docs.map(serialize); }
-export async function getVoteStream(user: DecodedIdToken, orgId: string, campId: string, id: string) { await access(user, orgId, campId); const ref = campaign(orgId, campId).collection('voteStreams').doc(id); const snapshot = await ref.get(); if (!snapshot.exists) throw new NotFoundError('La Vote Stream no existe.'); const [candidates, subLocations, genders, ageRanges, agents, submissions] = await Promise.all([ref.collection('candidates').orderBy('order').get(), ref.collection('subLocations').get(), ref.collection('genderOptions').get(), ref.collection('ageRanges').get(), ref.collection('agents').get(), ref.collection('submissions').get()]); return { ...serialize(snapshot), candidates: candidates.docs.map(serialize), subLocations: subLocations.docs.map(serialize), genderOptions: genders.docs.map(serialize), ageRanges: ageRanges.docs.map(serialize), agents: agents.docs.map(serialize), submissions: submissions.docs.map(serialize) }; }
+export async function listVoteStreams(user: DecodedIdToken, orgId: string, campId: string) { await access(user, orgId, campId, true); const snapshot = await campaign(orgId, campId).collection('voteStreams').orderBy('createdAt', 'desc').get(); return snapshot.docs.map(serialize); }
+export async function getVoteStream(user: DecodedIdToken, orgId: string, campId: string, id: string) { await access(user, orgId, campId, true); const ref = campaign(orgId, campId).collection('voteStreams').doc(id); const snapshot = await ref.get(); if (!snapshot.exists) throw new NotFoundError('La Vote Stream no existe.'); const [configuration, agents, submissions] = await Promise.all([voteStreamConfiguration(ref, snapshot), ref.collection('agents').get(), ref.collection('submissions').get()]); return { ...configuration, agents: agents.docs.map(serialize), submissions: submissions.docs.map(serializeSubmission) }; }
+
+export async function listMyVoteStreams(user: DecodedIdToken, orgId: string, campId: string) {
+  await access(user, orgId, campId);
+  const streams = await campaign(orgId, campId).collection('voteStreams').get();
+  if (streams.empty) return [];
+  const assignments = await db.getAll(...streams.docs.map((stream) => stream.ref.collection('agents').doc(user.uid)));
+  const assignedStreams = streams.docs.filter((_, index) => assignments[index]?.exists);
+  return (await Promise.all(assignedStreams.map((stream) => voteStreamConfiguration(stream.ref, stream)))).sort((left, right) => String((right as Record<string, unknown>).date ?? '').localeCompare(String((left as Record<string, unknown>).date ?? '')));
+}
+
+export async function createSubmission(user: DecodedIdToken, orgId: string, campId: string, id: string, input: Record<string, unknown>) {
+  const { ref, stream } = await agentStream(user, orgId, campId, id);
+  if (stream.data()?.status !== 'activa') throw new ValidationError('Esta Vote Stream no está activa, no se pueden enviar datos.');
+  const [candidates, subLocations, genders, ageRanges] = await Promise.all([ref.collection('candidates').get(), ref.collection('subLocations').get(), ref.collection('genderOptions').get(), ref.collection('ageRanges').get()]);
+  const subLocationId = optionalOptionId(input.subLocationId, 'La sub ubicación'); const genderId = optionalOptionId(input.genderId, 'El género'); const ageRangeId = optionalOptionId(input.ageRangeId, 'El rango de edad');
+  if (subLocationId && !subLocations.docs.some((item) => item.id === subLocationId)) throw new ValidationError('La sub ubicación no pertenece a esta Vote Stream.');
+  if (genderId && !genders.docs.some((item) => item.id === genderId)) throw new ValidationError('El género no pertenece a esta Vote Stream.');
+  if (ageRangeId && !ageRanges.docs.some((item) => item.id === ageRangeId)) throw new ValidationError('El rango de edad no pertenece a esta Vote Stream.');
+  const submission = {
+    submittedBy: user.uid,
+    submittedAt: FieldValue.serverTimestamp(),
+    votesByCandidate: votes(input.votesByCandidate, new Set(candidates.docs.map((item) => item.id))),
+    ...(subLocationId ? { subLocationId } : {}), ...(genderId ? { genderId } : {}), ...(ageRangeId ? { ageRangeId } : {})
+  };
+  const submissionRef = await ref.collection('submissions').add(submission);
+  return serializeSubmission(await submissionRef.get());
+}
+
+export async function listMySubmissions(user: DecodedIdToken, orgId: string, campId: string, id: string) {
+  const { ref } = await agentStream(user, orgId, campId, id);
+  const submissions = await ref.collection('submissions').get();
+  return submissions.docs.filter((submission) => submission.data().submittedBy === user.uid).sort((left, right) => (right.data().submittedAt?.toMillis?.() ?? 0) - (left.data().submittedAt?.toMillis?.() ?? 0)).map(serializeSubmission);
+}
 
 export async function createVoteStream(user: DecodedIdToken, orgId: string, campId: string, input: Record<string, unknown>) {
   await access(user, orgId, campId, true); const electoralSystem = String(input.electoralSystem) as ElectoralSystem; if (!systems.includes(electoralSystem)) throw new ValidationError('Elegí un sistema electoral válido.');

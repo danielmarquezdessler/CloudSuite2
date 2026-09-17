@@ -34,6 +34,14 @@ service cloud.firestore {
     // PBI comments are the sole SmartPlanner task feed read directly by the browser for live discussion.
     // The API/Admin SDK remains the only writer.
     match /organizations/{orgId}/campaigns/{campId}/spTasks/{taskId}/comments/{commentId} { allow read: if campaignMember(orgId, campId); allow write: if false; }
+    // Assigned Vote Stream agents may read just the configuration required for
+    // their capture form. Submissions always pass through the Node API/Admin SDK.
+    function assignedVoteStreamAgent(orgId, campId, voteStreamId) { return campaignMember(orgId, campId) && exists(/databases/$(database)/documents/organizations/$(orgId)/campaigns/$(campId)/voteStreams/$(voteStreamId)/agents/$(request.auth.uid)); }
+    match /organizations/{orgId}/campaigns/{campId}/voteStreams/{voteStreamId} { allow read: if assignedVoteStreamAgent(orgId, campId, voteStreamId); allow write: if false; }
+    match /organizations/{orgId}/campaigns/{campId}/voteStreams/{voteStreamId}/candidates/{candidateId} { allow read: if assignedVoteStreamAgent(orgId, campId, voteStreamId); allow write: if false; }
+    match /organizations/{orgId}/campaigns/{campId}/voteStreams/{voteStreamId}/subLocations/{subLocationId} { allow read: if assignedVoteStreamAgent(orgId, campId, voteStreamId); allow write: if false; }
+    match /organizations/{orgId}/campaigns/{campId}/voteStreams/{voteStreamId}/genderOptions/{genderId} { allow read: if assignedVoteStreamAgent(orgId, campId, voteStreamId); allow write: if false; }
+    match /organizations/{orgId}/campaigns/{campId}/voteStreams/{voteStreamId}/ageRanges/{ageRangeId} { allow read: if assignedVoteStreamAgent(orgId, campId, voteStreamId); allow write: if false; }
     match /organizations/{orgId}/campaigns/{campId}/auditLog/{logId} { allow read: if isCliente(orgId) && canAccessCampaign(campId); allow write: if false; }
     match /organizations/{orgId}/campaigns/{campId}/{document=**} { allow read, write: if false; }
     match /users/{uid} { allow read, update: if signedIn() && request.auth.uid == uid; allow create, delete: if false; }
