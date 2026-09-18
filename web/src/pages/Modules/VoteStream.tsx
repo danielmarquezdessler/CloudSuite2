@@ -680,6 +680,7 @@ export default function VoteStreamList() {
                     key={stream.id}
                     className="vote-stream-card"
                     data-card="true"
+                    data-testid={`vote-stream-card-${stream.id}`}
                   >
                     <Stack gap="sm">
                       <Inline gap="sm" className="justify-content-between">
@@ -699,11 +700,12 @@ export default function VoteStreamList() {
                         <Link
                           className="btn btn-primary btn-sm"
                           to={`/vote-stream/${stream.id}`}
+                          data-testid="vote-stream-action-view"
                         >
                           Visualizar
                         </Link>
-                        <button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => void openEdit(stream)}>Editar</button>
-                        <button type="button" className="btn btn-outline-danger btn-sm" onClick={() => void removeFromList(stream)}>Eliminar</button>
+                        <button type="button" className="btn btn-outline-secondary btn-sm" data-testid="vote-stream-action-edit" onClick={() => void openEdit(stream)}>Editar</button>
+                        <button type="button" className="btn btn-outline-danger btn-sm" data-testid="vote-stream-action-delete" onClick={() => void removeFromList(stream)}>Eliminar</button>
                       </Inline>
                     </Stack>
                   </article>
