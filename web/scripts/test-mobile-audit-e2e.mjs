@@ -102,6 +102,7 @@ try {
     await page.goto(webUrl, { waitUntil: 'domcontentloaded' }); await auditLogin(page, `${width}px login`);
     await page.getByLabel('Email').fill(env.E2E_EMAIL); await page.getByLabel('Contraseña').fill(env.E2E_PASSWORD); await page.getByRole('button', { name: 'Ingresar', exact: true }).click();
     await page.waitForURL(/dashboard/); await page.locator('.cs-topbar__mobile .cs-campaign-selector:not([disabled])').waitFor();
+    await page.getByRole('button', { name: 'Abrir menú lateral', exact: true }).click(); await page.locator('.pc-sidebar.mob-sidebar-active').waitFor(); await page.locator('.pc-menu-overlay').click({ position: { x: width - 20, y: 160 } });
     await page.getByRole('button', { name: 'Buscar electores', exact: true }).click(); await page.locator('#mobile-elector-search').waitFor({ state: 'visible' }); await audit(page, `${width}px header`);
     await page.getByLabel('Cerrar búsqueda').click();
     await page.goto(`${webUrl}/dashboard`, { waitUntil: 'domcontentloaded' }); await page.locator('.cd-dashboard').waitFor(); await audit(page, `${width}px dashboard`);

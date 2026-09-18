@@ -28,27 +28,20 @@ const Layout = ({ children }: LayoutProps) => {
   };
   const toogleMobileSidebarHide = () => {
     const sidebarHideId = document.getElementById("pc-sidebar-hide") as HTMLDivElement | null;
-
-    if (sidebarHideId) {
-      sidebarHideId.classList.toggle("mob-sidebar-active");
-    }
-
-    // Create a new element
+    if (!sidebarHideId) return;
+    const opening = !sidebarHideId.classList.contains("mob-sidebar-active");
+    sidebarHideId.classList.toggle("mob-sidebar-active", opening);
+    document.querySelectorAll('.pc-menu-overlay').forEach((overlay) => overlay.remove());
+    if (!opening) return;
     const newElement = document.createElement('div');
-    newElement.className = 'pc-menu-overlay'; // Set the desired class name
-
-    // Insert the new element after the .navbar-wrapper
+    newElement.className = 'pc-menu-overlay';
     const navbarWrapper = document.querySelector('.navbar-wrapper') as Element | null;
     if (navbarWrapper) {
       navbarWrapper.insertAdjacentElement('afterend', newElement);
     }
-
-    // Add an event listener to remove the "mob-sidebar-active" class when the new element is clicked
-    newElement.addEventListener('click', function () {
-      if (sidebarHideId) {
-        sidebarHideId.classList.remove("mob-sidebar-active");
-        newElement.remove(); // Remove the new element when clicked
-      }
+    newElement.addEventListener('click', () => {
+      sidebarHideId.classList.remove("mob-sidebar-active");
+      newElement.remove();
     });
   };
 
