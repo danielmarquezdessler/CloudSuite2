@@ -96,6 +96,22 @@ try {
   await signIn(agentPage, agent.email, password);
   console.log('Preparado: sesión de agente iniciada.');
 
+  const agentToken = await agentPage.evaluate(async () => {
+    const { auth } = await import('/src/lib/firebase.ts');
+    return auth.currentUser?.getIdToken(true) ?? null;
+  });
+  if (!agentToken) throw new Error('No se pudo recuperar el token del agente para validar el backend.');
+  const headers = { Authorization: `Bearer ${agentToken}` };
+  const protectedResponse = await fetch(`${apiUrl}/api/organizations/${orgId}/campaigns/${campId}/vote-streams/${streamRef.id}`, { headers });
+  if (protectedResponse.status !== 403) throw new Error(`El endpoint administrativo devolvió ${protectedResponse.status} al agente; debía devolver 403.`);
+  const mineResponse = await fetch(`${apiUrl}/api/organizations/${orgId}/campaigns/${campId}/vote-stream/mine`, { headers });
+  if (!mineResponse.ok) throw new Error(`El endpoint base del agente falló (${mineResponse.status}).`);
+  const minePayload = await mineResponse.json();
+  const forbiddenPayloadKeys = ['liveResults', 'winnerCandidateId', 'totalVotes', 'totalElectorsOrEstimatedVotes', 'marginOfError', 'submissions', 'agents'];
+  const payloadText = JSON.stringify(minePayload);
+  if (forbiddenPayloadKeys.some((key) => payloadText.includes(`"${key}"`))) throw new Error('El payload base del agente filtró resultados o metadatos administrativos.');
+  console.log('0/5 OK: token de agente recibió 403 del endpoint de resultados y /mine solo devolvió configuración permitida.');
+
   await adminPage.goto(`${webUrl}/vote-stream/${streamRef.id}`);
   await adminPage.getByRole('heading', { name: `Data Entry ${suffix}`, exact: true }).waitFor();
   await adminPage.locator('[data-vote-ranking-id="candidate-two"]').getByText('10 votos', { exact: false }).waitFor();
@@ -120,6 +136,7 @@ try {
   });
 
   await agentPage.goto(`${webUrl}/vote-stream/mi-panel`);
+  if (await agentPage.getByRole('heading', { name: 'Ranking actual', exact: true }).count() || await agentPage.locator('[data-vote-ranking-id]').count()) throw new Error('El panel del agente todavía mostró posiciones o resultados.');
   const activeCard = agentPage.locator('.vote-agent-stream', { hasText: `Data Entry ${suffix}` });
   await activeCard.getByRole('button', { name: 'Cargar resultados', exact: true }).click();
   await agentPage.getByLabel('Votos para Candidata Uno').fill('13');
@@ -127,6 +144,11 @@ try {
   await agentPage.getByRole('button', { name: 'Enviar resultado', exact: true }).click();
   await agentPage.getByRole('button', { name: 'Confirmar y enviar', exact: true }).click();
   if (!(await submitted).ok()) throw new Error('El agente no pudo enviar el dato de prueba.');
+  const personalResponse = await fetch(`${apiUrl}/api/organizations/${orgId}/campaigns/${campId}/vote-stream/${streamRef.id}/my-submissions`, { headers });
+  const personalPayload = await personalResponse.json();
+  if (!personalResponse.ok || personalPayload.length !== 1 || personalPayload[0]?.submittedBy !== agent.uid || personalPayload[0]?.votes !== 13 || JSON.stringify(personalPayload).includes('liveResults')) throw new Error('Mis envíos no quedó limitado a la actividad propia y sin agregados.');
+  if (await agentPage.getByRole('button', { name: /editar|eliminar/i }).count()) throw new Error('Mis envíos expuso una acción de edición o eliminación al agente.');
+  console.log('1/5 OK: el agente solo vio Data Entry y Mis envíos propio, en modo lectura y sin ranking.');
   await adminPage.locator('[data-vote-ranking-id="candidate-one"]').getByText('18 votos', { exact: false }).waitFor();
   const firstAfter = await adminPage.locator('[data-vote-ranking-id]').first().getAttribute('data-vote-ranking-id');
   if (firstAfter !== 'candidate-one') throw new Error('El ranking no reordenó el candidato que pasó al primer lugar.');
@@ -137,7 +159,14 @@ try {
   await adminPage.evaluate(() => cancelAnimationFrame(window.__rankingRaf));
   await adminPage.getByRole('button', { name: 'Salir de pantalla completa', exact: true }).click();
   await adminPage.waitForFunction(() => !document.fullscreenElement);
-  console.log('2/4 OK: una submission real reordenó el ranking en vivo y activó la animación de transición.');
+  await campaignRef.collection('publicVoteRankings').doc(streamRef.id).set({ public: true }, { merge: true });
+  const publicContext = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const publicPage = await publicContext.newPage();
+  await publicPage.goto(`${webUrl}/vote-stream/public/${orgId}/${campId}/${streamRef.id}`);
+  await publicPage.getByRole('heading', { name: `Data Entry ${suffix}`, exact: true }).waitFor();
+  await publicPage.getByText('18 votos', { exact: true }).waitFor();
+  await publicContext.close();
+  console.log('2/5 OK: el administrador siguió viendo ranking/fullscreen y la URL pública mostró el ranking sin login.');
 
   await adminPage.getByRole('button', { name: 'Editar foto de Candidata Uno', exact: true }).click();
   await adminPage.getByLabel('Foto de candidato', { exact: true }).setInputFiles(resolve(webDir, 'src/assets/images/user/avatar-1.jpg'));
@@ -154,7 +183,7 @@ try {
   if (!photoUrl || !(await fetch(photoUrl)).ok) throw new Error('La foto recortada no quedó accesible en Storage.');
   const [metadata] = await storage.bucket().file(`vote-streams/${streamRef.id}/candidates/candidate-one-photo`).getMetadata();
   if (metadata.contentType !== 'image/jpeg' || Number(metadata.size) <= 0) throw new Error('Storage no contiene la imagen JPEG recortada.');
-  console.log('3/4 OK: la foto se eligió, se recortó en UI y quedó persistida y accesible en Storage.');
+  console.log('3/5 OK: la foto se eligió, se recortó en UI y quedó persistida y accesible en Storage.');
 
   await adminPage.getByRole('button', { name: 'Ver envío', exact: true }).click();
   await adminPage.getByRole('button', { name: 'Editar envío de Candidata Uno', exact: true }).click();
@@ -166,7 +195,7 @@ try {
   const storedSubmission = (await streamRef.collection('submissions').where('submittedBy', '==', agent.uid).get()).docs[0]?.data();
   if (storedSubmission?.votes !== 20 || (await streamRef.get()).data()?.liveResults?.totals?.['candidate-one'] !== 25) throw new Error('La corrección UI no recalculó el agregado en Firestore.');
   await adminPage.locator('.vote-agent-batch').screenshot({ path: resolve(evidenceDir, 'admin-correction.png') });
-  console.log('4/4 OK: el administrador abrió el envío del agente, corrigió el valor desde UI y el ranking se recalculó en vivo.');
+  console.log('4/5 OK: el administrador abrió el envío del agente, corrigió el valor desde UI y el ranking se recalculó en vivo.');
   await new Promise((resolveAudit, rejectAudit) => {
     const audit = spawn(process.execPath, [resolve(webDir, 'scripts/padding-audit.mjs')], {
       cwd: webDir,

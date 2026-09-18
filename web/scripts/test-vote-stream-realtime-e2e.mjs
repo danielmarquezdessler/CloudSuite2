@@ -60,16 +60,16 @@ try {
   await agentPage.goto(`${webUrl}/vote-stream/mi-panel`); await agentPage.getByRole('heading', { name: 'Mi panel de Sondeo', exact: true }).waitFor();
   const activeCard = agentPage.locator('.vote-agent-stream', { hasText: `Tiempo Real Mobile ${suffix}` }); await activeCard.getByRole('button', { name: 'Cargar resultados', exact: true }).click();
   const candidateInput = agentPage.getByLabel('Votos para Candidata Uno'); const inputBox = await candidateInput.boundingBox(); if (!inputBox || inputBox.height < 50 || inputBox.width < 90) throw new Error(`El input mobile no alcanzó un área táctil amplia: ${JSON.stringify(inputBox)}`);
-  await candidateInput.fill('13'); await agentPage.getByLabel('Votos para Candidato Dos').fill('7');
+  await candidateInput.fill('13');
   for (const [label, option] of [['Sub-ubicación', 'Escuela Central'], ['Género', 'Femenino'], ['Rango de edad', '30 a 45']]) { await agentPage.getByLabel(label).click(); await agentPage.getByRole('option', { name: option, exact: true }).click(); }
-  const submitButton = agentPage.getByRole('button', { name: 'Confirmar y enviar', exact: true }); const submitBox = await submitButton.boundingBox(); if (!submitBox || submitBox.height < 52 || submitBox.width < 250) throw new Error(`El CTA mobile no es prominente: ${JSON.stringify(submitBox)}`);
-  const submitted = agentPage.waitForResponse((response) => response.request().method() === 'POST' && response.url().includes(`/vote-stream/${streamRef.id}/submissions`)); await submitButton.click(); if (!(await submitted).ok()) throw new Error('El envío mobile no fue aceptado.');
-  await agentPage.getByRole('heading', { name: new RegExp(`Ranking actual · Tiempo Real Mobile ${suffix}`) }).waitFor(); await agentPage.getByText('65%', { exact: true }).waitFor(); await agentPage.getByText('13 votos', { exact: true }).waitFor();
-  if (await agentPage.getByRole('button', { name: 'Guardar total', exact: true }).count()) throw new Error('El ranking rápido expuso controles administrativos al agente.');
+  const submitButton = agentPage.getByRole('button', { name: 'Enviar resultado', exact: true }); const submitBox = await submitButton.boundingBox(); if (!submitBox || submitBox.height < 52 || submitBox.width < 250) throw new Error(`El CTA mobile no es prominente: ${JSON.stringify(submitBox)}`);
+  const submitted = agentPage.waitForResponse((response) => response.request().method() === 'POST' && response.url().includes(`/vote-stream/${streamRef.id}/submissions`)); await submitButton.click(); await agentPage.getByRole('button', { name: 'Confirmar y enviar', exact: true }).click(); if (!(await submitted).ok()) throw new Error('El envío mobile no fue aceptado.');
+  await agentPage.getByRole('heading', { name: 'Mis envíos', exact: true }).waitFor(); await agentPage.getByText('13 votos', { exact: true }).waitFor();
+  if (await agentPage.getByRole('heading', { name: /Ranking actual/i }).count() || await agentPage.getByRole('button', { name: 'Guardar total', exact: true }).count()) throw new Error('El agente recibió resultados o controles administrativos.');
   console.log('1/3 OK: en 375px los inputs midieron al menos 90×50px y el CTA 250×52px; el formulario es táctil y vertical.');
-  console.log('2/3 OK: el agente recibió el ranking de solo lectura por onSnapshot (65%, 13 votos), sin controles de administración.');
+  console.log('2/3 OK: el agente solo vio su Data Entry y Mis envíos, sin ranking ni controles administrativos.');
 
   const adminCandidate = adminPage.locator('.vote-ranking', { hasText: 'Candidata Uno' }); await adminCandidate.getByText('13 votos', { exact: false }).waitFor({ timeout: 15_000 });
-  const stored = await streamRef.get(); if (stored.data()?.liveResults?.totals?.['candidate-one'] !== 13 || stored.data()?.liveResults?.totalVotes !== 20) throw new Error('El agregado liveResults no persistió con los datos enviados.');
+  const stored = await streamRef.get(); if (stored.data()?.liveResults?.totals?.['candidate-one'] !== 13 || stored.data()?.liveResults?.totalVotes !== 13) throw new Error('El agregado liveResults no persistió con los datos enviados.');
   console.log('3/3 OK: una segunda sesión administrativa actualizó el ranking a 13 votos sin recargar la página; el agregado transaccional quedó en Firestore.');
 } finally { await browser?.close(); vite?.kill(); api?.kill(); await restore?.(); }

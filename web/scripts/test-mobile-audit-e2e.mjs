@@ -108,7 +108,7 @@ try {
     await page.goto(`${webUrl}/dashboard`, { waitUntil: 'domcontentloaded' }); await page.locator('.cd-dashboard').waitFor(); await audit(page, `${width}px dashboard`);
     await page.goto(`${webUrl}/vote-stream/mi-panel`, { waitUntil: 'domcontentloaded' }); await page.getByRole('heading', { name: 'Mi panel de Sondeo', exact: true }).waitFor(); await audit(page, `${width}px panel Vote Stream`);
     await page.getByRole('button', { name: 'Cargar resultados', exact: true }).first().click(); await page.getByRole('heading', { name: new RegExp(`Carga de datos · Auditoría móvil ${suffix}`) }).waitFor(); await audit(page, `${width}px data entry`);
-    await page.getByRole('heading', { name: 'Ranking actual', exact: true }).scrollIntoViewIfNeeded(); await audit(page, `${width}px ranking Vote Stream`);
+    if (await page.getByRole('heading', { name: 'Ranking actual', exact: true }).count()) throw new Error(`${width}px panel Vote Stream: un agente no debe ver el ranking.`); await audit(page, `${width}px Data Entry sin resultados`);
     await page.goto(`${webUrl}/visit/${voterRef.id}`, { waitUntil: 'domcontentloaded' }); await page.getByRole('heading', { name: 'Visita electoral', exact: true }).waitFor(); await page.getByRole('button', { name: 'Siguiente', exact: true }).waitFor(); await audit(page, `${width}px visita`);
     if (width === 375) {
       await page.goto(`${webUrl}/dashboard`, { waitUntil: 'domcontentloaded' }); await page.locator('.cd-dashboard').waitFor(); await page.screenshot({ path: resolve(screenshots, 'dashboard-375.png'), fullPage: true });
@@ -116,7 +116,7 @@ try {
       await page.goto(`${webUrl}/visit/${voterRef.id}`, { waitUntil: 'domcontentloaded' }); await page.getByRole('heading', { name: 'Visita electoral', exact: true }).waitFor(); await page.getByRole('button', { name: 'Siguiente', exact: true }).waitFor(); await page.screenshot({ path: resolve(screenshots, 'visit-375.png'), fullPage: true });
     }
     await page.close();
-    console.log(`${width}px OK: header, dashboard, panel/ranking Vote Stream, Data Entry y visita sin overflow, cortes, solapes ni targets pequeños.`);
+    console.log(`${width}px OK: header, dashboard, panel Vote Stream sin ranking, Data Entry y visita sin overflow, cortes, solapes ni targets pequeños.`);
   }
   console.log('MOBILE AUDIT OK: 4 viewports × Block 1 verificados con Firebase/API/Firestore reales.');
 } finally {
