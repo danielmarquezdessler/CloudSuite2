@@ -22,8 +22,9 @@
   .cs-topbar__mobile-search button { display: grid; width: 44px; height: 44px; place-items: center; border: 0; border-radius: 12px; background: transparent; color: #385477; font-size: 20px; }
 
   .pc-container { top: 60px !important; width: 100%; min-width: 0; }
-  .auth-main { min-width: 0; overflow-x: clip; }
-  .auth-main .form-control, .auth-main .btn { min-height: 48px !important; }
+  .cloudsuite-auth, .auth-main { min-width: 0; overflow-x: clip; }
+  .cloudsuite-auth .form-control, .cloudsuite-auth .btn, .auth-main .form-control, .auth-main .btn { min-height: 48px !important; }
+  .cloudsuite-auth .btn-outline-secondary { display: grid; width: 48px; min-width: 48px; place-items: center; padding: 0; font-size: 19px; }
   .cs-page-container { padding: 16px 12px 24px; }
   .cs-page-container__content, .cs-stack, .cs-inline { min-width: 0; }
   .cd-card { min-width: 0; }

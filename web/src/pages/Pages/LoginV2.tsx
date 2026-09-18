@@ -48,7 +48,7 @@ const LoginV2 = () => {
                             aria-label="Cambiar entre modo claro y oscuro"
                             onClick={() => dispatch(changeThemeMode(themeMode === THEME_MODE.DARK ? THEME_MODE.LIGHT : THEME_MODE.DARK))}
                         >
-                            <i className={themeMode === THEME_MODE.DARK ? 'ti ti-sun' : 'ti ti-moon'}></i>
+                            <span aria-hidden="true">{themeMode === THEME_MODE.DARK ? '☀' : '◐'}</span>
                         </button>
                     </div>
                     <h1 className="h4 mb-2">Iniciá sesión</h1>
