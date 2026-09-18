@@ -104,6 +104,8 @@ try {
 
   await adminPage.getByRole('button', { name: 'Abrir ranking en pantalla completa', exact: true }).click();
   await adminPage.waitForFunction(() => Boolean(document.fullscreenElement));
+  const fullscreenUsage = await adminPage.locator('[data-vote-ranking-board] .cd-card').evaluate((card) => ({ cardHeight: card.getBoundingClientRect().height, viewportHeight: window.innerHeight }));
+  if (fullscreenUsage.cardHeight < fullscreenUsage.viewportHeight * 0.75) throw new Error(`El ranking fullscreen solo usa ${Math.round(fullscreenUsage.cardHeight / fullscreenUsage.viewportHeight * 100)}% del alto disponible.`);
   console.log('1/4 OK: el ranking administrativo abrió pantalla completa desde la sesión autenticada.');
   await adminPage.evaluate(() => {
     window.__rankingFrames = [];

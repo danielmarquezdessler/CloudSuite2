@@ -137,15 +137,46 @@
 }
 
 .vote-ranking-board:fullscreen {
-  display:block;
+  display:flex;
+  box-sizing:border-box;
+  min-height:100vh;
   overflow:auto;
   padding:clamp(1rem,4vw,4rem);
   background:#f6f9fe;
 }
 
 .vote-ranking-board:fullscreen .cd-card {
-  max-width:70rem;
+  display:flex;
+  flex:1;
+  max-width:none;
   margin:0 auto;
+  flex-direction:column;
+}
+
+.vote-ranking-board:fullscreen .cd-card__body,
+.vote-ranking-board:fullscreen .cd-card__body > .cs-stack {
+  display:flex;
+  flex:1;
+  flex-direction:column;
+}
+
+.vote-ranking-board:fullscreen .cd-card__body > .cs-stack {
+  justify-content:space-evenly;
+}
+
+.vote-ranking-board:fullscreen .vote-ranking {
+  min-height:clamp(88px, 12vh, 160px);
+  display:flex;
+  align-items:center;
+}
+
+.vote-stream-card__actions .btn {
+  flex:1 1 120px;
+}
+
+.vote-winner-announcement__name {
+  color:#083b82;
+  font-size:1.35rem;
 }
 
 .vote-candidate-cropper {

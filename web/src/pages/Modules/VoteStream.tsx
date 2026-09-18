@@ -1677,7 +1677,7 @@ export function VoteStreamDetail() {
       : null;
   return (
     <PageContainer backTo="/vote-stream" backLabel="Volver a Vote Stream">
-      <Stack gap="lg">
+      <Stack gap="lg" className="gap-0">
         <HeroBanner
           icon="bar-chart-2"
           eyebrow="RESULTADOS ELECTORALES"
