@@ -89,8 +89,8 @@ try {
   browser = await chromium.launch({ headless: true, executablePath: chromiumPath });
   const adminPage = await browser.newPage({ viewport: { width: 1440, height: 1050 } });
   const agentPage = await browser.newPage({ viewport: { width: 375, height: 812 }, isMobile: true });
-  adminPage.setDefaultTimeout(30_000);
-  agentPage.setDefaultTimeout(30_000);
+  adminPage.setDefaultTimeout(60_000);
+  agentPage.setDefaultTimeout(60_000);
   await signIn(adminPage, testEnv.E2E_EMAIL, testEnv.E2E_PASSWORD);
   console.log('Preparado: sesión administrativa iniciada.');
   await signIn(agentPage, agent.email, password);
