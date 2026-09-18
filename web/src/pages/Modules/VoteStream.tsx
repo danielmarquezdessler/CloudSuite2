@@ -583,7 +583,7 @@ export default function VoteStreamList() {
             eyebrow="RESULTADOS ELECTORALES"
             title="Vote Stream"
             subtitle="Centralizá la carga y el seguimiento de resultados en tiempo real."
-            ctaLabel={canManage ? "+ Stream" : undefined}
+            ctaLabel={canManage ? "Stream" : undefined}
             onCtaClick={() => setShow(true)}
             tags={[
               {
@@ -648,7 +648,7 @@ export default function VoteStreamList() {
                 icon="target"
                 title="Todavía no hay Vote Streams"
                 description="Creá la primera jornada para preparar candidatos, segmentos y agentes."
-                ctaLabel={canManage ? "+ Stream" : undefined}
+                ctaLabel={canManage ? "Stream" : undefined}
                 onCtaClick={canManage ? () => setShow(true) : undefined}
               />
             )}

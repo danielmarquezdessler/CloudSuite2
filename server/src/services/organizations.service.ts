@@ -140,10 +140,13 @@ export async function getCurrentUserData(user: DecodedIdToken) {
   const organization = organizationSnapshot.data()!;
   // La cuenta primaria siempre recibe los add-ons ya terminados sin una
   // habilitación manual posterior, incluso en organizaciones existentes.
+  // Mantener ambos flags juntos evita que el bootstrap entregue un estado
+  // parcial (por ejemplo Vote Stream activo y SmartPlanner bloqueado).
   const isPrimaryValidationAccount = String(user.email ?? '').toLowerCase() === 'danielmarquez82@hotmail.com';
-  if (isPrimaryValidationAccount && organization.enabledAddons?.voteStream !== true) {
-    await orgRef.set({ enabledAddons: { ...(organization.enabledAddons ?? {}), voteStream: true } }, { merge: true });
-    organization.enabledAddons = { ...(organization.enabledAddons ?? {}), voteStream: true };
+  const completedAddons = { ...(organization.enabledAddons ?? {}), smartPlanner: true, voteStream: true };
+  if (isPrimaryValidationAccount && (organization.enabledAddons?.smartPlanner !== true || organization.enabledAddons?.voteStream !== true)) {
+    await orgRef.set({ enabledAddons: completedAddons }, { merge: true });
+    organization.enabledAddons = completedAddons;
   }
   const member = memberSnapshot.data() ?? {};
   const camps = typeof user.camps === 'object' && user.camps !== null ? user.camps as Record<string, boolean> : {};
