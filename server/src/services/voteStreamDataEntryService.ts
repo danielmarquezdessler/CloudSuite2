@@ -57,7 +57,7 @@ export async function syncPublicRanking(orgId: string, campId: string, streamId:
   const [stream, config] = await Promise.all([ref.get(), configuration(ref)]);
   if (!stream.exists) return;
   const totals = (stream.data()?.liveResults?.totals ?? {}) as Record<string, number>;
-  const candidates = config.candidates.map((candidate) => ({ id: candidate.id, name: String(candidate.data().name ?? ''), party: String(candidate.data().party ?? ''), photoUrl: candidate.data().photoUrl ?? null, partyLogoUrl: candidate.data().partyLogoUrl ?? null, votes: Number(totals[candidate.id] ?? 0), order: Number(candidate.data().order ?? 0) }));
+  const candidates = config.candidates.map((candidate) => ({ id: candidate.id, name: String(candidate.data().name ?? ''), party: String(candidate.data().party ?? ''), photoUrl: candidate.data().photoUrl ?? null, partyLogoUrl: candidate.data().partyLogoUrl ?? null, partyColor: candidate.data().partyColor ?? '#0060F0', votes: Number(totals[candidate.id] ?? 0), order: Number(candidate.data().order ?? 0) }));
   const publicRef = campaign(orgId, campId).collection('publicVoteRankings').doc(streamId);
   const current = await publicRef.get();
   await publicRef.set({ public: current.data()?.public === true, streamId, name: stream.data()?.name ?? '', location: stream.data()?.location ?? '', date: stream.data()?.date ?? '', status: stream.data()?.status ?? '', candidates, totalVotes: candidates.reduce((sum, c) => sum + c.votes, 0), updatedAt: FieldValue.serverTimestamp() }, { merge: true });

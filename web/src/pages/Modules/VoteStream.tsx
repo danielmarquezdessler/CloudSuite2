@@ -34,6 +34,12 @@ type Candidate = {
   name: string;
   party: string;
   photoUrl?: string | null;
+  partyLogoUrl?: string | null;
+  partyColor?: string;
+  photoPreviewUrl?: string | null;
+  photoUpload?: Blob | null;
+  partyLogoPreviewUrl?: string | null;
+  partyLogoUpload?: File | null;
   linkedToPrincipal: boolean;
   order?: number;
 };
@@ -102,6 +108,7 @@ const blankMargin = (): Margin => ({
 const blankCandidate = (): Candidate => ({
   name: "",
   party: "",
+  partyColor: "#0060F0",
   linkedToPrincipal: false,
 });
 const MAX_CANDIDATE_PHOTO_BYTES = 8 * 1024 * 1024;
@@ -244,15 +251,18 @@ function CandidateAvatar({
   candidate: Candidate;
   size?: "normal" | "large";
 }) {
-  return candidate.photoUrl ? (
-    <img
-      className={`vote-avatar vote-avatar--${size}`}
-      src={candidate.photoUrl}
-      alt=""
-    />
-  ) : (
-    <span className={`vote-avatar vote-avatar--${size}`}>
-      {candidate.name.slice(0, 2).toUpperCase() || "?"}
+  const photoUrl = candidate.photoPreviewUrl ?? candidate.photoUrl;
+  const partyLogoUrl = candidate.partyLogoPreviewUrl ?? candidate.partyLogoUrl;
+  return (
+    <span className={`vote-avatar-frame vote-avatar-frame--${size}`}>
+      {photoUrl ? (
+        <img className={`vote-avatar vote-avatar--${size}`} src={photoUrl} alt="" />
+      ) : (
+        <span className={`vote-avatar vote-avatar--${size}`}>
+          {candidate.name.slice(0, 2).toUpperCase() || "?"}
+        </span>
+      )}
+      {partyLogoUrl && <img className="vote-party-logo" src={partyLogoUrl} alt={`Logo de ${candidate.party || 'partido'}`} />}
     </span>
   );
 }
@@ -283,11 +293,13 @@ async function cropCandidatePhoto(source: string, area: Area) {
 function CandidatePhotoCropModal({
   candidate,
   saving,
+  submitLabel = "Subir foto recortada",
   onClose,
   onSave,
 }: {
   candidate: Candidate | null;
   saving: boolean;
+  submitLabel?: string;
   onClose: () => void;
   onSave: (photo: Blob) => Promise<void>;
 }) {
@@ -411,7 +423,7 @@ function CandidatePhotoCropModal({
           Cancelar
         </button>
         <PrimaryButton icon="plus" disabled={!photo || saving} onClick={() => void save()}>
-          {saving ? "Subiendo…" : "Subir foto recortada"}
+          {saving ? "Guardando…" : submitLabel}
         </PrimaryButton>
       </Modal.Footer>
     </Modal>
@@ -472,6 +484,7 @@ export default function VoteStreamList() {
   const [ages, setAges] = useState<string[]>([]);
   const [agentIds, setAgentIds] = useState<string[]>([]);
   const [margin, setMargin] = useState<Margin>(blankMargin());
+  const [photoEditorIndex, setPhotoEditorIndex] = useState<number | null>(null);
   const principal = (candidatesQ.data ?? []).find(
     (candidate) => candidate.isPrincipal,
   );
@@ -546,6 +559,16 @@ export default function VoteStreamList() {
         candidateIndex === index ? { ...candidate, ...next } : candidate,
       ),
     );
+  const choosePartyLogo = (index: number, event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/') || file.size > MAX_CANDIDATE_PHOTO_BYTES) {
+      setNotice({ message: !file.type.startsWith('image/') ? 'El logo debe ser una imagen.' : 'El logo no puede superar los 8 MB.', variant: 'danger' });
+      event.target.value = '';
+      return;
+    }
+    setCandidate(index, { partyLogoUpload: file, partyLogoPreviewUrl: URL.createObjectURL(file) });
+  };
   const linkPrincipal = (index: number) => {
     if (!principal)
       return setNotice({
@@ -579,14 +602,14 @@ export default function VoteStreamList() {
     if (!user || !base) return;
     setSaving(true);
     try {
-      await authenticatedFetch(user, editingStream ? `${base}/${editingStream.id}` : base, {
+      const saved = await authenticatedFetch<VoteStream>(user, editingStream ? `${base}/${editingStream.id}` : base, {
         method: editingStream ? "PUT" : "POST",
         body: JSON.stringify({
           name,
           electoralSystem: system,
           location,
           date,
-          candidates,
+          candidates: candidates.map(({ photoPreviewUrl: _photoPreviewUrl, photoUpload: _photoUpload, partyLogoPreviewUrl: _partyLogoPreviewUrl, partyLogoUpload: _partyLogoUpload, ...candidate }) => candidate),
           subLocations,
           genderOptions: genders,
           ageRanges: ages,
@@ -594,6 +617,13 @@ export default function VoteStreamList() {
           marginOfError: { ...margin, computedMargin: calculateMargin(margin) },
         }),
       });
+      await Promise.all(candidates.map(async (candidate, index) => {
+        if ((!candidate.photoUpload && !candidate.partyLogoUpload) || !saved.candidates?.[index]?.id) return;
+        const form = new FormData();
+        if (candidate.photoUpload) form.append('photo', candidate.photoUpload, 'candidate.jpg');
+        if (candidate.partyLogoUpload) form.append('partyLogo', candidate.partyLogoUpload, candidate.partyLogoUpload.name);
+        await authenticatedFetch(user, `${base}/${saved.id}/candidates/${saved.candidates[index].id}/assets`, { method: 'POST', body: form });
+      }));
       await streamsQ.reload();
       setShow(false); reset(); setEditingStream(null);
       setNotice({
@@ -816,6 +846,22 @@ export default function VoteStreamList() {
                             }
                             placeholder="Partido"
                           />
+                          <label className="vote-candidate-editor__color" title="Color primario del partido">
+                            <span className="visually-hidden">Color primario de {candidate.name || `candidato ${index + 1}`}</span>
+                            <input
+                              aria-label={`Color del partido del candidato ${index + 1}`}
+                              type="color"
+                              value={candidate.partyColor || "#0060F0"}
+                              onChange={(event) => setCandidate(index, { partyColor: event.target.value })}
+                            />
+                          </label>
+                          <button type="button" className="btn btn-sm btn-outline-primary" onClick={() => setPhotoEditorIndex(index)}>
+                            Foto
+                          </button>
+                          <label className="btn btn-sm btn-outline-primary vote-candidate-editor__logo">
+                            Logo
+                            <input aria-label={`Logo del partido del candidato ${index + 1}`} type="file" accept="image/*" onChange={(event) => choosePartyLogo(index, event)} />
+                          </label>
                           {candidate.linkedToPrincipal ? (
                             <Inline
                               gap="xs"
@@ -1026,6 +1072,17 @@ export default function VoteStreamList() {
               </Modal.Footer>
             </form>
           </Modal>
+          <CandidatePhotoCropModal
+            candidate={photoEditorIndex === null ? null : candidates[photoEditorIndex] ?? null}
+            saving={false}
+            submitLabel="Usar foto recortada"
+            onClose={() => setPhotoEditorIndex(null)}
+            onSave={async (photo) => {
+              if (photoEditorIndex === null) return;
+              setCandidate(photoEditorIndex, { photoUpload: photo, photoPreviewUrl: URL.createObjectURL(photo) });
+              setPhotoEditorIndex(null);
+            }}
+          />
           {notice && (
             <Toast
               message={notice.message}

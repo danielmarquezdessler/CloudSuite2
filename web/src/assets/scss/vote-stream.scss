@@ -61,6 +61,7 @@
   font-weight: 800;
   object-fit: cover;
 }
+.vote-avatar-frame{position:relative;display:inline-flex;flex:0 0 auto}.vote-avatar-frame .vote-avatar{display:grid}.vote-party-logo{position:absolute;right:-.15rem;bottom:-.15rem;width:1.15rem;height:1.15rem;border:2px solid var(--bs-body-bg);border-radius:50%;object-fit:cover;background:#fff}.vote-avatar-frame--large .vote-party-logo{width:1.35rem;height:1.35rem}
 .vote-avatar--large {
   width: 48px;
   height: 48px;
@@ -322,6 +323,7 @@
   border-color: #d2ddec;
   border-radius: 9px;
 }
+.vote-candidate-editor__color{display:inline-grid;width:2.5rem;height:2.5rem;place-items:center;border:1px solid #d2ddec;border-radius:9px;background:#fff;cursor:pointer}.vote-candidate-editor__color input{width:1.65rem;height:1.65rem;padding:0;border:0;background:none;cursor:pointer}.vote-candidate-editor__logo{position:relative;margin:0;overflow:hidden}.vote-candidate-editor__logo input{position:absolute;inset:0;opacity:0;cursor:pointer}
 .vote-candidate-editor__linked {
   align-items: center;
 }

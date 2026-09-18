@@ -161,7 +161,8 @@ function normalizeCandidates(value: unknown) {
   if (value.length > 10) throw new ValidationError('Podés agregar hasta 10 candidatos.');
   const candidates = value.map((raw, index) => {
     const item = (raw ?? {}) as Record<string, unknown>;
-    return { id: typeof item.id === 'string' && item.id.trim() ? item.id.trim() : undefined, name: text(item.name, `El nombre del candidato ${index + 1}`, 160, !item.linkedToPrincipal), party: text(item.party, 'El partido', 120), photoUrl: typeof item.photoUrl === 'string' ? item.photoUrl : null, partyLogoUrl: typeof item.partyLogoUrl === 'string' ? item.partyLogoUrl : null, linkedToPrincipal: item.linkedToPrincipal === true, order: index + 1 };
+    const partyColor = typeof item.partyColor === 'string' && /^#[0-9a-fA-F]{6}$/.test(item.partyColor) ? item.partyColor.toUpperCase() : '#0060F0';
+    return { id: typeof item.id === 'string' && item.id.trim() ? item.id.trim() : undefined, name: text(item.name, `El nombre del candidato ${index + 1}`, 160, !item.linkedToPrincipal), party: text(item.party, 'El partido', 120), photoUrl: typeof item.photoUrl === 'string' ? item.photoUrl : null, partyLogoUrl: typeof item.partyLogoUrl === 'string' ? item.partyLogoUrl : null, partyColor, linkedToPrincipal: item.linkedToPrincipal === true, order: index + 1 };
   });
   if (candidates.filter((item) => item.linkedToPrincipal).length > 1) throw new ValidationError('Solo un candidato puede vincularse al Principal de la campaña.');
   return candidates;
