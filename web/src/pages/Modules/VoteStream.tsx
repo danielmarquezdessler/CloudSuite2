@@ -1292,7 +1292,182 @@ function AdminRanking({
   );
 }
 
-function AgentTracking({ user, base, streamId }: { user: ReturnType<typeof useAuth>['user']; base: string; streamId: string }) { const [agents, setAgents] = useState<Array<{ uid: string; name: string; submittedToday: boolean; latestBatchId: string | null }>>([]); const [batch, setBatch] = useState<Array<{ id: string; candidateId: string; votes: number }>>([]); useEffect(() => { if (!user) return; void authenticatedFetch<Array<{ uid: string; name: string; submittedToday: boolean; latestBatchId: string | null }>>(user, `${base}/${streamId}/agents-status`).then(setAgents).catch(() => setAgents([])); }, [user, base, streamId]); const openBatch = async (batchId: string) => { if (!user) return; setBatch(await authenticatedFetch(user, `${base}/${streamId}/submissions/by-batch/${encodeURIComponent(batchId)}`)); }; return <ContentPanel icon="users" title="Seguimiento de agentes" subtitle="Estado de envío de la jornada actual."><Stack gap="sm">{agents.map((agent) => <Inline key={agent.uid} gap="sm" className="justify-content-between align-items-center"><span>{agent.name}</span><Inline gap="sm">{agent.submittedToday ? <span className="badge text-bg-success">Enviado</span> : <span className="badge text-bg-secondary">Pendiente</span>}{agent.latestBatchId && <button type="button" className="btn btn-sm btn-outline-primary" onClick={() => void openBatch(agent.latestBatchId!)}>Ver envío</button>}</Inline></Inline>)}{agents.length > 0 && agents.every((agent) => agent.submittedToday) && <span className="text-success">Todos los agentes enviaron resultados.</span>}{batch.length > 0 && <Stack gap="xs">{batch.map((entry) => <small key={entry.id}>{entry.candidateId}: {entry.votes} votos</small>)}</Stack>}</Stack></ContentPanel>; }
+function AgentTracking({
+  user,
+  base,
+  streamId,
+  candidates,
+  onCorrected,
+  refreshKey,
+}: {
+  user: ReturnType<typeof useAuth>["user"];
+  base: string;
+  streamId: string;
+  candidates: Candidate[];
+  onCorrected: () => Promise<void>;
+  refreshKey: number;
+}) {
+  const [agents, setAgents] = useState<
+    Array<{
+      uid: string;
+      name: string;
+      submittedToday: boolean;
+      latestBatchId: string | null;
+    }>
+  >([]);
+  const [batch, setBatch] = useState<
+    Array<{ id: string; candidateId: string; votes: number }>
+  >([]);
+  const [editingSubmissionId, setEditingSubmissionId] = useState<string | null>(null);
+  const [draftVotes, setDraftVotes] = useState("");
+  const [savingSubmissionId, setSavingSubmissionId] = useState<string | null>(null);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    if (!user) return;
+    void authenticatedFetch<
+      Array<{
+        uid: string;
+        name: string;
+        submittedToday: boolean;
+        latestBatchId: string | null;
+      }>
+    >(user, `${base}/${streamId}/agents-status`)
+      .then(setAgents)
+      .catch(() => setAgents([]));
+  }, [user, base, streamId, refreshKey]);
+  const openBatch = async (batchId: string) => {
+    if (!user) return;
+    setError("");
+    setEditingSubmissionId(null);
+    try {
+      setBatch(
+        await authenticatedFetch(
+        user,
+        `${base}/${streamId}/submissions/by-batch/${encodeURIComponent(batchId)}`,
+        ),
+      );
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "No pudimos abrir el envío.");
+    }
+  };
+  const saveCorrection = async (entry: { id: string; candidateId: string; votes: number }) => {
+    if (!user) return;
+    const votes = Number(draftVotes);
+    if (!Number.isInteger(votes) || votes < 0) {
+      setError("Indicá una cantidad entera de votos válida.");
+      return;
+    }
+    setSavingSubmissionId(entry.id);
+    setError("");
+    try {
+      const updated = await authenticatedFetch<{ id: string; votes: number }>(
+        user,
+        `${base}/${streamId}/submissions/${entry.id}`,
+        { method: "PUT", body: JSON.stringify({ votes }) },
+      );
+      setBatch((current) => current.map((item) => (item.id === entry.id ? { ...item, votes: updated.votes } : item)));
+      setEditingSubmissionId(null);
+      await onCorrected();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "No pudimos corregir el envío.");
+    } finally {
+      setSavingSubmissionId(null);
+    }
+  };
+  return (
+    <ContentPanel
+      icon="users"
+      title="Seguimiento de agentes"
+      subtitle="Estado de envío de la jornada actual."
+    >
+      <Stack gap="sm">
+        {agents.map((agent) => (
+          <Inline
+            key={agent.uid}
+            gap="sm"
+            className="justify-content-between align-items-center"
+          >
+            <span>{agent.name}</span>
+            <Inline gap="sm">
+              {agent.submittedToday ? (
+                <span className="badge text-bg-success">Enviado</span>
+              ) : (
+                <span className="badge text-bg-secondary">Pendiente</span>
+              )}
+              {agent.latestBatchId && (
+                <button
+                  type="button"
+                  className="btn btn-sm btn-outline-primary"
+                  onClick={() => void openBatch(agent.latestBatchId!)}
+                >
+                  Ver envío
+                </button>
+              )}
+            </Inline>
+          </Inline>
+        ))}
+        {agents.length > 0 && agents.every((agent) => agent.submittedToday) && (
+          <span className="text-success">
+            Todos los agentes enviaron resultados.
+          </span>
+        )}
+        {batch.length > 0 && (
+          <Stack gap="sm" className="vote-agent-batch">
+            <strong>Detalle del envío</strong>
+            {batch.map((entry) => {
+              const candidate = candidates.find((item) => item.id === entry.candidateId);
+              const isEditing = editingSubmissionId === entry.id;
+              return (
+                <Inline key={entry.id} gap="sm" wrap className="vote-agent-batch__entry">
+                  <span>{candidate?.name ?? entry.candidateId}</span>
+                  {isEditing ? (
+                    <>
+                      <input
+                        aria-label={`Votos corregidos para ${candidate?.name ?? entry.candidateId}`}
+                        type="number"
+                        min="0"
+                        className="form-control form-control-sm vote-agent-batch__votes"
+                        value={draftVotes}
+                        onChange={(event) => setDraftVotes(event.target.value)}
+                      />
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-primary"
+                        disabled={savingSubmissionId === entry.id}
+                        onClick={() => void saveCorrection(entry)}
+                      >
+                        {savingSubmissionId === entry.id ? "Guardando…" : "Guardar corrección"}
+                      </button>
+                      <button type="button" className="btn btn-sm btn-light" disabled={savingSubmissionId === entry.id} onClick={() => setEditingSubmissionId(null)}>
+                        Cancelar
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <strong>{entry.votes} votos</strong>
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-outline-primary"
+                        aria-label={`Editar envío de ${candidate?.name ?? entry.candidateId}`}
+                        onClick={() => {
+                          setDraftVotes(String(entry.votes));
+                          setEditingSubmissionId(entry.id);
+                        }}
+                      >
+                        Editar
+                      </button>
+                    </>
+                  )}
+                </Inline>
+              );
+            })}
+          </Stack>
+        )}
+        {error && <span className="text-danger small">{error}</span>}
+      </Stack>
+    </ContentPanel>
+  );
+}
 export function VoteStreamDetail() {
   const { voteStreamId = "" } = useParams();
   const { user } = useAuth();
@@ -1581,7 +1756,14 @@ export function VoteStreamDetail() {
           keyName="ageRangeId"
         />
         {canManage && (
-          <AgentTracking user={user} base={base!} streamId={stream.id} />
+          <AgentTracking
+            user={user}
+            base={base!}
+            streamId={stream.id}
+            candidates={stream.candidates ?? []}
+            onCorrected={query.reload}
+            refreshKey={scrutinized}
+          />
         )}
         <ContentPanel
           icon="award"

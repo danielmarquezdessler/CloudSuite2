@@ -156,9 +156,16 @@
   background:#172b4d;
 }
 
+.vote-agent-batch__entry {
+  align-items:center;
+  padding:.5rem .65rem;
+  border:1px solid var(--bs-border-color);
+  border-radius:9px;
+}
 
-
-
+.vote-agent-batch__votes {
+  width:7rem;
+}
 
 /* Creation modal: dense visual hierarchy based on the approved Vote Stream reference. */
 .vote-stream-modal {
