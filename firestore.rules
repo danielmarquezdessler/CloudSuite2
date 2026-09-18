@@ -7,6 +7,7 @@ service cloud.firestore {
     function canAccessCampaign(campId) { return signedIn() && ((request.auth.token.role == 'cliente' && request.auth.token.allCamps == true) || (request.auth.token.camps != null && request.auth.token.camps[campId] == true)); }
     function campaignMember(orgId, campId) { return belongsToOrganization(orgId) && canAccessCampaign(campId); }
     function isCliente(orgId) { return belongsToOrganization(orgId) && request.auth.token.role == 'cliente'; }
+    function voteStreamManager(orgId, campId) { return campaignMember(orgId, campId) && (request.auth.token.role == 'cliente' || request.auth.token.role == 'admin'); }
 
     match /organizations/{orgId} { allow read: if belongsToOrganization(orgId); allow write: if false; }
     match /organizations/{orgId}/members/{memberId} { allow read: if belongsToOrganization(orgId); allow write: if false; }
@@ -37,17 +38,16 @@ service cloud.firestore {
     // Assigned Vote Stream agents may read just the configuration required for
     // their capture form. Submissions always pass through the Node API/Admin SDK.
     function assignedVoteStreamAgent(orgId, campId, voteStreamId) { return belongsToOrganization(orgId) && exists(/databases/$(database)/documents/organizations/$(orgId)/members/$(request.auth.uid)) && exists(/databases/$(database)/documents/organizations/$(orgId)/campaigns/$(campId)/voteStreams/$(voteStreamId)/agents/$(request.auth.uid)); }
-    // The stream root carries high-level metadata plus the live aggregate, but
-    // never individual submissions. Campaign clients can observe totals while
-    // agents still need an assignment to read the capture configuration.
-    match /organizations/{orgId}/campaigns/{campId}/voteStreams/{voteStreamId} { allow read: if assignedVoteStreamAgent(orgId, campId, voteStreamId) || isCliente(orgId); allow write: if false; }
-    match /organizations/{orgId}/campaigns/{campId}/voteStreams/{voteStreamId}/candidates/{candidateId} { allow read: if assignedVoteStreamAgent(orgId, campId, voteStreamId); allow write: if false; }
-    match /organizations/{orgId}/campaigns/{campId}/voteStreams/{voteStreamId}/subLocations/{subLocationId} { allow read: if assignedVoteStreamAgent(orgId, campId, voteStreamId); allow write: if false; }
-    match /organizations/{orgId}/campaigns/{campId}/voteStreams/{voteStreamId}/genderOptions/{genderId} { allow read: if assignedVoteStreamAgent(orgId, campId, voteStreamId); allow write: if false; }
-    match /organizations/{orgId}/campaigns/{campId}/voteStreams/{voteStreamId}/ageRanges/{ageRangeId} { allow read: if assignedVoteStreamAgent(orgId, campId, voteStreamId); allow write: if false; }
-    // Public sharing deliberately exposes only the aggregate ranking document;
-    // submissions and agent assignments are never readable without authentication.
-    match /organizations/{orgId}/campaigns/{campId}/publicVoteRankings/{voteStreamId} { allow read: if resource.data.public == true || campaignMember(orgId, campId); allow write: if false; }
+    // The Stream root carries live totals and winner data. It is manager-only;
+    // agents receive a whitelisted configuration DTO from the backend instead.
+    match /organizations/{orgId}/campaigns/{campId}/voteStreams/{voteStreamId} { allow read: if voteStreamManager(orgId, campId); allow write: if false; }
+    match /organizations/{orgId}/campaigns/{campId}/voteStreams/{voteStreamId}/candidates/{candidateId} { allow read: if assignedVoteStreamAgent(orgId, campId, voteStreamId) || voteStreamManager(orgId, campId); allow write: if false; }
+    match /organizations/{orgId}/campaigns/{campId}/voteStreams/{voteStreamId}/subLocations/{subLocationId} { allow read: if assignedVoteStreamAgent(orgId, campId, voteStreamId) || voteStreamManager(orgId, campId); allow write: if false; }
+    match /organizations/{orgId}/campaigns/{campId}/voteStreams/{voteStreamId}/genderOptions/{genderId} { allow read: if assignedVoteStreamAgent(orgId, campId, voteStreamId) || voteStreamManager(orgId, campId); allow write: if false; }
+    match /organizations/{orgId}/campaigns/{campId}/voteStreams/{voteStreamId}/ageRanges/{ageRangeId} { allow read: if assignedVoteStreamAgent(orgId, campId, voteStreamId) || voteStreamManager(orgId, campId); allow write: if false; }
+    // Only a deliberately published document is public. A campaign membership
+    // alone never grants an agent access to unpublished aggregates.
+    match /organizations/{orgId}/campaigns/{campId}/publicVoteRankings/{voteStreamId} { allow read: if resource.data.public == true || voteStreamManager(orgId, campId); allow write: if false; }
     match /organizations/{orgId}/campaigns/{campId}/auditLog/{logId} { allow read: if isCliente(orgId) && canAccessCampaign(campId); allow write: if false; }
     match /organizations/{orgId}/campaigns/{campId}/{document=**} { allow read, write: if false; }
     match /users/{uid} { allow read, update: if signedIn() && request.auth.uid == uid; allow create, delete: if false; }

@@ -153,6 +153,46 @@ async function voteStreamConfiguration(ref: FirebaseFirestore.DocumentReference,
   return { ...serialize(snapshot), candidates: candidates.docs.map(serialize), subLocations: subLocations.docs.map(serialize), genderOptions: genders.docs.map(serialize), ageRanges: ageRanges.docs.map(serialize) };
 }
 
+/**
+ * Agents only receive the configuration required to identify a Stream and
+ * complete Data Entry. Never derive this response from `serialize(stream)`:
+ * the Stream document also contains live totals, the winner and other
+ * administrator-only election data.
+ */
+async function agentVoteStreamConfiguration(ref: FirebaseFirestore.DocumentReference, stream?: FirebaseFirestore.DocumentSnapshot) {
+  const snapshot = stream ?? await ref.get();
+  if (!snapshot.exists) throw new NotFoundError('La Vote Stream no existe.');
+  const [candidates, subLocations, genders, ageRanges] = await Promise.all([
+    ref.collection('candidates').orderBy('order').get(), ref.collection('subLocations').get(), ref.collection('genderOptions').get(), ref.collection('ageRanges').get()
+  ]);
+  const data = snapshot.data() ?? {};
+  const option = (item: FirebaseFirestore.QueryDocumentSnapshot) => ({ id: item.id, name: String(item.data().name ?? '') });
+  const candidate = (item: FirebaseFirestore.QueryDocumentSnapshot) => {
+    const value = item.data();
+    return {
+      id: item.id,
+      name: String(value.name ?? ''),
+      party: String(value.party ?? ''),
+      photoUrl: typeof value.photoUrl === 'string' ? value.photoUrl : null,
+      partyLogoUrl: typeof value.partyLogoUrl === 'string' ? value.partyLogoUrl : null,
+      partyColor: typeof value.partyColor === 'string' ? value.partyColor : '#0060F0',
+      order: Number(value.order ?? 0),
+    };
+  };
+  return {
+    id: snapshot.id,
+    name: String(data.name ?? ''),
+    electoralSystem: String(data.electoralSystem ?? ''),
+    location: String(data.location ?? ''),
+    date: String(data.date ?? ''),
+    status: String(data.status ?? 'pendiente'),
+    candidates: candidates.docs.map(candidate),
+    subLocations: subLocations.docs.map(option),
+    genderOptions: genders.docs.map(option),
+    ageRanges: ageRanges.docs.map(option),
+  };
+}
+
 function optionalOptionId(value: unknown, label: string) {
   if (value === undefined || value === null || value === '') return null;
   if (typeof value !== 'string' || !value.trim()) throw new ValidationError(`${label} no es válido.`);
@@ -219,7 +259,7 @@ export async function listMyVoteStreams(user: DecodedIdToken, orgId: string, cam
   if (streams.empty) return [];
   const assignments = await db.getAll(...streams.docs.map((stream) => stream.ref.collection('agents').doc(user.uid)));
   const assignedStreams = streams.docs.filter((_, index) => assignments[index]?.exists);
-  return (await Promise.all(assignedStreams.map((stream) => voteStreamConfiguration(stream.ref, stream)))).sort((left, right) => String((right as Record<string, unknown>).date ?? '').localeCompare(String((left as Record<string, unknown>).date ?? '')));
+  return (await Promise.all(assignedStreams.map((stream) => agentVoteStreamConfiguration(stream.ref, stream)))).sort((left, right) => right.date.localeCompare(left.date));
 }
 
 export async function createSubmission(user: DecodedIdToken, orgId: string, campId: string, id: string, input: Record<string, unknown>) {
@@ -237,8 +277,8 @@ export async function createSubmission(user: DecodedIdToken, orgId: string, camp
     votesByCandidate,
     ...(subLocationId ? { subLocationId } : {}), ...(genderId ? { genderId } : {}), ...(ageRangeId ? { ageRangeId } : {})
   };
-  // Only this aggregate is exposed live to agents. Individual submissions stay
-  // backend-only, so an agent never learns who sent another agent's results.
+  // Aggregates are never returned to the agent. This calculation is solely the
+  // server-side write path that keeps the administrator and public ranking live.
   const historicalSubmissions = await ref.collection('submissions').get();
   const historicalTotals = Object.fromEntries(candidates.docs.map((candidate) => [candidate.id, 0])) as Record<string, number>;
   historicalSubmissions.docs.forEach((existing) => Object.entries(existing.data().votesByCandidate ?? {}).forEach(([candidateId, count]) => { historicalTotals[candidateId] = (historicalTotals[candidateId] ?? 0) + (Number(count) || 0); }));
