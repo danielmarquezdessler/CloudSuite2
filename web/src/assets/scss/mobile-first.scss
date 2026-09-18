@@ -68,7 +68,7 @@
   .vote-data-entry__candidate--prominent .vote-avatar { width: 5.75rem; height: 5.75rem; flex-basis: 5.75rem; }
   .vote-data-entry__candidate-name { font-size: clamp(1.75rem, 10vw, 2.4rem); line-height: 1.08; }
   .vote-data-entry__party-chip { font-size: 1rem; }
-  .vote-data-entry__votes { min-height: 58px; font-size: 1.35rem; }
+  .vote-data-entry__votes { min-height: 58px !important; font-size: 1.35rem; }
   .vote-data-entry__segments { grid-template-columns: minmax(0, 1fr); }
   .vote-data-entry__select { min-height: 52px; font-size: 1rem; }
   .vote-data-entry__actions { align-items: stretch; }
