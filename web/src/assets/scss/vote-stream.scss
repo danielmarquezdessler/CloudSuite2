@@ -497,6 +497,7 @@
   gap: 1rem;
   padding: 1rem 1.25rem;
   border-radius: 1rem;
+  border-left: 0.3rem solid var(--vote-party-color, #0060f0);
   background: rgba(255, 255, 255, 0.12);
   backdrop-filter: blur(10px);
   transition:
@@ -507,6 +508,7 @@
   transform: translateX(0.35rem);
   background: rgba(255, 255, 255, 0.2);
 }
+.vote-public-ranking__identity { position: relative; display: inline-flex; width: 3rem; height: 3rem; }
 .vote-public-ranking__row img,
 .vote-public-ranking__avatar {
   width: 3rem;
@@ -518,6 +520,7 @@
   display: grid;
   place-items: center;
 }
+.vote-public-ranking__party-logo { position: absolute; right: -0.25rem; bottom: -0.25rem; width: 1.25rem !important; height: 1.25rem !important; border: 2px solid #fff; }
 .vote-public-ranking__row small {
   display: block;
   opacity: 0.75;
