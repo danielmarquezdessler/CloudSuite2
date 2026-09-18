@@ -8,6 +8,8 @@
     "build": "tsc",
     "notify:smartplanner-due": "node scripts/smartplanner-due-invoices.mjs",
     "test:e2e:vote-stream-agents": "node scripts/test-vote-stream-agents-e2e.mjs",
+    "backfill:vote-stream-agents": "node scripts/backfill-vote-stream-agent-access.mjs --apply",
+    "test:e2e:vote-stream-legacy-agent": "node scripts/test-vote-stream-legacy-agent-backfill.mjs",
     "start": "node dist/index.js"
   },
   "dependencies": {

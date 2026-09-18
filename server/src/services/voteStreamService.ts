@@ -61,7 +61,7 @@ async function validAgentIds(user: DecodedIdToken, orgId: string, campId: string
  * the Firebase claim and the organization-level entitlement together avoids
  * an agent being assigned successfully but seeing no campaign at login.
  */
-async function grantVoteStreamAgentAccess(orgId: string, campId: string, agentIds: string[], assignedBy: string) {
+export async function grantVoteStreamAgentAccess(orgId: string, campId: string, agentIds: string[], assignedBy: string) {
   if (!agentIds.length) return;
   const organizationRef = db.collection('organizations').doc(orgId);
   const campaignRef = campaign(orgId, campId);
@@ -103,6 +103,36 @@ async function grantVoteStreamAgentAccess(orgId: string, campId: string, agentId
     await adminAuth.setCustomUserClaims(uid, { ...claims, orgId, role, camps });
   }
   await batch.commit();
+}
+
+type VoteStreamAgentBackfillResult = { assignments: number; campaigns: number; users: number; applied: boolean };
+
+/**
+ * Repairs assignments created before agent access was granted as part of the
+ * assignment. The operation is deliberately idempotent: it only merges the
+ * organization entitlement, campaign membership and the existing custom claim.
+ */
+export async function backfillVoteStreamAgentAccess(apply = false): Promise<VoteStreamAgentBackfillResult> {
+  const assignments = await db.collectionGroup('agents').get();
+  const byCampaign = new Map<string, { orgId: string; campId: string; agentIds: Set<string> }>();
+  for (const assignment of assignments.docs) {
+    const streamRef = assignment.ref.parent.parent;
+    const campaignRef = streamRef?.parent.parent;
+    const organizationRef = campaignRef?.parent.parent;
+    if (!streamRef || !campaignRef || !organizationRef || streamRef.parent.id !== 'voteStreams' || campaignRef.parent.id !== 'campaigns' || organizationRef.parent.id !== 'organizations') continue;
+    const key = `${organizationRef.id}/${campaignRef.id}`;
+    const group = byCampaign.get(key) ?? { orgId: organizationRef.id, campId: campaignRef.id, agentIds: new Set<string>() };
+    group.agentIds.add(assignment.id);
+    byCampaign.set(key, group);
+  }
+  const users = new Set([...byCampaign.values()].flatMap((group) => [...group.agentIds]));
+  if (apply) {
+    for (const group of byCampaign.values()) {
+      const ids = [...group.agentIds];
+      for (let index = 0; index < ids.length; index += 100) await grantVoteStreamAgentAccess(group.orgId, group.campId, ids.slice(index, index + 100), 'vote-stream-legacy-backfill');
+    }
+  }
+  return { assignments: assignments.size, campaigns: byCampaign.size, users: users.size, applied: apply };
 }
 
 async function agentStream(user: DecodedIdToken, orgId: string, campId: string, id: string) {
