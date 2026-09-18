@@ -19,7 +19,9 @@ const allPages = [
   ,['Backlog de Campaña SmartPlanner', '/smartplanner/backlog'], ['War Room SmartPlanner', '/smartplanner/war-room'], ['Viabilidad jurídica SmartPlanner', '/smartplanner/promises'], ['Panel Día D SmartPlanner', '/smartplanner/election-day'], ['Centro de Comunicaciones SmartPlanner', '/smartplanner/comunicaciones'], ['Tickets SmartPlanner', '/smartplanner/tickets'], ['Reportes SmartPlanner', '/smartplanner/reports'], ['Personal SmartPlanner', '/smartplanner/staff'], ['Configuración SmartPlanner', '/smartplanner/settings'], ['Tareas', '/execution/tasks'], ['Productividad', '/execution/productivity'], ['Incidencias', '/execution/incidents'], ['Resumen de jornada', '/execution/daily-summary'], ['Temas', '/execution/issues'], ['Administración de add-ons', '/system/addons']
 ];
 const selectedRoutes = new Set((process.env.PADDING_AUDIT_ROUTES ?? '').split(',').filter(Boolean));
-const pages = selectedRoutes.size ? allPages.filter(([, route]) => selectedRoutes.has(route)) : allPages;
+const pages = selectedRoutes.size
+  ? [...selectedRoutes].map((route) => allPages.find(([, knownRoute]) => knownRoute === route) ?? [route, route])
+  : allPages;
 const minimumPadding = 12;
 const minimumHeaderGap = 16;
 const minimumSiblingCardGap = 8;
@@ -57,6 +59,8 @@ try {
 
   for (const [name, route] of pages) {
     await page.goto(`${appUrl}${route}`, { waitUntil: 'domcontentloaded' });
+    if (route === '/vote-stream/mi-panel') await page.getByRole('heading', { name: 'Activas', exact: true }).waitFor({ state: 'visible' });
+    else if (route.startsWith('/vote-stream/') && !route.includes('/public/')) await page.locator('[data-vote-ranking-id]').first().waitFor({ state: 'visible' });
     if (route === '/smartplanner/war-room') await page.getByRole('heading', { name: 'Motor de Crisis' }).waitFor({ state: 'visible' });
     if (route === '/smartplanner/promises') await page.getByRole('heading', { name: 'Propuestas de campaña' }).waitFor({ state: 'visible' });
     if (route === '/smartplanner/election-day') await page.getByRole('heading', { name: 'Panel del Día D' }).waitFor({ state: 'visible' });
