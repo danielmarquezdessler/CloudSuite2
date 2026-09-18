@@ -90,8 +90,37 @@ export async function submitCandidate(user: DecodedIdToken, orgId: string, campI
   await syncPublicRanking(orgId, campId, streamId); return serialise(await result.get());
 }
 
+/** Administrators use the same candidate-by-candidate flow without needing an agent assignment. */
+export async function submitManualCandidate(user: DecodedIdToken, orgId: string, campId: string, streamId: string, input: Record<string, unknown>) {
+  await manager(user, orgId, campId);
+  const ref = campaign(orgId, campId).collection('voteStreams').doc(streamId); const stream = await ref.get();
+  if (!stream.exists) throw new NotFoundError('La Vote Stream no existe.');
+  if (stream.data()?.status !== 'activa') throw new ValidationError('Esta Vote Stream no está activa, no se pueden enviar datos.');
+  const { candidates, subLocations, genders, ages } = await configuration(ref);
+  const candidateId = typeof input.candidateId === 'string' ? input.candidateId : '';
+  if (!candidates.some((candidate) => candidate.id === candidateId)) throw new ValidationError('El candidato no pertenece a esta Vote Stream.');
+  const votes = Number(input.votes); if (!Number.isInteger(votes) || votes < 0) throw new ValidationError('Indicá una cantidad entera de votos válida.');
+  const subLocationId = option(input.subLocationId, subLocations, 'La sub ubicación'); const genderId = option(input.genderId, genders, 'El género'); const ageRangeId = option(input.ageRangeId, ages, 'El rango de edad');
+  const batchId = typeof input.batchId === 'string' && input.batchId ? input.batchId.slice(0, 100) : db.collection('_ids').doc().id;
+  const submission = { submittedBy: user.uid, submittedAt: FieldValue.serverTimestamp(), batchId, candidateId, votes, source: 'admin_manual', ...(subLocationId ? { subLocationId } : {}), ...(genderId ? { genderId } : {}), ...(ageRangeId ? { ageRangeId } : {}) };
+  const result = ref.collection('submissions').doc();
+  await db.runTransaction(async (transaction) => {
+    const current = await transaction.get(ref); const existing = (current.data()?.liveResults?.totals ?? {}) as Record<string, number>;
+    const totals: Record<string, number> = {}; candidates.forEach((candidate) => { totals[candidate.id] = Number(existing[candidate.id] ?? 0); }); totals[candidateId] += votes;
+    transaction.set(result, submission); transaction.update(ref, { liveResults: { totals, totalVotes: Object.values(totals).reduce((sum, value) => sum + value, 0), updatedAt: FieldValue.serverTimestamp() } });
+  });
+  await syncPublicRanking(orgId, campId, streamId); return serialise(await result.get());
+}
+
 export async function mySubmissions(user: DecodedIdToken, orgId: string, campId: string, streamId: string) {
-  const { ref } = await agentStream(user, orgId, campId, streamId); await migrateLegacySubmissions(ref); const all = await ref.collection('submissions').where('submittedBy', '==', user.uid).get(); return all.docs.sort((a,b) => (b.data().submittedAt?.toMillis?.() ?? 0) - (a.data().submittedAt?.toMillis?.() ?? 0)).map(serialise);
+  let ref: FirebaseFirestore.DocumentReference;
+  try { ({ ref } = await agentStream(user, orgId, campId, streamId)); }
+  catch (error) {
+    if (!(error instanceof ForbiddenError) || !isManager(user)) throw error;
+    await manager(user, orgId, campId); ref = campaign(orgId, campId).collection('voteStreams').doc(streamId);
+    if (!(await ref.get()).exists) throw new NotFoundError('La Vote Stream no existe.');
+  }
+  await migrateLegacySubmissions(ref); const all = await ref.collection('submissions').where('submittedBy', '==', user.uid).get(); return all.docs.sort((a,b) => (b.data().submittedAt?.toMillis?.() ?? 0) - (a.data().submittedAt?.toMillis?.() ?? 0)).map(serialise);
 }
 export async function agentsStatus(user: DecodedIdToken, orgId: string, campId: string, streamId: string) {
   await manager(user, orgId, campId); const ref = campaign(orgId, campId).collection('voteStreams').doc(streamId); const [agents, subs, profiles] = await Promise.all([ref.collection('agents').get(), ref.collection('submissions').get(), db.collection('users').where('orgIds', 'array-contains', orgId).get()]);

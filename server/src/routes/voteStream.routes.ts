@@ -11,6 +11,7 @@ const assetUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize
 voteStreamRouter.get(`${agentBase}/mine`, ...guarded, controller.mine);
 voteStreamRouter.get(`${agentBase}/:voteStreamId/next-candidate`, ...guarded, controller.nextCandidate);
 voteStreamRouter.post(`${agentBase}/:voteStreamId/submissions`, ...guarded, controller.createSubmission);
+voteStreamRouter.post(`${base}/:voteStreamId/manual-submissions`, ...guarded, controller.createManualSubmission);
 voteStreamRouter.get(`${agentBase}/:voteStreamId/my-submissions`, ...guarded, controller.listMySubmissions);
 voteStreamRouter.get(base, ...guarded, controller.list);
 voteStreamRouter.post(base, ...guarded, controller.create);
