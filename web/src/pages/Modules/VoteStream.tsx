@@ -671,7 +671,6 @@ export default function VoteStreamList() {
                         >
                           Visualizar
                         </Link>
-                        <Link className="btn btn-outline-primary btn-sm" to={`/vote-stream/${stream.id}#seguimiento-agentes`}>Gerenciar agentes</Link>
                         <button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => void openEdit(stream)}>Editar</button>
                         <button type="button" className="btn btn-outline-danger btn-sm" onClick={() => void removeFromList(stream)}>Eliminar</button>
                       </Inline>
