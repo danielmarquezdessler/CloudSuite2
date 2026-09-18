@@ -13,6 +13,7 @@
   padding: 1rem;
   box-shadow: 0 0.35rem 1rem rgba(34, 62, 110, 0.05);
 }
+.vote-ranking{border-left:5px solid var(--vote-party-color,#0060f0);background:linear-gradient(135deg,color-mix(in srgb,var(--vote-party-color,#0060f0) 8%,#fff),#fff 52%)}
 .vote-status {
   border-radius: 99px;
   padding: 0.22rem 0.55rem;
@@ -112,12 +113,12 @@
 .vote-ranking__bar span {
   display: block;
   height: 100%;
-  background: linear-gradient(90deg, #0060f0, #63a7ff);
+  background: linear-gradient(90deg, var(--vote-party-color, #0060f0), color-mix(in srgb, var(--vote-party-color, #0060f0) 55%, #fff));
   border-radius: inherit;
 }
 .vote-ranking__percentage {
   font-size: 1.25rem;
-  color: #083b82;
+  color: var(--vote-party-color, #083b82);
 }
 
 
@@ -170,6 +171,8 @@
   display:flex;
   align-items:center;
 }
+
+.vote-ranking-board:fullscreen .vote-avatar-frame--large .vote-avatar{width:clamp(88px,11vh,132px);height:clamp(88px,11vh,132px);flex-basis:clamp(88px,11vh,132px);font-size:1.4rem}.vote-ranking-board:fullscreen .vote-avatar-frame--large .vote-party-logo{width:2.4rem;height:2.4rem;border-width:3px}.vote-ranking-board:fullscreen .vote-ranking__copy strong{font-size:clamp(1.2rem,2.2vw,2rem)}.vote-ranking-board:fullscreen .vote-ranking__percentage{font-size:clamp(1.8rem,3vw,3rem)}
 
 .vote-stream-card__actions .btn {
   flex:1 1 120px;

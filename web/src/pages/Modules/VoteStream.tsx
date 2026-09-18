@@ -1,5 +1,6 @@
 import {
   ChangeEvent,
+  CSSProperties,
   FormEvent,
   KeyboardEvent,
   useEffect,
@@ -1340,6 +1341,7 @@ function AdminRanking({
                   data-card="true"
                   data-vote-ranking-id={candidate.id}
                   key={candidate.id}
+                  style={{ "--vote-party-color": candidate.partyColor || "#0060F0" } as CSSProperties}
                 >
                   <Inline gap="md" className="align-items-center">
                     <span className="vote-ranking__position">#{index + 1}</span>
