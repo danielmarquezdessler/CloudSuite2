@@ -456,6 +456,7 @@ export default function VoteStreamList() {
     [base, enabledAddons.voteStream],
   );
   const [show, setShow] = useState(false);
+  const [editingStream, setEditingStream] = useState<VoteStream | null>(null);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<{
     message: string;
@@ -501,6 +502,44 @@ export default function VoteStreamList() {
     setAgentIds([]);
     setMargin(blankMargin());
   };
+  const openCreate = () => {
+    reset();
+    setEditingStream(null);
+    setShow(true);
+  };
+  const openEdit = async (stream: VoteStream) => {
+    if (!user || !base) return;
+    setSaving(true);
+    try {
+      const complete = await authenticatedFetch<VoteStream>(user, `${base}/${stream.id}`);
+      setEditingStream(complete);
+      setName(complete.name);
+      setSystem(complete.electoralSystem);
+      setLocation(complete.location);
+      setDate(complete.date);
+      setCandidates((complete.candidates ?? []).map((candidate) => ({ ...candidate, party: candidate.party ?? "", linkedToPrincipal: candidate.linkedToPrincipal === true })));
+      setSubLocations((complete.subLocations ?? []).map((item) => item.name));
+      setGenders((complete.genderOptions ?? []).map((item) => item.name));
+      setAges((complete.ageRanges ?? []).map((item) => item.name));
+      setAgentIds((complete.agents ?? []).map((agent) => agent.id));
+      setMargin(complete.marginOfError ?? blankMargin());
+      setShow(true);
+    } catch (error) {
+      setNotice({ message: error instanceof Error ? error.message : "No pudimos abrir la Stream para editar.", variant: "danger" });
+    } finally {
+      setSaving(false);
+    }
+  };
+  const removeFromList = async (stream: VoteStream) => {
+    if (!user || !base || !window.confirm(`¿Eliminar “${stream.name}”? Esta acción no se puede deshacer.`)) return;
+    try {
+      await authenticatedFetch(user, `${base}/${stream.id}`, { method: "DELETE" });
+      await streamsQ.reload();
+      setNotice({ message: "Stream eliminada.", variant: "success" });
+    } catch (error) {
+      setNotice({ message: error instanceof Error ? error.message : "No pudimos eliminar la Stream.", variant: "danger" });
+    }
+  };
   const setCandidate = (index: number, next: Partial<Candidate>) =>
     setCandidates((current) =>
       current.map((candidate, candidateIndex) =>
@@ -540,8 +579,8 @@ export default function VoteStreamList() {
     if (!user || !base) return;
     setSaving(true);
     try {
-      await authenticatedFetch(user, base, {
-        method: "POST",
+      await authenticatedFetch(user, editingStream ? `${base}/${editingStream.id}` : base, {
+        method: editingStream ? "PUT" : "POST",
         body: JSON.stringify({
           name,
           electoralSystem: system,
@@ -556,10 +595,9 @@ export default function VoteStreamList() {
         }),
       });
       await streamsQ.reload();
-      setShow(false);
-      reset();
+      setShow(false); reset(); setEditingStream(null);
       setNotice({
-        message: "Vote Stream creada y lista para activar.",
+        message: editingStream ? "Stream actualizada." : "Vote Stream creada y lista para activar.",
         variant: "success",
       });
     } catch (error) {
@@ -584,7 +622,7 @@ export default function VoteStreamList() {
             title="Vote Stream"
             subtitle="Centralizá la carga y el seguimiento de resultados en tiempo real."
             ctaLabel={canManage ? "Stream" : undefined}
-            onCtaClick={() => setShow(true)}
+            onCtaClick={openCreate}
             tags={[
               {
                 icon: "bar-chart-2",
@@ -626,18 +664,16 @@ export default function VoteStreamList() {
                           {formatSystem(stream.electoralSystem)}
                         </small>
                       </Stack>
-                      <Inline gap="sm" wrap>
+                      <Inline gap="sm" wrap className="vote-stream-card__actions">
                         <Link
                           className="btn btn-primary btn-sm"
                           to={`/vote-stream/${stream.id}`}
                         >
-                          Ver resultados
+                          Visualizar
                         </Link>
-                        {stream.status === "pendiente" && (
-                          <small className="text-muted">
-                            Aguardando activación
-                          </small>
-                        )}
+                        <Link className="btn btn-outline-primary btn-sm" to={`/vote-stream/${stream.id}#seguimiento-agentes`}>Gerenciar agentes</Link>
+                        <button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => void openEdit(stream)}>Editar</button>
+                        <button type="button" className="btn btn-outline-danger btn-sm" onClick={() => void removeFromList(stream)}>Eliminar</button>
                       </Inline>
                     </Stack>
                   </article>
@@ -649,7 +685,7 @@ export default function VoteStreamList() {
                 title="Todavía no hay Vote Streams"
                 description="Creá la primera jornada para preparar candidatos, segmentos y agentes."
                 ctaLabel={canManage ? "Stream" : undefined}
-                onCtaClick={canManage ? () => setShow(true) : undefined}
+                onCtaClick={canManage ? openCreate : undefined}
               />
             )}
           </ContentPanel>
@@ -669,7 +705,7 @@ export default function VoteStreamList() {
                     <i className="ph-duotone ph-chart-bar" />
                   </span>
                   <Stack gap="xs">
-                    <Modal.Title>Nueva Stream</Modal.Title>
+                    <Modal.Title>{editingStream ? "Editar Stream" : "Nueva Stream"}</Modal.Title>
                     <span>Configurá los detalles de tu encuesta electoral</span>
                   </Stack>
                 </Inline>
@@ -980,13 +1016,13 @@ export default function VoteStreamList() {
                 <button
                   type="button"
                   className="btn btn-light"
-                  onClick={() => setShow(false)}
+                  onClick={() => { setShow(false); reset(); setEditingStream(null); }}
                   disabled={saving}
                 >
                   Cancelar
                 </button>
                 <PrimaryButton type="submit" icon="plus" disabled={saving}>
-                  {saving ? "Creando…" : "Crear Stream"}
+                  {saving ? "Guardando…" : editingStream ? "Guardar cambios" : "Crear Stream"}
                 </PrimaryButton>
               </Modal.Footer>
             </form>
@@ -1755,16 +1791,7 @@ export function VoteStreamDetail() {
           stream={stream}
           keyName="ageRangeId"
         />
-        {canManage && (
-          <AgentTracking
-            user={user}
-            base={base!}
-            streamId={stream.id}
-            candidates={stream.candidates ?? []}
-            onCorrected={query.reload}
-            refreshKey={scrutinized}
-          />
-        )}
+        {canManage && <section id="seguimiento-agentes"><AgentTracking user={user} base={base!} streamId={stream.id} candidates={stream.candidates ?? []} onCorrected={query.reload} refreshKey={scrutinized} /></section>}
         <ContentPanel
           icon="award"
           title="Nota sobre resultados"
