@@ -18,6 +18,8 @@ export default function TopBar({ changeThemeMode, toogleSidebarHide, toogleMobil
   const { role, organizationId } = useActiveCampaign();
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.matchMedia('(max-width: 767.98px)').matches);
   const handleLogout = async () => { await logout(); navigate('/'); };
   const userName = user?.displayName ?? user?.email ?? 'Usuario';
   const [avatarUrl, setAvatarUrl] = useState<string | null>(user?.photoURL ?? null);
@@ -34,10 +36,16 @@ export default function TopBar({ changeThemeMode, toogleSidebarHide, toogleMobil
   }, [organizationId, user]);
 
   useEffect(() => { setAvatarFailed(false); }, [avatarUrl]);
-  const submitSearch = (event: React.FormEvent) => { event.preventDefault(); if (search.trim()) navigate(`/electoral-conversion/voters?search=${encodeURIComponent(search.trim())}`); };
+  useEffect(() => {
+    const query = window.matchMedia('(max-width: 767.98px)');
+    const update = () => setIsMobile(query.matches);
+    update(); query.addEventListener('change', update);
+    return () => query.removeEventListener('change', update);
+  }, []);
+  const submitSearch = (event: React.FormEvent) => { event.preventDefault(); if (search.trim()) { navigate(`/electoral-conversion/voters?search=${encodeURIComponent(search.trim())}`); setMobileSearchOpen(false); } };
 
   return <header className="pc-header cs-topbar">
-    <div className="header-wrapper cs-topbar__wrapper">
+    {!isMobile && <div className="header-wrapper cs-topbar__wrapper cs-topbar__desktop">
       <div className="me-auto pc-mob-drp cs-topbar__left">
         <ul className="list-unstyled">
           <li className="pc-h-item pc-sidebar-collapse"><Link to="#" className="pc-head-link cs-topbar__icon" aria-label="Ocultar menú lateral" onClick={toogleSidebarHide}><i className="ti ti-menu-2" /></Link></li>
@@ -53,6 +61,18 @@ export default function TopBar({ changeThemeMode, toogleSidebarHide, toogleMobil
         <NotificationInbox />
         <Dropdown as="li" className="pc-h-item cs-topbar__profile"><Dropdown.Toggle as="button" type="button" className="pc-head-link arrow-none me-0" aria-label="Perfil">{avatarUrl && !avatarFailed ? <img src={avatarUrl} alt={`Foto de ${userName}`} className="cs-topbar__profile-avatar" data-profile-avatar="image" onError={() => setAvatarFailed(true)} /> : <span className="cs-topbar__profile-avatar cs-topbar__profile-avatar--fallback" data-profile-avatar="initials" aria-label={`Avatar de ${userName}`}>{initials}</span>}<i className="ph-duotone ph-caret-down cs-topbar__profile-caret" /></Dropdown.Toggle><Dropdown.Menu className="dropdown-menu-end pc-h-dropdown"><div className="dropdown-header"><h5 className="mb-1 text-truncate">{userName}</h5><p className="mb-0 text-muted text-truncate">{user?.email} · {role || 'Cliente'}</p></div><Dropdown.Divider /><Dropdown.Item onClick={handleLogout}><i className="ph-duotone ph-power me-2" />Cerrar sesión</Dropdown.Item></Dropdown.Menu></Dropdown>
       </ul></div>
-    </div>
+    </div>}
+    {isMobile && <nav className="cs-topbar__mobile" aria-label="Navegación móvil principal">
+      <button type="button" className="cs-topbar__mobile-action" aria-label="Abrir menú lateral" onClick={toogleMobileSidebarHide}><i className="ti ti-menu-2" /></button>
+      <div className="cs-topbar__mobile-campaign"><CampaignSelector /></div>
+      <button type="button" className="cs-topbar__mobile-action" aria-label="Buscar electores" aria-expanded={mobileSearchOpen} onClick={() => setMobileSearchOpen((open) => !open)}><i className="ph-duotone ph-magnifying-glass" /></button>
+      <Dropdown className="cs-topbar__mobile-profile">
+        <Dropdown.Toggle as="button" type="button" className="cs-topbar__mobile-action arrow-none" aria-label="Perfil">
+          {avatarUrl && !avatarFailed ? <img src={avatarUrl} alt={`Foto de ${userName}`} className="cs-topbar__profile-avatar" data-profile-avatar="image" onError={() => setAvatarFailed(true)} /> : <span className="cs-topbar__profile-avatar cs-topbar__profile-avatar--fallback" data-profile-avatar="initials" aria-label={`Avatar de ${userName}`}>{initials}</span>}
+        </Dropdown.Toggle>
+        <Dropdown.Menu className="dropdown-menu-end pc-h-dropdown"><div className="dropdown-header"><h5 className="mb-1 text-truncate">{userName}</h5><p className="mb-0 text-muted text-truncate">{user?.email} · {role || 'Cliente'}</p></div><Dropdown.Divider /><Dropdown.Item onClick={handleLogout}><i className="ph-duotone ph-power me-2" />Cerrar sesión</Dropdown.Item></Dropdown.Menu>
+      </Dropdown>
+      {mobileSearchOpen && <form className="cs-topbar__mobile-search" onSubmit={submitSearch}><label className="visually-hidden" htmlFor="mobile-elector-search">Buscar electores</label><i className="ph-duotone ph-magnifying-glass" /><input id="mobile-elector-search" autoFocus placeholder="Buscar elector…" value={search} onChange={(event) => setSearch(event.target.value)} /><button type="button" aria-label="Cerrar búsqueda" onClick={() => setMobileSearchOpen(false)}><i className="ti ti-x" /></button></form>}
+    </nav>}
   </header>;
 }

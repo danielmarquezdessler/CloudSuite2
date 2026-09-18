@@ -25,7 +25,7 @@ export default function CampaignSelector() {
   return <>
     <button type="button" className="cs-campaign-selector" aria-label={`Cambiar campaña activa: ${activeCampaign?.nombre ?? 'Cargando campaña'}`} onClick={() => setShow(true)} disabled={loading || !activeCampaign}>
       <i className="ph-duotone ph-flag cs-campaign-selector__flag" />
-      <span className="cs-campaign-selector__name">{activeCampaign?.nombre ?? 'Cargando campaña…'}</span>
+      <span className="cs-campaign-selector__name">{activeCampaign?.nombre ?? 'Campaña'}</span>
       <i className="ph-duotone ph-caret-down cs-campaign-selector__chevron" aria-hidden="true" />
     </button>
     <Modal show={show} onHide={() => !saving && setShow(false)} centered aria-labelledby="campaign-selector-title" dialogClassName="cs-campaign-modal__dialog" contentClassName="cs-campaign-modal">

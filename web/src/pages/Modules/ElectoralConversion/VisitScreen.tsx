@@ -147,9 +147,9 @@ export default function VisitScreen() {
 
   const renderQuestion = (question: OfflineQuestion) => <div key={question.id}><label className="form-label">{question.text}{question.isRequired && ' *'}</label>{question.type === 'text' ? <input className="form-control" value={String(answers[question.id] ?? '')} onChange={event => updateAnswer(question, event.target.value)} /> : question.options.map(option => <div className="form-check" key={option.value}><input className="form-check-input" id={`${question.id}-${option.value}`} type={question.type === 'radio' ? 'radio' : 'checkbox'} name={question.id} checked={question.type === 'checkbox' ? Array.isArray(answers[question.id]) && answers[question.id].includes(option.value) : answers[question.id] === option.value} onChange={() => updateAnswer(question, option.value)} /><label className="form-check-label" htmlFor={`${question.id}-${option.value}`}>{option.label}</label></div>)}</div>;
 
-  return <PageContainer><Stack gap="md">
+  return <PageContainer className="cs-visit-screen"><Stack gap="md">
     <OfflineVisitStatus state={syncState} />
-    <Card icon="people" title="Visita electoral" subtitle={draft ? `Paso ${step + 1} de 4 · El progreso se guarda primero en este dispositivo.` : 'Preparando una copia local de la visita…'}>
+    <Card className="cs-visit-screen__card" icon="people" title="Visita electoral" subtitle={draft ? `Paso ${step + 1} de 4 · El progreso se guarda primero en este dispositivo.` : 'Preparando una copia local de la visita…'}>
       <Stack gap="md">
         {error && <div className="alert alert-danger mb-0" role="alert">{error}</div>}
         {!draft ? <div className="text-muted">Preparando la visita para que puedas continuar incluso sin señal…</div> : <>

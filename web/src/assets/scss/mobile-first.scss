@@ -1,0 +1,75 @@
+@import './settings/color-variables';
+
+// Mobile-first application shell. This is intentionally loaded after the legacy
+// LightAble overrides so desktop rules cannot leak into the small-screen layout.
+@media (max-width: 767.98px) {
+  html, body, #root { min-width: 0; overflow-x: clip; }
+  .pc-header.cs-topbar { position: sticky; inset: 0 0 auto; width: 100%; min-height: 60px; z-index: $z-sticky-header; }
+  .cs-topbar__desktop { display: none !important; }
+  .cs-topbar__mobile { position: relative; display: grid; grid-template-columns: 48px minmax(0, 1fr) 48px 48px; align-items: center; min-height: 60px; padding: 6px 8px; background: var(--pc-header-background); box-shadow: var(--pc-header-shadow); }
+  .cs-topbar__mobile-action { display: grid; width: 44px; height: 44px; place-items: center; border: 0; border-radius: 12px; background: transparent; color: #385477; font-size: 21px; }
+  .cs-topbar__mobile-action:focus-visible, .cs-topbar__mobile-action:hover { background: #eaf2ff; color: #0060f0; outline: 0; }
+  .cs-topbar__mobile-campaign { min-width: 0; padding: 0 4px; }
+  .cs-topbar__mobile .cs-campaign-selector { width: 100%; min-width: 0; height: 44px; gap: 7px; padding: 0 10px; border-radius: 12px; font-size: 13px; }
+  .cs-topbar__mobile .cs-campaign-selector__flag { font-size: 18px; }
+  .cs-topbar__mobile .cs-campaign-selector__name { min-width: 0; }
+  .cs-topbar__mobile-profile { display: grid; }
+  .cs-topbar__mobile-profile .dropdown-toggle::after { display: none; }
+  .cs-topbar__mobile .cs-topbar__profile-avatar { width: 32px; height: 32px; }
+  .cs-topbar__mobile-search { position: absolute; z-index: $z-dropdown; top: 100%; right: 0; left: 0; display: grid; grid-template-columns: 32px minmax(0, 1fr) 44px; align-items: center; min-height: 60px; padding: 8px 12px; border-top: 1px solid #dce7f5; background: var(--pc-header-background); box-shadow: 0 12px 20px rgba(22, 57, 103, .14); }
+  .cs-topbar__mobile-search > i { justify-self: center; color: #617796; font-size: 19px; }
+  .cs-topbar__mobile-search input { min-width: 0; height: 44px; border: 0; outline: 0; background: transparent; color: #213d68; font: 600 16px 'Public Sans', Rubik, sans-serif; }
+  .cs-topbar__mobile-search button { display: grid; width: 44px; height: 44px; place-items: center; border: 0; border-radius: 12px; background: transparent; color: #385477; font-size: 20px; }
+
+  .pc-container { top: 60px !important; width: 100%; min-width: 0; }
+  .auth-main { min-width: 0; overflow-x: clip; }
+  .auth-main .form-control, .auth-main .btn { min-height: 48px !important; }
+  .cs-page-container { padding: 16px 12px 24px; }
+  .cs-page-container__content, .cs-stack, .cs-inline { min-width: 0; }
+  .cd-card { min-width: 0; }
+  .cd-card__header > .cs-inline { width: 100%; min-width: 0; align-items: flex-start; flex-wrap: wrap; }
+  .cd-card__header-copy { flex: 1 1 calc(100% - 60px); min-width: 0; }
+  .cd-card__header-copy h2, .cd-card__header-copy p, .cd-card__header-copy span { overflow-wrap: normal; word-break: normal; }
+  .cd-card__header h2 { font-size: clamp(1.05rem, 5vw, 1.3rem); line-height: 1.25; }
+  .cd-card__header p { font-size: .88rem; line-height: 1.45; }
+  .cd-card__header-action { flex: 1 0 100%; min-width: 0; margin-left: 0; }
+  .cd-card__header-action > .cs-inline, .cd-card__header-action .btn, .cd-card__header-action .cd-select-control { width: 100%; min-width: 0; }
+  .pc-container button:not(.btn-close), .pc-container .btn, .pc-container input:not([type='checkbox']):not([type='radio']), .pc-container select, .cd-primary-button, .cd-select-control, .form-control, .form-select { min-width: 44px; min-height: 44px !important; }
+
+  .cd-dashboard__kpis, .cd-dashboard__overview, .cd-dashboard__main, .cd-dashboard__lower { grid-template-columns: minmax(0, 1fr); }
+  .cd-dashboard__overview, .cd-dashboard__main, .cd-dashboard__lower { gap: var(--cs-space-md); }
+  .cd-dashboard .cd-card__body { min-width: 0; }
+  .cd-dashboard .apexcharts-canvas, .cd-dashboard .apexcharts-svg { max-width: 100% !important; }
+
+  .cs-visit-screen__card .form-check { display: flex; align-items: center; min-height: 44px; }
+  .cs-visit-screen__card .form-check-input { width: 20px; height: 20px; margin-top: 0; }
+  .cs-visit-screen__card .form-check-label { padding-left: 8px; font-size: 1rem; }
+  .cs-visit-screen__card .cs-inline.justify-content-between { align-items: stretch !important; }
+  .cs-visit-screen__card .cs-inline.justify-content-between > * { flex: 1 1 100%; }
+  .cs-visit-screen__card .cs-inline.justify-content-between .btn { width: 100%; }
+
+  .vote-agent-candidate-grid, .vote-agent-stream-list { grid-template-columns: minmax(0, 1fr); }
+  .vote-agent-candidate { min-height: 56px; }
+  .vote-agent-candidate__input { max-width: 100%; min-height: 52px; font-size: 1.2rem; }
+  .vote-agent-segments { grid-template-columns: minmax(0, 1fr); }
+  .vote-agent-submission, .vote-agent-stream { padding: var(--cs-space-md); }
+
+  .vote-data-entry-card { border-radius: 20px; }
+  .vote-data-entry__header { min-height: 0; }
+  .vote-data-entry__header-copy { flex-basis: 100%; }
+  .vote-data-entry__back { min-height: 44px; }
+  .vote-data-entry__header .cs-inline { align-items: flex-start; }
+  .vote-data-entry__tile { flex-basis: 4.25rem; width: 4.25rem; height: 4.25rem; border-radius: 1rem; }
+  .vote-data-entry__header h2 { font-size: clamp(1.35rem, 7vw, 1.9rem); letter-spacing: -.03em; }
+  .vote-data-entry__header p { font-size: .95rem; }
+  .vote-data-entry__illustration { display: none; }
+  .vote-data-entry__candidate--prominent { align-items: flex-start; }
+  .vote-data-entry__candidate--prominent .vote-avatar { width: 5.75rem; height: 5.75rem; flex-basis: 5.75rem; }
+  .vote-data-entry__candidate-name { font-size: clamp(1.75rem, 10vw, 2.4rem); line-height: 1.08; }
+  .vote-data-entry__party-chip { font-size: 1rem; }
+  .vote-data-entry__votes { min-height: 58px; font-size: 1.35rem; }
+  .vote-data-entry__segments { grid-template-columns: minmax(0, 1fr); }
+  .vote-data-entry__select { min-height: 52px; font-size: 1rem; }
+  .vote-data-entry__actions { align-items: stretch; }
+  .vote-data-entry__actions .btn { width: 100%; min-height: 52px; }
+}
