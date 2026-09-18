@@ -3,7 +3,9 @@ import {
   FormEvent,
   KeyboardEvent,
   useEffect,
+  useLayoutEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { doc, onSnapshot } from "firebase/firestore";
@@ -1137,6 +1139,159 @@ function useLiveVoteTotals(
   return totals;
 }
 
+function useRankingReorderAnimation(
+  containerRef: React.RefObject<HTMLDivElement>,
+  rankingIds: string[],
+) {
+  const previousOrder = useRef<string[]>([]);
+  useLayoutEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const cards = Array.from(
+      container.querySelectorAll<HTMLElement>("[data-vote-ranking-id]"),
+    );
+    const slots = cards.map((card) => card.getBoundingClientRect().top);
+    const animations: Animation[] = [];
+    cards.forEach((card, index) => {
+      const id = card.dataset.voteRankingId;
+      if (!id) return;
+      const previousIndex = previousOrder.current.indexOf(id);
+      const moved = previousIndex >= 0 && previousIndex !== index;
+      if (!moved || slots[previousIndex] === undefined || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+      // Use positions in the current layout so entering fullscreen or scrolling
+      // cannot introduce a stale viewport offset into the animation.
+      const deltaY = slots[previousIndex] - slots[index];
+      animations.push(
+        card.animate(
+          [{ transform: `translateY(${deltaY}px)` }, { transform: 'translateY(0)' }],
+          { duration: 420, easing: 'cubic-bezier(.2,.8,.2,1)' },
+        ),
+      );
+    });
+    previousOrder.current = cards
+      .map((card) => card.dataset.voteRankingId)
+      .filter((id): id is string => Boolean(id));
+    return () => animations.forEach((animation) => animation.cancel());
+  }, [containerRef, rankingIds.join("|")]);
+}
+
+function AdminRanking({
+  stream,
+  ranked,
+  totals,
+  scrutinized,
+  maxVotes,
+  margin,
+  irreversible,
+  canManage,
+  onEditPhoto,
+}: {
+  stream: VoteStream;
+  ranked: Candidate[];
+  totals: Record<string, number>;
+  scrutinized: number;
+  maxVotes: number;
+  margin: number | null;
+  irreversible: boolean;
+  canManage: boolean;
+  onEditPhoto: (candidate: Candidate) => void;
+}) {
+  const rankingRef = useRef<HTMLDivElement>(null);
+  const [fullScreen, setFullScreen] = useState(false);
+  useRankingReorderAnimation(
+    rankingRef,
+    ranked.map((candidate) => candidate.id ?? candidate.name),
+  );
+  useEffect(() => {
+    const onFullscreenChange = () =>
+      setFullScreen(document.fullscreenElement === rankingRef.current);
+    document.addEventListener("fullscreenchange", onFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", onFullscreenChange);
+  }, []);
+  const toggleFullscreen = async () => {
+    if (document.fullscreenElement === rankingRef.current) {
+      await document.exitFullscreen?.();
+      return;
+    }
+    await rankingRef.current?.requestFullscreen?.();
+  };
+
+  return (
+    <div ref={rankingRef} className="vote-ranking-board" data-vote-ranking-board>
+      <ContentPanel
+        icon="bar-chart-2"
+        title="Ranking de candidatos"
+        subtitle="Los resultados se actualizan con cada envío recibido."
+        headerAction={
+          <Inline gap="sm" className="vote-ranking-board__actions">
+            <span className={`vote-status is-${stream.status}`}>{stream.status}</span>
+            <button
+              type="button"
+              className="btn btn-sm btn-outline-primary vote-ranking-board__fullscreen"
+              aria-label={fullScreen ? "Salir de pantalla completa" : "Abrir ranking en pantalla completa"}
+              title={fullScreen ? "Salir de pantalla completa" : "Abrir ranking en pantalla completa"}
+              onClick={() => void toggleFullscreen()}
+            >
+              <i className={`ph-duotone ${fullScreen ? "ph-corners-in" : "ph-corners-out"}`} aria-hidden="true" />
+            </button>
+          </Inline>
+        }
+      >
+        <Stack gap="md">
+          {ranked.length ? (
+            ranked.map((candidate, index) => {
+              const votes = totals[candidate.id ?? ""] ?? 0;
+              const percentage = scrutinized ? Math.round((votes / scrutinized) * 100) : 0;
+              return (
+                <article
+                  className="vote-ranking"
+                  data-card="true"
+                  data-vote-ranking-id={candidate.id}
+                  key={candidate.id}
+                >
+                  <Inline gap="md" className="align-items-center">
+                    <span className="vote-ranking__position">#{index + 1}</span>
+                    <CandidateAvatar candidate={candidate} size="large" />
+                    <Stack gap="xs" className="vote-ranking__copy">
+                      <Inline gap="xs" wrap>
+                        <strong>{candidate.name}</strong>
+                        {index === 0 && irreversible && <span className="badge text-bg-success">🏆 Ganador proyectado (irreversible)</span>}
+                        {stream.winnerCandidateId === candidate.id && <span className="badge text-bg-primary">Ganador al cierre</span>}
+                      </Inline>
+                      <small>
+                        {candidate.party || "Sin partido informado"} · {votes} votos
+                        {margin !== null
+                          ? ` · rango ${Math.max(0, percentage - margin)}%-${Math.min(100, percentage + margin)}%`
+                          : ""}
+                      </small>
+                      <div className="vote-ranking__bar"><span style={{ width: `${(votes / maxVotes) * 100}%` }} /></div>
+                    </Stack>
+                    <Stack gap="xs" className="vote-ranking__end">
+                      <strong className="vote-ranking__percentage">{percentage}%</strong>
+                      {canManage && (
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-outline-primary"
+                          aria-label={`Editar foto de ${candidate.name}`}
+                          onClick={() => onEditPhoto(candidate)}
+                        >
+                          Foto
+                        </button>
+                      )}
+                    </Stack>
+                  </Inline>
+                </article>
+              );
+            })
+          ) : (
+            <EmptyState icon="bar-chart-2" title="Aún no hay datos cargados" description="El ranking aparecerá cuando los agentes de sondeo envíen resultados." />
+          )}
+        </Stack>
+      </ContentPanel>
+    </div>
+  );
+}
+
 function AgentTracking({ user, base, streamId }: { user: ReturnType<typeof useAuth>['user']; base: string; streamId: string }) { const [agents, setAgents] = useState<Array<{ uid: string; name: string; submittedToday: boolean; latestBatchId: string | null }>>([]); const [batch, setBatch] = useState<Array<{ id: string; candidateId: string; votes: number }>>([]); useEffect(() => { if (!user) return; void authenticatedFetch<Array<{ uid: string; name: string; submittedToday: boolean; latestBatchId: string | null }>>(user, `${base}/${streamId}/agents-status`).then(setAgents).catch(() => setAgents([])); }, [user, base, streamId]); const openBatch = async (batchId: string) => { if (!user) return; setBatch(await authenticatedFetch(user, `${base}/${streamId}/submissions/by-batch/${encodeURIComponent(batchId)}`)); }; return <ContentPanel icon="users" title="Seguimiento de agentes" subtitle="Estado de envío de la jornada actual."><Stack gap="sm">{agents.map((agent) => <Inline key={agent.uid} gap="sm" className="justify-content-between align-items-center"><span>{agent.name}</span><Inline gap="sm">{agent.submittedToday ? <span className="badge text-bg-success">Enviado</span> : <span className="badge text-bg-secondary">Pendiente</span>}{agent.latestBatchId && <button type="button" className="btn btn-sm btn-outline-primary" onClick={() => void openBatch(agent.latestBatchId!)}>Ver envío</button>}</Inline></Inline>)}{agents.length > 0 && agents.every((agent) => agent.submittedToday) && <span className="text-success">Todos los agentes enviaron resultados.</span>}{batch.length > 0 && <Stack gap="xs">{batch.map((entry) => <small key={entry.id}>{entry.candidateId}: {entry.votes} votos</small>)}</Stack>}</Stack></ContentPanel>; }
 export function VoteStreamDetail() {
   const { voteStreamId = "" } = useParams();
@@ -1363,7 +1518,17 @@ export function VoteStreamDetail() {
             }
           />
         </div>
-        <ContentPanel icon="bar-chart-2" title="Ranking de candidatos" subtitle="Los resultados se actualizan con cada envío recibido." headerAction={<span className={`vote-status is-${stream.status}`}>{stream.status}</span>}><Stack gap="md">{ranked.length ? ranked.map((candidate, index) => { const votes = totals[candidate.id ?? ''] ?? 0; const percentage = scrutinized ? Math.round(votes / scrutinized * 100) : 0; return <article className="vote-ranking" data-card="true" key={candidate.id}><Inline gap="md" className="align-items-center"><span className="vote-ranking__position">#{index + 1}</span><CandidateAvatar candidate={candidate} size="large" />{canManage && <button type="button" className="btn btn-sm btn-outline-primary" aria-label={`Editar foto de ${candidate.name}`} onClick={() => setPhotoCandidate(candidate)}>Foto</button>}<Stack gap="xs" className="vote-ranking__copy"><Inline gap="xs" wrap><strong>{candidate.name}</strong>{index === 0 && irreversible && <span className="badge text-bg-success">🏆 Ganador proyectado (irreversible)</span>}{stream.winnerCandidateId === candidate.id && <span className="badge text-bg-primary">Ganador al cierre</span>}</Inline><small>{candidate.party || 'Sin partido informado'} · {votes} votos {margin !== null ? `· rango ${Math.max(0, percentage - margin)}%-${Math.min(100, percentage + margin)}%` : ''}</small><div className="vote-ranking__bar"><span style={{ width: `${votes / maxVotes * 100}%` }} /></div></Stack><strong className="vote-ranking__percentage">{percentage}%</strong></Inline></article>; }) : <EmptyState icon="bar-chart-2" title="Aún no hay datos cargados" description="El ranking aparecerá cuando los agentes de sondeo envíen resultados." />}</Stack></ContentPanel>
+        <AdminRanking
+          stream={stream}
+          ranked={ranked}
+          totals={totals}
+          scrutinized={scrutinized}
+          maxVotes={maxVotes}
+          margin={margin}
+          irreversible={irreversible}
+          canManage={canManage}
+          onEditPhoto={setPhotoCandidate}
+        />
         <ContentPanel
           icon="people"
           title="Total de electores/votos estimados"
