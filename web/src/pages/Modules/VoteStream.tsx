@@ -1531,6 +1531,7 @@ export function VoteStreamDetail() {
     variant: "success" | "danger";
   } | null>(null);
   const [closing, setClosing] = useState(false);
+  const [winnerAnnouncement, setWinnerAnnouncement] = useState<{ name: string; votes: number; percentage: number } | null>(null);
   const [photoCandidate, setPhotoCandidate] = useState<Candidate | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const stream = query.data;
@@ -1596,10 +1597,16 @@ export function VoteStreamDetail() {
       return;
     setClosing(true);
     try {
-      await authenticatedFetch(user, `${base}/${stream.id}/${path}`, {
+      const updated = await authenticatedFetch<VoteStream>(user, `${base}/${stream.id}/${path}`, {
         method: "POST",
       });
       await query.reload();
+      if (path === "close") {
+        const winner = updated.candidates?.find((candidate) => candidate.id === updated.winnerCandidateId);
+        const updatedTotals = updated.liveResults?.totals ?? {};
+        const updatedVotes = Object.values(updatedTotals).reduce((sum, value) => sum + Number(value), 0);
+        setWinnerAnnouncement({ name: winner?.name ?? "Sin vencedor", votes: Number(updatedTotals[updated.winnerCandidateId ?? ""] ?? 0), percentage: updatedVotes ? Math.round(Number(updatedTotals[updated.winnerCandidateId ?? ""] ?? 0) / updatedVotes * 100) : 0 });
+      }
       setNotice({
         message:
           path === "activate"
@@ -1685,12 +1692,10 @@ export function VoteStreamDetail() {
           subtitle={`${stream.location} · ${stream.date} · ${formatSystem(stream.electoralSystem)}`}
           backTo="/vote-stream"
           backLabel="Volver a Vote Stream"
-          ctaLabel={
-            stream.status === "pendiente" && canManage ? "Activar" : undefined
-          }
-          onCtaClick={() => void action("activate")}
+          ctaLabel={stream.status === "pendiente" && canManage ? "Activar" : stream.status === "activa" && canManage ? "Data Entry" : undefined}
+          onCtaClick={() => stream.status === "pendiente" ? void action("activate") : navigate(`/vote-stream/${stream.id}/data-entry`)}
           secondaryCtaLabel={
-            stream.status === "activa" && canManage ? "Cerrar" : undefined
+            stream.status === "activa" && canManage ? "Finalizar elección" : undefined
           }
           onSecondaryCtaClick={() => void action("close")}
           ctaDisabled={closing}
@@ -1848,6 +1853,11 @@ export function VoteStreamDetail() {
             onClose={() => setNotice(null)}
           />
         )}
+        <Modal show={Boolean(winnerAnnouncement)} centered onHide={() => setWinnerAnnouncement(null)}>
+          <Modal.Header closeButton><Modal.Title>🏆 Elección finalizada</Modal.Title></Modal.Header>
+          <Modal.Body><Stack gap="sm"><strong className="vote-winner-announcement__name">{winnerAnnouncement?.name}</strong><span>es el vencedor con {winnerAnnouncement?.percentage ?? 0}% de los votos.</span><small>{winnerAnnouncement?.votes ?? 0} votos registrados al cierre.</small></Stack></Modal.Body>
+          <Modal.Footer><PrimaryButton icon="check" onClick={() => setWinnerAnnouncement(null)}>Ver resultados</PrimaryButton></Modal.Footer>
+        </Modal>
         <CandidatePhotoCropModal
           candidate={photoCandidate}
           saving={uploadingPhoto}
