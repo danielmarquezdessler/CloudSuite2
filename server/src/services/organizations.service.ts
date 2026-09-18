@@ -151,7 +151,13 @@ export async function getCurrentUserData(user: DecodedIdToken) {
   const member = memberSnapshot.data() ?? {};
   const camps = typeof user.camps === 'object' && user.camps !== null ? user.camps as Record<string, boolean> : {};
   const allCampaigns = user.role === 'cliente' && user.allCamps === true;
-  const claimsArePending = !claimedOrgId;
+  // An agent assigned from Vote Stream receives the campaign claim immediately,
+  // but a token issued seconds earlier can still be in circulation.  The
+  // backend-created campaign membership is a narrow, safe fallback so /api/me
+  // can prepare the selector instead of leaving it on “Cargando campaña…”.
+  const campaignMemberships = campaignsSnapshot.empty
+    ? []
+    : await db.getAll(...campaignsSnapshot.docs.map((campaign) => campaign.ref.collection('members').doc(user.uid)));
   return {
     hasOrg: true,
     profile: {
@@ -164,7 +170,7 @@ export async function getCurrentUserData(user: DecodedIdToken) {
       enabledAddons: { smartPlanner: organization.enabledAddons?.smartPlanner === true, voteStream: organization.enabledAddons?.voteStream === true }
     },
     campaigns: campaignsSnapshot.docs
-      .filter((campaign) => claimsArePending || allCampaigns || camps[campaign.id] === true)
+      .filter((campaign, index) => allCampaigns || camps[campaign.id] === true || campaignMemberships[index]?.exists)
       .map((campaign) => ({ id: campaign.id, nombre: campaign.data().nombre })),
     role: typeof user.role === 'string' ? user.role : member.role ?? 'sin-rol'
   };

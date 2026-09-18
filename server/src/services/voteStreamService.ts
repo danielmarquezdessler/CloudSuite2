@@ -1,8 +1,7 @@
 import { DecodedIdToken } from 'firebase-admin/auth';
 import { FieldValue } from 'firebase-admin/firestore';
 import { randomUUID } from 'node:crypto';
-import { storage } from '../config/firebase.js';
-import { db } from '../config/firebase.js';
+import { adminAuth, db, storage } from '../config/firebase.js';
 import { assertCampaignAccess, ForbiddenError, NotFoundError, ValidationError } from './access.service.js';
 import { migrateLegacySubmissions, syncPublicRanking } from './voteStreamDataEntryService.js';
 
@@ -55,6 +54,55 @@ async function validAgentIds(user: DecodedIdToken, orgId: string, campId: string
   const allowed = new Set((await assignableAgents(user, orgId, campId)).map((agent) => agent.uid));
   if (ids.some((uid) => !allowed.has(uid))) throw new ValidationError('Cada agente debe pertenecer a la organización de esta campaña.');
   return ids;
+}
+
+/**
+ * A Stream assignment is also an access grant.  Keeping campaign membership,
+ * the Firebase claim and the organization-level entitlement together avoids
+ * an agent being assigned successfully but seeing no campaign at login.
+ */
+async function grantVoteStreamAgentAccess(orgId: string, campId: string, agentIds: string[], assignedBy: string) {
+  if (!agentIds.length) return;
+  const organizationRef = db.collection('organizations').doc(orgId);
+  const campaignRef = campaign(orgId, campId);
+  const [organization, ...profiles] = await Promise.all([
+    organizationRef.get(),
+    ...agentIds.map((uid) => db.collection('users').doc(uid).get()),
+  ]);
+  if (!organization.exists) throw new NotFoundError('La organización no existe.');
+
+  const batch = db.batch();
+  batch.set(
+    organizationRef,
+    { enabledAddons: { ...(organization.data()?.enabledAddons ?? {}), voteStream: true } },
+    { merge: true },
+  );
+
+  for (const [index, uid] of agentIds.entries()) {
+    const profile = profiles[index]?.data() ?? {};
+    const authUser = await adminAuth.getUser(uid);
+    const claims = { ...(authUser.customClaims ?? {}) } as Record<string, unknown>;
+    if (claims.orgId && claims.orgId !== orgId) {
+      throw new ValidationError('Un agente no puede vincularse a una organización distinta.');
+    }
+    const role = typeof claims.role === 'string' ? claims.role : 'usuario';
+    const camps = { ...((claims.camps as Record<string, boolean> | undefined) ?? {}), [campId]: true };
+    batch.set(organizationRef.collection('members').doc(uid), {
+      role,
+      email: String(profile.email ?? authUser.email ?? ''),
+      displayName: String(profile.displayName ?? authUser.displayName ?? ''),
+      updatedAt: FieldValue.serverTimestamp(),
+    }, { merge: true });
+    batch.set(campaignRef.collection('members').doc(uid), {
+      role,
+      email: String(profile.email ?? authUser.email ?? ''),
+      displayName: String(profile.displayName ?? authUser.displayName ?? ''),
+      joinedAt: FieldValue.serverTimestamp(),
+      voteStreamAssignedBy: assignedBy,
+    }, { merge: true });
+    await adminAuth.setCustomUserClaims(uid, { ...claims, orgId, role, camps });
+  }
+  await batch.commit();
 }
 
 async function agentStream(user: DecodedIdToken, orgId: string, campId: string, id: string) {
@@ -185,7 +233,7 @@ export async function createVoteStream(user: DecodedIdToken, orgId: string, camp
   await access(user, orgId, campId, true); const electoralSystem = String(input.electoralSystem) as ElectoralSystem; if (!systems.includes(electoralSystem)) throw new ValidationError('Elegí un sistema electoral válido.');
   const candidates = normalizeCandidates(input.candidates); const agentIds = await validAgentIds(user, orgId, campId, input.agentIds); const linked = candidates.find((candidate) => candidate.linkedToPrincipal); if (linked) Object.assign(linked, await principalCandidate(orgId, campId));
   const ref = campaign(orgId, campId).collection('voteStreams').doc(); const candidateEntries = candidates.map(({ id: _candidateId, ...candidate }) => ({ ref: ref.collection('candidates').doc(), candidate })); const batch = db.batch(); const created = { name: text(input.name, 'El nombre', 160, true), electoralSystem, location: text(input.location, 'La localización', 200, true), date: text(input.date, 'La fecha', 20, true), status: 'pendiente', totalElectorsOrEstimatedVotes: number(input.totalElectorsOrEstimatedVotes, 'El total de votantes'), marginOfError: margin(input.marginOfError), createdBy: user.uid, createdAt: FieldValue.serverTimestamp(), closedAt: null, winnerCandidateId: null, liveResults: { totals: Object.fromEntries(candidateEntries.map(({ ref: candidateRef }) => [candidateRef.id, 0])), totalVotes: 0, updatedAt: FieldValue.serverTimestamp() } };
-  batch.set(ref, created); candidateEntries.forEach(({ ref: candidateRef, candidate }) => batch.set(candidateRef, candidate)); normalizeOptions(input.subLocations, 'La sub ubicación').forEach((name) => batch.set(ref.collection('subLocations').doc(), { name })); normalizeOptions(input.genderOptions, 'El género').forEach((name) => batch.set(ref.collection('genderOptions').doc(), { name })); normalizeOptions(input.ageRanges, 'El rango de edad').forEach((name) => batch.set(ref.collection('ageRanges').doc(), { name })); agentIds.forEach((uid) => batch.set(ref.collection('agents').doc(uid), { assignedAt: FieldValue.serverTimestamp(), assignedBy: user.uid })); await batch.commit(); await syncPublicRanking(orgId, campId, ref.id); return getVoteStream(user, orgId, campId, ref.id);
+  batch.set(ref, created); candidateEntries.forEach(({ ref: candidateRef, candidate }) => batch.set(candidateRef, candidate)); normalizeOptions(input.subLocations, 'La sub ubicación').forEach((name) => batch.set(ref.collection('subLocations').doc(), { name })); normalizeOptions(input.genderOptions, 'El género').forEach((name) => batch.set(ref.collection('genderOptions').doc(), { name })); normalizeOptions(input.ageRanges, 'El rango de edad').forEach((name) => batch.set(ref.collection('ageRanges').doc(), { name })); agentIds.forEach((uid) => batch.set(ref.collection('agents').doc(uid), { assignedAt: FieldValue.serverTimestamp(), assignedBy: user.uid })); await batch.commit(); await grantVoteStreamAgentAccess(orgId, campId, agentIds, user.uid); await syncPublicRanking(orgId, campId, ref.id); return getVoteStream(user, orgId, campId, ref.id);
 }
 
 export async function updateVoteStream(user: DecodedIdToken, orgId: string, campId: string, id: string, input: Record<string, unknown>) {
@@ -194,7 +242,7 @@ export async function updateVoteStream(user: DecodedIdToken, orgId: string, camp
   const hasSubmissions = 'candidates' in input || 'subLocations' in input || 'genderOptions' in input || 'ageRanges' in input ? !(await ref.collection('submissions').limit(1).get()).empty : false;
   const collections = [{ key: 'subLocations', collection: 'subLocations', label: 'La sub ubicación' }, { key: 'genderOptions', collection: 'genderOptions', label: 'El género' }, { key: 'ageRanges', collection: 'ageRanges', label: 'El rango de edad' }] as const;
   for (const item of collections) if (item.key in input) { const existing = await ref.collection(item.collection).get(); const values = normalizeOptions(input[item.key], item.label); const byName = new Map(existing.docs.map((document) => [String(document.data().name ?? ''), document])); if (hasSubmissions && (values.length !== existing.docs.length || values.some((value) => !byName.has(value)))) throw new ValidationError(`No podés modificar ${item.label.toLowerCase()} después de recibir resultados.`); const batch = db.batch(); existing.docs.filter((document) => !values.includes(String(document.data().name ?? ''))).forEach((document) => batch.delete(document.ref)); values.forEach((name) => batch.set(byName.get(name)?.ref ?? ref.collection(item.collection).doc(), { name }, { merge: true })); await batch.commit(); }
-  if ('agentIds' in input) { const agentIds = await validAgentIds(user, orgId, campId, input.agentIds); const existing = await ref.collection('agents').get(); const batch = db.batch(); existing.docs.forEach((document) => batch.delete(document.ref)); agentIds.forEach((uid) => batch.set(ref.collection('agents').doc(uid), { assignedAt: FieldValue.serverTimestamp(), assignedBy: user.uid })); await batch.commit(); }
+  if ('agentIds' in input) { const agentIds = await validAgentIds(user, orgId, campId, input.agentIds); const existing = await ref.collection('agents').get(); const batch = db.batch(); existing.docs.forEach((document) => batch.delete(document.ref)); agentIds.forEach((uid) => batch.set(ref.collection('agents').doc(uid), { assignedAt: FieldValue.serverTimestamp(), assignedBy: user.uid })); await batch.commit(); await grantVoteStreamAgentAccess(orgId, campId, agentIds, user.uid); }
   if ('candidates' in input) { const candidates = normalizeCandidates(input.candidates); const linked = candidates.find((candidate) => candidate.linkedToPrincipal); if (linked) Object.assign(linked, await principalCandidate(orgId, campId)); const existing = await ref.collection('candidates').get(); const existingIds = new Set(existing.docs.map((document) => document.id)); if (candidates.some((candidate) => candidate.id && !existingIds.has(candidate.id))) throw new ValidationError('Uno de los candidatos ya no pertenece a esta Vote Stream. Recargá antes de guardar.'); const retained = new Set(candidates.map((candidate) => candidate.id).filter((candidateId): candidateId is string => Boolean(candidateId))); if (hasSubmissions && existing.docs.some((document) => !retained.has(document.id))) throw new ValidationError('No podés quitar candidatos después de recibir resultados.'); const batch = db.batch(); existing.docs.filter((document) => !retained.has(document.id)).forEach((document) => batch.delete(document.ref)); candidates.forEach(({ id: candidateId, ...candidate }) => batch.set(candidateId ? ref.collection('candidates').doc(candidateId) : ref.collection('candidates').doc(), candidate)); await batch.commit(); }
   await ref.update(next); return getVoteStream(user, orgId, campId, id);
 }
