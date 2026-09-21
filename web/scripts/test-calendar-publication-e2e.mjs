@@ -79,10 +79,11 @@ try {
   const publicationDto = listAsCollaborator.body?.find((item) => item.id === eventId);
   if (!publicationDto?.canEdit) throw new Error('El colaborador vinculado no recibió permiso de edición en el DTO de publicación.');
   const editedTitle = `Publicación editada ${suffix}`;
-  const edit = await request(collaboratorToken, `${base}/calendar/${eventId}`, { method: 'PUT', body: JSON.stringify({ title: editedTitle, expectedRevision: publicationDto.revision }) });
+  const editedStartAt = new Date(Date.now() + 259_200_000).toISOString();
+  const edit = await request(collaboratorToken, `${base}/calendar/${eventId}`, { method: 'PUT', body: JSON.stringify({ title: editedTitle, startAt: editedStartAt, endAt: new Date(Date.parse(editedStartAt) + 3_600_000).toISOString(), status: 'completed', expectedRevision: publicationDto.revision }) });
   if (!edit.response.ok) throw new Error(`El colaborador vinculado no pudo editar: ${edit.response.status}.`);
   const mirroredTask = await campaign.collection('tasks').doc(taskId).get();
-  if (mirroredTask.data()?.title !== editedTitle) throw new Error('La edición de la publicación no se reflejó en la tarea espejo.');
+  if (mirroredTask.data()?.title !== editedTitle || mirroredTask.data()?.dueDate !== editedStartAt.slice(0, 10) || mirroredTask.data()?.status !== 'completada' || mirroredTask.data()?.linkedUserIds?.[0] !== collaborator.uid) throw new Error('La edición de la publicación no se reflejó por completo en la tarea espejo.');
   const attachmentBody = new FormData(); attachmentBody.append('attachment', new Blob(['comprobante de publicación E2E'], { type: 'text/plain' }), 'publicacion-e2e.txt');
   const attachment = await request(collaboratorToken, `${base}/calendar/${eventId}/attachments`, { method: 'POST', body: attachmentBody });
   if (attachment.response.status !== 201 || !attachment.body?.storagePath || !(await storage.bucket().file(attachment.body.storagePath).exists())[0]) throw new Error('El adjunto del colaborador no quedó aislado en Storage.');
