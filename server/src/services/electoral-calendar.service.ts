@@ -8,13 +8,13 @@ type Input = Record<string, unknown>;
 type Participant = { uid: string; required: boolean; status: 'pending' | 'confirmed' | 'declined' };
 type CalendarEvent = Record<string, unknown> & { id: string; startAt: string; endAt: string; participants: Participant[]; resourceIds: string[]; revision: number; status: string };
 
-const eventTypes = new Set(['event', 'election', 'veda', 'meeting', 'territory', 'training', 'communication', 'legal', 'fundraising']);
 const eventStatuses = new Set(['draft', 'confirmed', 'cancelled', 'completed']);
 const calendars = (orgId: string, campId: string) => campaignRef(orgId, campId).collection('calendar');
 const resources = (orgId: string, campId: string) => campaignRef(orgId, campId).collection('calendarResources');
 const templates = (orgId: string, campId: string) => campaignRef(orgId, campId).collection('calendarTemplates');
 const idempotency = (orgId: string, campId: string) => campaignRef(orgId, campId).collection('calendarIdempotency');
 const text = (value: unknown, max = 500) => typeof value === 'string' ? value.trim().slice(0, max) : '';
+const eventType = (value: unknown, fallback = 'event') => text(value, 80) || fallback;
 const list = (value: unknown) => Array.isArray(value) ? value : [];
 const ids = (value: unknown, max = 100) => Array.from(new Set(list(value).map((item) => text(item, 128)).filter(Boolean))).slice(0, max);
 const iso = (value: unknown, label: string) => {
@@ -35,7 +35,7 @@ function normalizeLegacy(document: FirebaseFirestore.QueryDocumentSnapshot | Fir
   return {
     id: document.id,
     ...raw,
-    type: eventTypes.has(text(raw.type)) ? text(raw.type) : 'event',
+    type: eventType(raw.type),
     status: eventStatuses.has(text(raw.status)) ? text(raw.status) : 'confirmed',
     startAt,
     endAt,
@@ -81,8 +81,7 @@ function cleanEvent(input: Input, current?: CalendarEvent) {
   const startAt = iso(startSource, 'El inicio');
   const endAt = iso(endSource, 'El fin');
   if (Date.parse(endAt) <= Date.parse(startAt)) throw new ValidationError('El fin debe ser posterior al inicio.');
-  const type = text(input.type) || String(current?.type ?? 'event');
-  if (!eventTypes.has(type)) throw new ValidationError('El tipo de evento no es válido.');
+  const type = eventType(input.type, eventType(current?.type));
   const status = text(input.status) || String(current?.status ?? 'confirmed');
   if (!eventStatuses.has(status)) throw new ValidationError('El estado del evento no es válido.');
   const participants = input.participants === undefined && input.participantIds === undefined && input.optionalParticipantIds === undefined ? current?.participants ?? [] : cleanParticipants(input.participants ?? input.participantIds, input.optionalParticipantIds);
@@ -263,7 +262,7 @@ export async function deleteResource(user: DecodedIdToken, orgId: string, campId
 export async function listTemplates(user: DecodedIdToken, orgId: string, campId: string) { assertCampaignAccess(user, orgId, campId); return (await templates(orgId, campId).get()).docs.map(serialized).filter((template) => !(template as Input).deleted); }
 export async function saveTemplate(user: DecodedIdToken, orgId: string, campId: string, templateId: string | null, input: Input) {
   assertCampaignManager(user, orgId, campId); const name = text(input.name, 200); if (!name) throw new ValidationError('La plantilla necesita un nombre.'); const ref = templateId ? templates(orgId, campId).doc(templateId) : templates(orgId, campId).doc(); const body = input.event && typeof input.event === 'object' ? input.event as Input : input;
-  await ref.set({ name, event: { title: text(body.title, 300), description: text(body.description, 5000), type: eventTypes.has(text(body.type)) ? text(body.type) : 'event', durationMinutes: Math.max(15, Math.min(10080, Number(body.durationMinutes) || 60)), teamIds: ids(body.teamIds), resourceIds: ids(body.resourceIds), preparationMinutes: Math.max(0, Number(body.preparationMinutes) || 0), teardownMinutes: Math.max(0, Number(body.teardownMinutes) || 0), runOfShow: cleanRunOfShow(body.runOfShow) }, ...(templateId ? { updatedAt: FieldValue.serverTimestamp() } : { createdAt: FieldValue.serverTimestamp(), createdBy: user.uid }), deleted: false }, { merge: true }); return { id: ref.id, name };
+  await ref.set({ name, event: { title: text(body.title, 300), description: text(body.description, 5000), type: eventType(body.type), durationMinutes: Math.max(15, Math.min(10080, Number(body.durationMinutes) || 60)), teamIds: ids(body.teamIds), resourceIds: ids(body.resourceIds), preparationMinutes: Math.max(0, Number(body.preparationMinutes) || 0), teardownMinutes: Math.max(0, Number(body.teardownMinutes) || 0), runOfShow: cleanRunOfShow(body.runOfShow) }, ...(templateId ? { updatedAt: FieldValue.serverTimestamp() } : { createdAt: FieldValue.serverTimestamp(), createdBy: user.uid }), deleted: false }, { merge: true }); return { id: ref.id, name };
 }
 export async function deleteTemplate(user: DecodedIdToken, orgId: string, campId: string, templateId: string) { assertCampaignManager(user, orgId, campId); await templates(orgId, campId).doc(templateId).update({ deleted: true, deletedAt: FieldValue.serverTimestamp() }); }
 
