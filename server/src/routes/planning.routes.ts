@@ -8,6 +8,7 @@ const publicationUpload = multer({ storage: multer.memoryStorage(), limits: { fi
 const publicationAttachment = (request: Request, response: Response, next: NextFunction) => publicationUpload.single('attachment')(request, response, (error) => error instanceof multer.MulterError && error.code === 'LIMIT_FILE_SIZE' ? response.status(413).json({ message: 'El adjunto no puede superar los 15 MB.' }) : next(error));
 planningRouter.get(`${b}/calendar`, requireAuth, c.getCalendar); planningRouter.post(`${b}/calendar`, requireAuth, c.postCalendar);
 planningRouter.get(`${b}/calendar/types`, requireAuth, c.getCalendarEventTypes);
+planningRouter.post(`${b}/calendar/types`, requireAuth, c.postCalendarEventType);
 planningRouter.post(`${b}/calendar/:eventId/attachments`, requireAuth, publicationAttachment, c.postCalendarPublicationAttachment);
 planningRouter.delete(`${b}/calendar/:eventId/attachments/:attachmentId`, requireAuth, c.deleteCalendarPublicationAttachment);
 planningRouter.get(`${b}/calendar/availability`, requireAuth, c.getCalendarAvailability); planningRouter.post(`${b}/calendar/availability`, requireAuth, c.postCalendarAvailability);

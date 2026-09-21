@@ -16,8 +16,28 @@ const tasks = (orgId: string, campId: string) => campaignRef(orgId, campId).coll
 const idempotency = (orgId: string, campId: string) => campaignRef(orgId, campId).collection('calendarIdempotency');
 const eventTypes = (orgId: string, campId: string) => campaignRef(orgId, campId).collection('calendarEventTypes');
 const defaultEventTypes = [
+  ['campaign-launch', 'Lanzamiento de campaña'],
+  ['political-rally', 'Actos políticos y mítines'],
+  ['territorial-walk', 'Caminatas y recorridas territoriales (Timbreos)'],
+  ['electoral-debate', 'Debates electorales'],
+  ['press-conference', 'Conferencias de prensa'],
+  ['media-interview', 'Entrevistas en medios de comunicación'],
+  ['fundraising-event', 'Eventos de recaudación de fondos'],
+  ['community-leaders', 'Reuniones con líderes comunitarios, sindicales o empresariales'],
+  ['institution-visit', 'Visitas a instituciones, fábricas u ONGs'],
+  ['strategy-meeting', 'Reuniones de estrategia con el equipo o comité de campaña'],
+  ['volunteer-training', 'Capacitación de voluntarios y fiscales de mesa'],
+  ['spot-recording', 'Grabación de spots publicitarios y sesiones de fotos'],
+  ['outreach-table', 'Mesas de difusión y entrega de volantes'],
+  ['campaign-closing', 'Actos de cierre de campaña'],
+  ['election-day', 'Día de la elección (Votación del candidato y vigilia en el búnker)'],
+  ['other', 'Otros']
+] as const;
+const legacyEventTypes = [
   ['event', 'Evento'], ['election', 'Elección'], ['veda', 'Veda'], ['meeting', 'Reunión'], ['territory', 'Territorio'], ['training', 'Capacitación'], ['communication', 'Comunicación'], ['legal', 'Jurídico'], ['fundraising', 'Recaudación']
 ] as const;
+const defaultEventTypeValues = new Set<string>(defaultEventTypes.map(([value]) => value));
+const legacyEventTypeLabels = new Map<string, string>(legacyEventTypes);
 const text = (value: unknown, max = 500) => typeof value === 'string' ? value.trim().slice(0, max) : '';
 const eventType = (value: unknown, fallback = 'event') => text(value, 80) || fallback;
 const list = (value: unknown) => Array.isArray(value) ? value : [];
@@ -152,21 +172,76 @@ async function archivePublicationTask(orgId: string, campId: string, eventId: st
   await tasks(orgId, campId).doc(`calendar-publication-${eventId}`).set({ archived: true, archivedAt: FieldValue.serverTimestamp(), archivedBy: user.uid, source: 'calendar_publication', sourceEventId: eventId }, { merge: true });
 }
 
+const eventTypeRef = (orgId: string, campId: string, value: string) => eventTypes(orgId, campId).doc(createHash('sha256').update(value.toLocaleLowerCase()).digest('hex').slice(0, 32));
+
+/**
+ * Keeps the campaign catalogue on the new campaign-oriented defaults without
+ * invalidating an event that still uses one of the former generic values.
+ */
+async function ensureEventTypeCatalog(orgId: string, campId: string) {
+  const [eventsSnapshot, typesSnapshot] = await Promise.all([calendars(orgId, campId).get(), eventTypes(orgId, campId).get()]);
+  const legacyInUse = new Set<string>();
+  eventsSnapshot.docs.forEach((document) => {
+    const value = text(document.data().type, 80) || 'event';
+    if (legacyEventTypeLabels.has(value)) legacyInUse.add(value);
+  });
+
+  const stored = new Map(typesSnapshot.docs.map((document) => [text(document.data().value, 80), document]));
+  const batch = db.batch();
+  let writes = 0;
+  defaultEventTypes.forEach(([value, label]) => {
+    const existing = stored.get(value);
+    if (!existing || text(existing.data().label, 80) !== label || existing.data().system !== true) {
+      const ref = eventTypeRef(orgId, campId, value);
+      batch.set(ref, { value, label, system: true, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+      writes += 1;
+    }
+  });
+  legacyEventTypes.forEach(([value, label]) => {
+    const existing = stored.get(value);
+    if (legacyInUse.has(value) && !existing) {
+      batch.set(eventTypeRef(orgId, campId, value), { value, label, legacy: true, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() });
+      writes += 1;
+    }
+    if (!legacyInUse.has(value) && existing) {
+      batch.delete(existing.ref);
+      writes += 1;
+    }
+  });
+  if (writes) await batch.commit();
+  return legacyInUse;
+}
+
 async function rememberEventType(orgId: string, campId: string, type: string, user: DecodedIdToken) {
-  if (defaultEventTypes.some(([value]) => value === type)) return;
-  const ref = eventTypes(orgId, campId).doc(createHash('sha256').update(type.toLocaleLowerCase()).digest('hex').slice(0, 32));
+  if (defaultEventTypeValues.has(type)) return;
+  const ref = eventTypeRef(orgId, campId, type);
   await ref.set({ value: type, label: type, createdBy: user.uid, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() }, { merge: true });
 }
 
 export async function listEventTypes(user: DecodedIdToken, orgId: string, campId: string) {
   assertCampaignAccess(user, orgId, campId);
+  const legacyInUse = await ensureEventTypeCatalog(orgId, campId);
   const custom = await eventTypes(orgId, campId).get();
   const options = new Map<string, { value: string; label: string }>(defaultEventTypes.map(([value, label]) => [value, { value, label }]));
   custom.docs.forEach((document) => {
     const value = text(document.data().value, 80);
-    if (value) options.set(value, { value, label: text(document.data().label, 80) || value });
+    if (!value || (legacyEventTypeLabels.has(value) && !legacyInUse.has(value))) return;
+    options.set(value, { value, label: text(document.data().label, 80) || legacyEventTypeLabels.get(value) || value });
   });
   return [...options.values()];
+}
+
+export async function createEventType(user: DecodedIdToken, orgId: string, campId: string, input: Input) {
+  assertCampaignAccess(user, orgId, campId);
+  const label = text(input.label, 80);
+  if (!label) throw new ValidationError('El tipo necesita un nombre.');
+  const existingDefault = defaultEventTypes.find(([, defaultLabel]) => defaultLabel.localeCompare(label, 'es', { sensitivity: 'accent' }) === 0);
+  if (existingDefault) return { value: existingDefault[0], label: existingDefault[1] };
+  const catalog = await listEventTypes(user, orgId, campId);
+  const existing = catalog.find((option) => option.label.localeCompare(label, 'es', { sensitivity: 'accent' }) === 0 || option.value.localeCompare(label, 'es', { sensitivity: 'accent' }) === 0);
+  if (existing) return existing;
+  await rememberEventType(orgId, campId, label, user);
+  return { value: label, label };
 }
 
 async function conflictsFor(orgId: string, campId: string, candidate: { id?: string; startAt: string; endAt: string; participants: Participant[]; resourceIds: string[] }) {

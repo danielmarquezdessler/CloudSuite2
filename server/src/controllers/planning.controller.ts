@@ -12,6 +12,7 @@ const user = (request: Request) => request.user!;
 
 export const getCalendar = handler(r => calendar.listEvents(user(r), ...ids(r)));
 export const getCalendarEventTypes = handler(r => calendar.listEventTypes(user(r), ...ids(r)));
+export const postCalendarEventType = handler(r => calendar.createEventType(user(r), ...ids(r), r.body), 201);
 export const postCalendarPublicationAttachment = handler(r => calendar.uploadPublicationAttachment(user(r), ...ids(r), id(r, 'eventId'), r.file), 201);
 export const deleteCalendarPublicationAttachment = destroy(r => calendar.deletePublicationAttachment(user(r), ...ids(r), id(r, 'eventId'), id(r, 'attachmentId')));
 export const postCalendar = handler(r => calendar.createEvent(user(r), ...ids(r), r.body), 201);
