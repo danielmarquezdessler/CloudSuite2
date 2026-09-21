@@ -5,11 +5,12 @@ import Card from './Shared/Card';
 import Inline from './Shared/Inline';
 import Stack from './Shared/Stack';
 
-type Addon = { label: string; subtitle: string; icon: string; accent: string; path?: string; href?: string; comingSoon?: boolean; gated?: 'smartPlanner' | 'voteStream' };
+type Addon = { label: string; subtitle: string; icon: string; accent: string; path?: string; href?: string; comingSoon?: boolean; gated?: 'smartPlanner' | 'voteStream' | 'finance' };
 
 const addons: Addon[] = [
   { label: 'SmartPlanner', subtitle: 'Planificación profesional', icon: 'ph-sparkle', accent: 'var(--bs-primary)', path: '/smartplanner', gated: 'smartPlanner' },
   { label: 'Vote Stream', subtitle: 'Resultados electorales en tiempo real', icon: 'ph-ballot', accent: 'var(--bs-secondary)', path: '/vote-stream', gated: 'voteStream' },
+  { label: 'Finanzas', subtitle: 'Caja y movimientos de campaña', icon: 'ph-wallet', accent: 'var(--bs-success)', path: '/finanzas', gated: 'finance' },
   { label: 'Civica Pulse', subtitle: 'Software de Inteligencia Política profesional', icon: 'ph-activity', accent: 'var(--bs-success)', href: 'https://civicapulse.com/' },
   { label: 'Governo Hub', subtitle: 'Sistema de gestión de gobiernos locales', icon: 'ph-buildings', accent: 'var(--bs-primary)', href: 'http://governohub.com/' },
   { label: 'Termómetro Comunitario', subtitle: 'Sistema de medición de opinión pública y focus group', icon: 'ph-thermometer', accent: 'var(--bs-warning)', href: 'https://termometrocomunitario.programascomunitarios.org' },

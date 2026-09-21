@@ -8,6 +8,7 @@ import './assets/scss/global-loading-bar.scss'
 import './assets/scss/pbi-autosave.scss'
 import './assets/scss/electoral-calendar.scss'
 import './assets/scss/mobile-first.scss'
+import './assets/scss/finance.scss'
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom';

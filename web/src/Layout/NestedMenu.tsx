@@ -16,7 +16,7 @@ interface MenuItem {
   badge?: string;
   dataPage?: string;
   submenu?: MenuItem[];
-  addon?: 'smartPlanner' | 'voteStream';
+  addon?: 'smartPlanner' | 'voteStream' | 'finance';
   agentOnly?: boolean;
   managerOnly?: boolean;
   adminOnly?: boolean;

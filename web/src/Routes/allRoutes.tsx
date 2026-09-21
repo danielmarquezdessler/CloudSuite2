@@ -40,6 +40,7 @@ import PbiDetail from '../pages/Modules/SmartPlanner/PbiDetail';
 import VoteStreamList, { VoteStreamDetail } from '../pages/Modules/VoteStream';
 import VoteStreamAgentPanel from '../pages/Modules/VoteStreamAgentPanel';
 import PublicVoteStreamRanking from '../pages/PublicVoteStreamRanking';
+import Finance from '../pages/Modules/Finance';
 import LiveVisits from '../pages/Modules/Execution/LiveVisits';
 import Heatmap from '../pages/Modules/Execution/Heatmap';
 import Undecided from '../pages/Modules/Execution/Undecided';
@@ -226,6 +227,7 @@ const routes = [
     { path: "/visit/:voterId", component: <VisitScreen /> },
     { path: "/control-de-revision", component: <AuditLog /> },
     { path: "/system/addons", component: <AddonsAdmin /> },
+    { path: "/finanzas", component: <Finance /> },
     { path: "/vote-stream", component: <VoteStreamList /> },
     { path: "/vote-stream/mi-panel", component: <VoteStreamAgentPanel /> },
     { path: "/vote-stream/agente", component: <VoteStreamAgentPanel /> },

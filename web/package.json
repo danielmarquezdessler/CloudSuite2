@@ -85,6 +85,7 @@
     "test:e2e:vote-stream-agent-panel": "node scripts/test-vote-stream-agent-panel-e2e.mjs",
     "test:e2e:vote-stream-realtime": "node scripts/test-vote-stream-realtime-e2e.mjs",
     "test:e2e:vote-stream-data-entry": "node scripts/test-vote-stream-data-entry-e2e.mjs",
+    "test:e2e:finance": "node scripts/test-finance-e2e.mjs",
     "test:e2e:global-loading-bar": "node scripts/test-global-loading-bar-e2e.mjs",
     "test:e2e:mobile-audit": "node scripts/test-mobile-audit-e2e.mjs",
     "test:e2e:mobile-system": "node scripts/test-mobile-system-sweep.mjs"

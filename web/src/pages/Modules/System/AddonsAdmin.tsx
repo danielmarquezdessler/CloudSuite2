@@ -13,15 +13,17 @@ import { authenticatedRequest } from '../../../lib/api';
 export default function AddonsAdmin() {
   const { user } = useAuth();
   const { organizationId, role, enabledAddons, updateEnabledAddons, reload } = useActiveCampaign();
-  const [saving, setSaving] = useState<'smartPlanner' | 'voteStream' | null>(null);
+  const [saving, setSaving] = useState<'smartPlanner' | 'voteStream' | 'finance' | null>(null);
   const [notice, setNotice] = useState('');
   const isGlobalAdmin = role === 'admin';
 
-  const updateAddon = async (addon: 'smartPlanner' | 'voteStream') => {
+  const updateAddon = async (addon: 'smartPlanner' | 'voteStream' | 'finance') => {
     if (!user || !organizationId || !isGlobalAdmin) return;
     setSaving(addon);
     setNotice('');
-    const result = await authenticatedRequest<{ enabledAddons: typeof enabledAddons }>(user, `/api/organizations/${organizationId}/addons/${addon === 'smartPlanner' ? 'smart-planner' : 'vote-stream'}`, {
+    const route = addon === 'smartPlanner' ? 'smart-planner' : addon === 'voteStream' ? 'vote-stream' : 'finance';
+    const label = addon === 'smartPlanner' ? 'SmartPlanner' : addon === 'voteStream' ? 'Vote Stream' : 'Finanzas';
+    const result = await authenticatedRequest<{ enabledAddons: typeof enabledAddons }>(user, `/api/organizations/${organizationId}/addons/${route}`, {
       method: 'PUT',
       body: JSON.stringify({ enabled: !enabledAddons[addon] })
     });
@@ -31,7 +33,7 @@ export default function AddonsAdmin() {
       await reload();
       const nextEnabledAddons = result.data?.enabledAddons ?? enabledAddons;
       updateEnabledAddons(nextEnabledAddons);
-      setNotice(nextEnabledAddons[addon] ? `${addon === 'smartPlanner' ? 'SmartPlanner' : 'Vote Stream'} quedó habilitado para esta organización.` : `${addon === 'smartPlanner' ? 'SmartPlanner' : 'Vote Stream'} quedó deshabilitado para esta organización.`);
+      setNotice(nextEnabledAddons[addon] ? `${label} quedó habilitado para esta organización.` : `${label} quedó deshabilitado para esta organización.`);
     }
     setSaving(null);
   };
@@ -53,6 +55,9 @@ export default function AddonsAdmin() {
         <p className="mb-0">Al habilitarlo, Vote Stream queda disponible en el sidebar y en el lanzador de productos.</p>
         <Inline gap="md" wrap><span className={`cd-state-pill ${enabledAddons.voteStream ? 'is-success' : ''}`}>{enabledAddons.voteStream ? 'Habilitado' : 'Deshabilitado'}</span><PrimaryButton icon={enabledAddons.voteStream ? 'check' : 'plus'} onClick={() => void updateAddon('voteStream')} disabled={Boolean(saving)}>{saving === 'voteStream' ? 'Guardando…' : enabledAddons.voteStream ? 'Deshabilitar Vote Stream' : 'Habilitar Vote Stream'}</PrimaryButton></Inline>
       </Stack>}
+    </ContentPanel>
+    <ContentPanel icon="pie" title="Finanzas" subtitle="Caja, ingresos y egresos de campaña.">
+      {!isGlobalAdmin ? <EmptyState icon="award" title="Acceso restringido" description="Solo un administrador global puede modificar los add-ons de una organización." /> : <Stack gap="md"><p className="mb-0">Habilitá el núcleo transaccional para Cliente y Administrador.</p><Inline gap="md" wrap><span className={`cd-state-pill ${enabledAddons.finance ? 'is-success' : ''}`}>{enabledAddons.finance ? 'Habilitado' : 'Deshabilitado'}</span><PrimaryButton icon={enabledAddons.finance ? 'check' : 'plus'} onClick={() => void updateAddon('finance')} disabled={Boolean(saving)}>{saving === 'finance' ? 'Guardando…' : enabledAddons.finance ? 'Deshabilitar Finanzas' : 'Habilitar Finanzas'}</PrimaryButton></Inline></Stack>}
     </ContentPanel>
   </Stack></PageContainer>;
 }
