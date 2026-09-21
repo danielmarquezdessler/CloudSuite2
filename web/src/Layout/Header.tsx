@@ -45,12 +45,6 @@ const Header = ({ themeMode }: { themeMode: string }) => {
 
               <NestedMenu menuItems={menuItems} />
             </ul>
-            <Card className="nav-action-card border-0 bg-primary-subtle">
-              <CardBody>
-                <h5 className="text-primary">CloudSuite</h5>
-                <p className="text-muted mb-0">Módulos de campaña próximamente.</p>
-              </CardBody>
-            </Card>
           </SimpleBar>
           <Card className="pc-user-card cloudsuite-party-footer" data-party-sidebar-footer>
             <CardBody>
