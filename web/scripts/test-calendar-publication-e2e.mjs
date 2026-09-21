@@ -61,6 +61,8 @@ try {
   }
   const ownProfile = await request(collaboratorToken, '/api/me');
   if (!ownProfile.response.ok || ownProfile.body?.profile?.photoURL !== 'https://example.com/e2e-avatar.png') throw new Error('El perfil del colaborador no devolvió su avatar propio.');
+  const smartPlannerMembers = await request(collaboratorToken, `${base}/smartplanner/members`);
+  if (!smartPlannerMembers.response.ok || smartPlannerMembers.body?.find((member) => member.uid === collaborator.uid)?.smartPlannerRole !== 'contador') throw new Error('Roles SmartPlanner no devolvió el rol asignado del colaborador.');
   const visibleType = `Tipo colaborador ${suffix}`;
   const createdByCollaborator = await request(collaboratorToken, `${base}/calendar`, { method: 'POST', body: JSON.stringify({ title: `Evento de colaborador ${suffix}`, type: visibleType, startAt: new Date(Date.now() + 86_400_000).toISOString(), endAt: new Date(Date.now() + 90_000_000).toISOString(), participantIds: [], resourceIds: [], idempotencyKey: `collab-${suffix}` }) });
   if (createdByCollaborator.response.status !== 201) throw new Error(`El colaborador no pudo crear un evento: ${createdByCollaborator.response.status}.`);
