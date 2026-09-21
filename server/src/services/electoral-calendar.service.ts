@@ -1,8 +1,8 @@
 import { DecodedIdToken } from 'firebase-admin/auth';
 import { FieldValue } from 'firebase-admin/firestore';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { assertCampaignAccess, assertCampaignManager, campaignRef, ConflictError, ForbiddenError, NotFoundError, ValidationError } from './access.service.js';
-import { db } from '../config/firebase.js';
+import { db, storage } from '../config/firebase.js';
 
 type Input = Record<string, unknown>;
 type Participant = { uid: string; required: boolean; status: 'pending' | 'confirmed' | 'declined' };
@@ -12,6 +12,7 @@ const eventStatuses = new Set(['draft', 'confirmed', 'cancelled', 'completed']);
 const calendars = (orgId: string, campId: string) => campaignRef(orgId, campId).collection('calendar');
 const resources = (orgId: string, campId: string) => campaignRef(orgId, campId).collection('calendarResources');
 const templates = (orgId: string, campId: string) => campaignRef(orgId, campId).collection('calendarTemplates');
+const tasks = (orgId: string, campId: string) => campaignRef(orgId, campId).collection('tasks');
 const idempotency = (orgId: string, campId: string) => campaignRef(orgId, campId).collection('calendarIdempotency');
 const eventTypes = (orgId: string, campId: string) => campaignRef(orgId, campId).collection('calendarEventTypes');
 const defaultEventTypes = [
@@ -91,6 +92,9 @@ function cleanEvent(input: Input, current?: CalendarEvent) {
   const participants = input.participants === undefined && input.participantIds === undefined && input.optionalParticipantIds === undefined ? current?.participants ?? [] : cleanParticipants(input.participants ?? input.participantIds, input.optionalParticipantIds);
   const resourceIds = input.resourceIds === undefined ? current?.resourceIds ?? [] : ids(input.resourceIds, 40);
   const locationRaw = input.location && typeof input.location === 'object' ? input.location as Input : (current?.location as Input | undefined) ?? {};
+  const isPublication = input.isPublication === undefined ? current?.isPublication === true : input.isPublication === true;
+  const linkedUserIds = input.linkedUserIds === undefined ? ids(current?.linkedUserIds) : ids(input.linkedUserIds);
+  const allowLinkedEditing = input.allowLinkedEditing === undefined ? current?.allowLinkedEditing === true : input.allowLinkedEditing === true;
   return {
     title: text(input.title ?? current?.title, 300) || (() => { throw new ValidationError('El título es obligatorio.'); })(),
     description: text(input.description ?? current?.description, 5000),
@@ -111,8 +115,41 @@ function cleanEvent(input: Input, current?: CalendarEvent) {
     preparationMinutes: Math.max(0, Math.min(1440, Number(input.preparationMinutes ?? current?.preparationMinutes ?? 0) || 0)),
     teardownMinutes: Math.max(0, Math.min(1440, Number(input.teardownMinutes ?? current?.teardownMinutes ?? 0) || 0)),
     runOfShow: input.runOfShow === undefined ? cleanRunOfShow(current?.runOfShow) : cleanRunOfShow(input.runOfShow),
-    reminders: input.reminders === undefined ? list(current?.reminders).slice(0, 10) : list(input.reminders).slice(0, 10)
+    reminders: input.reminders === undefined ? list(current?.reminders).slice(0, 10) : list(input.reminders).slice(0, 10),
+    isPublication,
+    linkedUserIds: isPublication ? linkedUserIds : [],
+    allowLinkedEditing: isPublication && allowLinkedEditing,
+    attachments: input.attachments === undefined ? list(current?.attachments).slice(0, 30) : list(input.attachments).slice(0, 30)
   };
+}
+
+function publicationEditable(user: DecodedIdToken, event: CalendarEvent) {
+  if (!event.isPublication) return true;
+  if (user.role === 'cliente' || user.role === 'admin') return true;
+  return event.allowLinkedEditing === true && ids(event.linkedUserIds).includes(user.uid);
+}
+
+async function assertEventEditable(user: DecodedIdToken, orgId: string, campId: string, event: CalendarEvent) {
+  assertCampaignAccess(user, orgId, campId);
+  if (!publicationEditable(user, event)) throw new ForbiddenError('No tenés permiso para editar esta publicación.');
+}
+
+async function syncPublicationTask(orgId: string, campId: string, eventId: string, event: CalendarEvent) {
+  const ref = tasks(orgId, campId).doc(`calendar-publication-${eventId}`);
+  if (!event.isPublication) return ref;
+  const linkedUserIds = ids(event.linkedUserIds);
+  await ref.set({
+    title: String(event.title), description: String(event.description ?? ''), assignedTo: linkedUserIds[0] || String(event.createdBy ?? ''),
+    linkedUserIds, dueDate: String(event.startAt).slice(0, 10), status: event.status === 'completed' ? 'completada' : event.status === 'cancelled' ? 'pendiente' : 'pendiente',
+    priority: String(event.priority ?? 'medium') === 'critical' ? 'alta' : String(event.priority ?? 'media'), teamId: null,
+    source: 'calendar_publication', sourceEventId: eventId, sourceEventPath: `/planning/calendar?event=${encodeURIComponent(eventId)}`,
+    archived: false, updatedAt: FieldValue.serverTimestamp()
+  }, { merge: true });
+  return ref;
+}
+
+async function archivePublicationTask(orgId: string, campId: string, eventId: string, user: DecodedIdToken) {
+  await tasks(orgId, campId).doc(`calendar-publication-${eventId}`).set({ archived: true, archivedAt: FieldValue.serverTimestamp(), archivedBy: user.uid, source: 'calendar_publication', sourceEventId: eventId }, { merge: true });
 }
 
 async function rememberEventType(orgId: string, campId: string, type: string, user: DecodedIdToken) {
@@ -170,10 +207,10 @@ async function clearOldReservations(orgId: string, campId: string, eventId: stri
   }));
 }
 
-export async function listEvents(user: DecodedIdToken, orgId: string, campId: string) {
+export async function listEvents(user: DecodedIdToken, orgId: string, campId: string): Promise<Array<CalendarEvent & { canEdit: boolean }>> {
   assertCampaignAccess(user, orgId, campId);
   const snapshot = await calendars(orgId, campId).get();
-  return snapshot.docs.map(normalizeLegacy).filter((event) => !event.deleted).sort((left, right) => Date.parse(left.startAt) - Date.parse(right.startAt));
+  return snapshot.docs.map(normalizeLegacy).filter((event) => !event.deleted).map((event) => ({ ...event, canEdit: publicationEditable(user, event) })).sort((left, right) => Date.parse(left.startAt) - Date.parse(right.startAt));
 }
 
 export async function createEvent(user: DecodedIdToken, orgId: string, campId: string, input: Input) {
@@ -206,15 +243,18 @@ export async function createEvent(user: DecodedIdToken, orgId: string, campId: s
   await reserveResources(orgId, campId, ref.id, data.resourceIds, data.startAt, data.endAt, data.status);
   await ref.set({ ...data, revision: 1, createdAt: FieldValue.serverTimestamp(), createdBy: user.uid, updatedAt: FieldValue.serverTimestamp(), deleted: false });
   await rememberEventType(orgId, campId, data.type, user);
-  return { eventId: ref.id, ...data, revision: 1, conflicts: conflict };
+  const event = { id: ref.id, ...data, revision: 1, status: data.status, participants: data.participants, resourceIds: data.resourceIds, startAt: data.startAt, endAt: data.endAt, createdBy: user.uid } as CalendarEvent;
+  const task = await syncPublicationTask(orgId, campId, ref.id, event);
+  if (data.isPublication) await ref.update({ planningTaskId: task.id });
+  return { eventId: ref.id, ...data, revision: 1, planningTaskId: data.isPublication ? task.id : null, conflicts: conflict };
 }
 
 export async function updateEvent(user: DecodedIdToken, orgId: string, campId: string, eventId: string, input: Input) {
-  assertCampaignAccess(user, orgId, campId);
   const ref = calendars(orgId, campId).doc(eventId);
   const snapshot = await ref.get();
   if (!snapshot.exists || snapshot.data()?.deleted) throw new NotFoundError('El evento no existe.');
   const current = normalizeLegacy(snapshot);
+  await assertEventEditable(user, orgId, campId, current);
   const expectedRevision = input.expectedRevision === undefined ? current.revision : Number(input.expectedRevision);
   if (expectedRevision !== current.revision) throw new ConflictError('El evento fue actualizado por otra persona.', { revision: current.revision, event: current });
   const data = cleanEvent(input, current);
@@ -226,25 +266,51 @@ export async function updateEvent(user: DecodedIdToken, orgId: string, campId: s
   const revision = current.revision + 1;
   await ref.update({ ...data, revision, updatedAt: FieldValue.serverTimestamp(), updatedBy: user.uid });
   await rememberEventType(orgId, campId, data.type, user);
-  return { eventId, ...data, revision, conflicts: conflict };
+  const task = await syncPublicationTask(orgId, campId, eventId, { ...current, ...data, id: eventId, revision, createdBy: current.createdBy } as CalendarEvent);
+  if (data.isPublication) await ref.update({ planningTaskId: task.id });
+  return { eventId, ...data, revision, planningTaskId: data.isPublication ? task.id : null, conflicts: conflict };
 }
 
 export async function deleteEvent(user: DecodedIdToken, orgId: string, campId: string, eventId: string) {
-  assertCampaignAccess(user, orgId, campId);
   const ref = calendars(orgId, campId).doc(eventId); const snapshot = await ref.get();
   if (!snapshot.exists) throw new NotFoundError('El evento no existe.');
-  await clearOldReservations(orgId, campId, eventId, normalizeLegacy(snapshot).resourceIds);
+  const current = normalizeLegacy(snapshot); await assertEventEditable(user, orgId, campId, current);
+  await clearOldReservations(orgId, campId, eventId, current.resourceIds);
+  if (current.isPublication) await archivePublicationTask(orgId, campId, eventId, user);
   await ref.delete();
 }
 
 export async function cancelEvent(user: DecodedIdToken, orgId: string, campId: string, eventId: string, reason: unknown) {
-  assertCampaignAccess(user, orgId, campId);
   const ref = calendars(orgId, campId).doc(eventId); const snapshot = await ref.get();
   if (!snapshot.exists) throw new NotFoundError('El evento no existe.');
   const current = normalizeLegacy(snapshot);
+  await assertEventEditable(user, orgId, campId, current);
   await clearOldReservations(orgId, campId, eventId, current.resourceIds);
   await ref.update({ status: 'cancelled', cancellationReason: text(reason, 1000), cancelledAt: FieldValue.serverTimestamp(), cancelledBy: user.uid, revision: current.revision + 1, updatedAt: FieldValue.serverTimestamp() });
+  if (current.isPublication) await syncPublicationTask(orgId, campId, eventId, { ...current, status: 'cancelled' });
   return { eventId, status: 'cancelled' };
+}
+
+export async function uploadPublicationAttachment(user: DecodedIdToken, orgId: string, campId: string, eventId: string, file?: Express.Multer.File) {
+  if (!file?.buffer) throw new ValidationError('Seleccioná un archivo para adjuntar.');
+  if (file.size > 15 * 1024 * 1024) throw new ValidationError('El adjunto no puede superar los 15 MB.');
+  const ref = calendars(orgId, campId).doc(eventId); const snapshot = await ref.get();
+  if (!snapshot.exists) throw new NotFoundError('El evento no existe.');
+  const event = normalizeLegacy(snapshot); if (!event.isPublication) throw new ValidationError('Los adjuntos están disponibles para eventos de Publicación.');
+  await assertEventEditable(user, orgId, campId, event);
+  const name = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_'); const path = `calendar/publications/${orgId}/${campId}/${eventId}/${Date.now()}-${randomUUID()}-${name}`; const token = randomUUID();
+  await storage.bucket().file(path).save(file.buffer, { resumable: false, contentType: file.mimetype || 'application/octet-stream', metadata: { metadata: { firebaseStorageDownloadTokens: token } } });
+  const attachment = { id: randomUUID(), name: file.originalname, type: file.mimetype, size: file.size, storagePath: path, url: `https://firebasestorage.googleapis.com/v0/b/${storage.bucket().name}/o/${encodeURIComponent(path)}?alt=media&token=${token}`, uploadedBy: user.uid, uploadedAt: new Date().toISOString() };
+  await ref.update({ attachments: list(event.attachments).concat(attachment).slice(0, 30), updatedAt: FieldValue.serverTimestamp(), revision: event.revision + 1 });
+  return attachment;
+}
+
+export async function deletePublicationAttachment(user: DecodedIdToken, orgId: string, campId: string, eventId: string, attachmentId: string) {
+  const ref = calendars(orgId, campId).doc(eventId); const snapshot = await ref.get(); if (!snapshot.exists) throw new NotFoundError('El evento no existe.');
+  const event = normalizeLegacy(snapshot); if (!event.isPublication) throw new ValidationError('El evento no admite adjuntos de publicación.'); await assertEventEditable(user, orgId, campId, event);
+  const attachments = list(event.attachments) as Input[]; const target = attachments.find((attachment) => text(attachment.id, 128) === attachmentId); if (!target) throw new NotFoundError('El adjunto no existe.');
+  await storage.bucket().file(text(target.storagePath, 1000)).delete({ ignoreNotFound: true });
+  await ref.update({ attachments: attachments.filter((attachment) => text(attachment.id, 128) !== attachmentId), updatedAt: FieldValue.serverTimestamp(), revision: event.revision + 1 });
 }
 
 export async function reschedulePreview(user: DecodedIdToken, orgId: string, campId: string, eventId: string, input: Input) {

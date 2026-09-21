@@ -1,10 +1,15 @@
-import { Router } from 'express';
+import { NextFunction, Request, Response, Router } from 'express';
+import multer from 'multer';
 import { requireAuth } from '../middleware/requireAuth.js';
 import * as c from '../controllers/planning.controller.js';
 export const planningRouter = Router();
 const b = '/organizations/:orgId/campaigns/:campId';
+const publicationUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024 } });
+const publicationAttachment = (request: Request, response: Response, next: NextFunction) => publicationUpload.single('attachment')(request, response, (error) => error instanceof multer.MulterError && error.code === 'LIMIT_FILE_SIZE' ? response.status(413).json({ message: 'El adjunto no puede superar los 15 MB.' }) : next(error));
 planningRouter.get(`${b}/calendar`, requireAuth, c.getCalendar); planningRouter.post(`${b}/calendar`, requireAuth, c.postCalendar);
 planningRouter.get(`${b}/calendar/types`, requireAuth, c.getCalendarEventTypes);
+planningRouter.post(`${b}/calendar/:eventId/attachments`, requireAuth, publicationAttachment, c.postCalendarPublicationAttachment);
+planningRouter.delete(`${b}/calendar/:eventId/attachments/:attachmentId`, requireAuth, c.deleteCalendarPublicationAttachment);
 planningRouter.get(`${b}/calendar/availability`, requireAuth, c.getCalendarAvailability); planningRouter.post(`${b}/calendar/availability`, requireAuth, c.postCalendarAvailability);
 planningRouter.get(`${b}/calendar/resources`, requireAuth, c.getCalendarResources); planningRouter.post(`${b}/calendar/resources`, requireAuth, c.postCalendarResource); planningRouter.put(`${b}/calendar/resources/:resourceId`, requireAuth, c.putCalendarResource); planningRouter.delete(`${b}/calendar/resources/:resourceId`, requireAuth, c.deleteCalendarResource);
 planningRouter.get(`${b}/calendar/templates`, requireAuth, c.getCalendarTemplates); planningRouter.post(`${b}/calendar/templates`, requireAuth, c.postCalendarTemplate); planningRouter.put(`${b}/calendar/templates/:templateId`, requireAuth, c.putCalendarTemplate); planningRouter.delete(`${b}/calendar/templates/:templateId`, requireAuth, c.deleteCalendarTemplate);

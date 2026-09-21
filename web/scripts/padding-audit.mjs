@@ -183,7 +183,7 @@ try {
     return { padding, failed: Object.values(padding).some((value) => value < minPadding) };
   }), minimumPadding);
   cardsAudited += launcherAudit.length;
-  if (launcherAudit.length !== 7) failures.push(`Launcher Addons — se esperaban 7 cards canónicas y se encontraron ${launcherAudit.length}.`);
+  if (launcherAudit.length !== 8) failures.push(`Launcher Addons — se esperaban 8 cards canónicas y se encontraron ${launcherAudit.length}.`);
   for (const [index, card] of launcherAudit.entries()) {
     if (card.failed) failures.push(`Launcher Addons — card ${index + 1} — ${formatBox(card.padding)}`);
   }
