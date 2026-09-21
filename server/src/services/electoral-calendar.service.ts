@@ -13,6 +13,10 @@ const calendars = (orgId: string, campId: string) => campaignRef(orgId, campId).
 const resources = (orgId: string, campId: string) => campaignRef(orgId, campId).collection('calendarResources');
 const templates = (orgId: string, campId: string) => campaignRef(orgId, campId).collection('calendarTemplates');
 const idempotency = (orgId: string, campId: string) => campaignRef(orgId, campId).collection('calendarIdempotency');
+const eventTypes = (orgId: string, campId: string) => campaignRef(orgId, campId).collection('calendarEventTypes');
+const defaultEventTypes = [
+  ['event', 'Evento'], ['election', 'Elección'], ['veda', 'Veda'], ['meeting', 'Reunión'], ['territory', 'Territorio'], ['training', 'Capacitación'], ['communication', 'Comunicación'], ['legal', 'Jurídico'], ['fundraising', 'Recaudación']
+] as const;
 const text = (value: unknown, max = 500) => typeof value === 'string' ? value.trim().slice(0, max) : '';
 const eventType = (value: unknown, fallback = 'event') => text(value, 80) || fallback;
 const list = (value: unknown) => Array.isArray(value) ? value : [];
@@ -111,6 +115,23 @@ function cleanEvent(input: Input, current?: CalendarEvent) {
   };
 }
 
+async function rememberEventType(orgId: string, campId: string, type: string, user: DecodedIdToken) {
+  if (defaultEventTypes.some(([value]) => value === type)) return;
+  const ref = eventTypes(orgId, campId).doc(createHash('sha256').update(type.toLocaleLowerCase()).digest('hex').slice(0, 32));
+  await ref.set({ value: type, label: type, createdBy: user.uid, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+}
+
+export async function listEventTypes(user: DecodedIdToken, orgId: string, campId: string) {
+  assertCampaignAccess(user, orgId, campId);
+  const custom = await eventTypes(orgId, campId).get();
+  const options = new Map<string, { value: string; label: string }>(defaultEventTypes.map(([value, label]) => [value, { value, label }]));
+  custom.docs.forEach((document) => {
+    const value = text(document.data().value, 80);
+    if (value) options.set(value, { value, label: text(document.data().label, 80) || value });
+  });
+  return [...options.values()];
+}
+
 async function conflictsFor(orgId: string, campId: string, candidate: { id?: string; startAt: string; endAt: string; participants: Participant[]; resourceIds: string[] }) {
   const events = (await calendars(orgId, campId).get()).docs.map(normalizeLegacy).filter((event) => event.id !== candidate.id && event.status !== 'cancelled' && !event.deleted);
   const personIds = new Set(candidate.participants.map((participant) => participant.uid));
@@ -156,7 +177,7 @@ export async function listEvents(user: DecodedIdToken, orgId: string, campId: st
 }
 
 export async function createEvent(user: DecodedIdToken, orgId: string, campId: string, input: Input) {
-  assertCampaignManager(user, orgId, campId);
+  assertCampaignAccess(user, orgId, campId);
   const data = cleanEvent(input);
   const key = text(input.idempotencyKey, 200);
   const payloadHash = createHash('sha256').update(JSON.stringify(data)).digest('hex');
@@ -184,11 +205,12 @@ export async function createEvent(user: DecodedIdToken, orgId: string, campId: s
   if (conflict.length && input.confirmConflicts !== true) throw new ConflictError('Hay conflictos de agenda. Revisalos antes de guardar.', { conflicts: conflict });
   await reserveResources(orgId, campId, ref.id, data.resourceIds, data.startAt, data.endAt, data.status);
   await ref.set({ ...data, revision: 1, createdAt: FieldValue.serverTimestamp(), createdBy: user.uid, updatedAt: FieldValue.serverTimestamp(), deleted: false });
+  await rememberEventType(orgId, campId, data.type, user);
   return { eventId: ref.id, ...data, revision: 1, conflicts: conflict };
 }
 
 export async function updateEvent(user: DecodedIdToken, orgId: string, campId: string, eventId: string, input: Input) {
-  assertCampaignManager(user, orgId, campId);
+  assertCampaignAccess(user, orgId, campId);
   const ref = calendars(orgId, campId).doc(eventId);
   const snapshot = await ref.get();
   if (!snapshot.exists || snapshot.data()?.deleted) throw new NotFoundError('El evento no existe.');
@@ -203,11 +225,12 @@ export async function updateEvent(user: DecodedIdToken, orgId: string, campId: s
   await reserveResources(orgId, campId, eventId, data.resourceIds, data.startAt, data.endAt, data.status);
   const revision = current.revision + 1;
   await ref.update({ ...data, revision, updatedAt: FieldValue.serverTimestamp(), updatedBy: user.uid });
+  await rememberEventType(orgId, campId, data.type, user);
   return { eventId, ...data, revision, conflicts: conflict };
 }
 
 export async function deleteEvent(user: DecodedIdToken, orgId: string, campId: string, eventId: string) {
-  assertCampaignManager(user, orgId, campId);
+  assertCampaignAccess(user, orgId, campId);
   const ref = calendars(orgId, campId).doc(eventId); const snapshot = await ref.get();
   if (!snapshot.exists) throw new NotFoundError('El evento no existe.');
   await clearOldReservations(orgId, campId, eventId, normalizeLegacy(snapshot).resourceIds);
@@ -215,7 +238,7 @@ export async function deleteEvent(user: DecodedIdToken, orgId: string, campId: s
 }
 
 export async function cancelEvent(user: DecodedIdToken, orgId: string, campId: string, eventId: string, reason: unknown) {
-  assertCampaignManager(user, orgId, campId);
+  assertCampaignAccess(user, orgId, campId);
   const ref = calendars(orgId, campId).doc(eventId); const snapshot = await ref.get();
   if (!snapshot.exists) throw new NotFoundError('El evento no existe.');
   const current = normalizeLegacy(snapshot);

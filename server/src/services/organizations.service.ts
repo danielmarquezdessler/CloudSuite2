@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { adminAuth, db, storage } from '../config/firebase.js';
 import { createNotification } from './notifications.service.js';
 import { appendAudit } from './audit.service.js';
+import { avatarReadUrl } from './users.service.js';
 
 export class ConflictError extends Error {}
 export class NotFoundError extends Error {}
@@ -112,6 +113,7 @@ export async function bootstrapOrganization(user: DecodedIdToken, input: Bootstr
 export async function getCurrentUserData(user: DecodedIdToken) {
   const profileSnapshot = await db.collection('users').doc(user.uid).get();
   const profile = profileSnapshot.data() ?? {};
+  const avatar = await avatarReadUrl(profile.photoURL, profile.avatarDownloadToken);
   const claimedOrgId = typeof user.orgId === 'string' ? user.orgId : undefined;
   const profileOrgId = Array.isArray(profile.orgIds)
     ? profile.orgIds.find((orgId): orgId is string => typeof orgId === 'string')
@@ -162,7 +164,8 @@ export async function getCurrentUserData(user: DecodedIdToken) {
     hasOrg: true,
     profile: {
       email: profile.email ?? user.email ?? '',
-      displayName: profile.displayName ?? null
+      displayName: profile.displayName ?? null,
+      photoURL: avatar?.url ?? null
     },
     organization: {
       id: organizationSnapshot.id,

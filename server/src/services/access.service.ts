@@ -15,6 +15,18 @@ export function assertCampaignAccess(user: DecodedIdToken, orgId: string, campId
   if (user.orgId !== orgId || (!allCampaigns && !camps?.[campId])) throw new ForbiddenError('No tenés acceso a esta campaña.');
 }
 
+/**
+ * Read-only organization access.  Membership claims remain the normal fast
+ * path; the member document is a narrow server-side fallback while a freshly
+ * issued Firebase token is still propagating.  Keeping this separate from
+ * administration gates makes the future visibility policy a single change.
+ */
+export async function assertOrganizationRead(user: DecodedIdToken, orgId: string) {
+  if (user.orgId === orgId || user.role === 'admin') return;
+  const member = await db.collection('organizations').doc(orgId).collection('members').doc(user.uid).get();
+  if (!member.exists) throw new ForbiddenError('No tenés acceso a esta organización.');
+}
+
 export function assertCampaignAdmin(user: DecodedIdToken, orgId: string, campId: string) {
   assertCampaignAccess(user, orgId, campId);
   if (user.role !== 'cliente') throw new ForbiddenError('Solo el Cliente puede administrar esta campaña.');

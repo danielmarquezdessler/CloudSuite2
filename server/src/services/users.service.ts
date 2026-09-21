@@ -2,7 +2,7 @@ import { DecodedIdToken } from 'firebase-admin/auth';
 import { FieldValue } from 'firebase-admin/firestore';
 import { randomUUID } from 'node:crypto';
 import { adminAuth, db, storage } from '../config/firebase.js';
-import { ForbiddenError, ValidationError, campaignRef } from './access.service.js';
+import { ForbiddenError, ValidationError, assertOrganizationRead, campaignRef } from './access.service.js';
 import { sendWelcomeEmail } from './email.service.js';
 
 export type CreateOrganizationUserInput = {
@@ -52,7 +52,7 @@ async function uploadAvatar(uid: string, avatar?: Express.Multer.File): Promise<
  * Firebase download tokens work with a private bucket and do not require a service-account
  * signing key, unlike V4 signed URLs when the local backend uses user ADC.
  */
-async function avatarReadUrl(photoURL: unknown, existingToken: unknown) {
+export async function avatarReadUrl(photoURL: unknown, existingToken: unknown) {
   if (typeof photoURL !== 'string' || !photoURL) return null;
   if (/^https?:\/\//.test(photoURL)) return { url: photoURL, downloadToken: null };
   const storageReference = /^gs:\/\/([^/]+)\/(.+)$/.exec(photoURL);
@@ -135,7 +135,7 @@ export async function createOrganizationUser(user: DecodedIdToken, orgId: string
 }
 
 export async function listOrganizationUsers(user: DecodedIdToken, orgId: string) {
-  assertOrganizationAdmin(user, orgId);
+  await assertOrganizationRead(user, orgId);
   const [members, users] = await Promise.all([db.collection('organizations').doc(orgId).collection('members').get(), db.collection('users').where('orgIds', 'array-contains', orgId).get()]);
   const roles = new Map(members.docs.map((member) => [member.id, member.data().role]));
   return Promise.all(users.docs.map(async (doc) => {

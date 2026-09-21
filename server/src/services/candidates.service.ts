@@ -2,7 +2,7 @@ import { DecodedIdToken } from 'firebase-admin/auth';
 import { FieldValue } from 'firebase-admin/firestore';
 import { randomUUID } from 'node:crypto';
 import { storage } from '../config/firebase.js';
-import { assertCampaignManager, campaignRef, NotFoundError, ValidationError } from './access.service.js';
+import { assertCampaignAccess, assertCampaignManager, campaignRef, NotFoundError, ValidationError } from './access.service.js';
 
 export const CANDIDATE_TYPES = [
   'Presidente', 'Vicepresidente', 'Gobernador', 'Vicegobernador', 'Jefe de Gobierno', 'Vicejefe de Gobierno', 'Intendente', 'Viceintendente', 'Alcalde', 'Vicealcalde', 'Prefecto', 'Viceprefecto', 'Jefe Comunal', 'Presidente Comunal', 'Concejal', 'Regidor', 'Edil', 'Diputado Nacional', 'Diputado Provincial / Estatal / Departamental', 'Diputado Distrital', 'Senador Nacional', 'Senador Provincial / Estatal', 'Parlamentario', 'Representante', 'Asambleísta', 'Legislador', 'Constituyente', 'Consejero Regional', 'Consejero Departamental', 'Consejero Provincial', 'Consejero Municipal', 'Miembro de Junta', 'Miembro de Junta Departamental', 'Miembro de Junta Local', 'Vocal', 'Síndico', 'Corregidor', 'Gobernador Regional', 'Gobernador Departamental', 'Gobernador Provincial', 'Gobernador Municipal', 'Intendente Regional', 'Alcalde Metropolitano', 'Alcalde Municipal', 'Alcalde Distrital', 'Alcalde Provincial', 'Alcalde Local', 'Presidente Regional', 'Presidente Provincial', 'Presidente Municipal', 'Presidente de Junta', 'Representante Distrital', 'Representante Departamental', 'Representante Provincial', 'Representante Regional', 'Representante Municipal', 'Representante Comunal', 'Parlamentario Andino', 'Diputado del Parlamento Centroamericano', 'Diputado del Parlamento Regional', 'Miembro de Parlamento Supranacional', 'Candidato a Convencional', 'Candidato a Constituyente', 'Cargo Ejecutivo', 'Cargo Legislativo', 'Cargo Deliberativo', 'Cargo Regional', 'Cargo Provincial', 'Cargo Departamental', 'Cargo Municipal', 'Cargo Comunal', 'Cargo Distrital', 'Cargo Local', 'Otro'
@@ -54,7 +54,7 @@ async function serialize(id: string, data: FirebaseFirestore.DocumentData) {
 }
 
 export async function listCandidates(user: DecodedIdToken, orgId: string, campId: string) {
-  assertCampaignManager(user, orgId, campId);
+  assertCampaignAccess(user, orgId, campId);
   const snapshot = await campaignRef(orgId, campId).collection('candidates').orderBy('createdAt', 'asc').get();
   return Promise.all(snapshot.docs.map((candidate) => serialize(candidate.id, candidate.data())));
 }

@@ -4,6 +4,7 @@ import * as c from '../controllers/planning.controller.js';
 export const planningRouter = Router();
 const b = '/organizations/:orgId/campaigns/:campId';
 planningRouter.get(`${b}/calendar`, requireAuth, c.getCalendar); planningRouter.post(`${b}/calendar`, requireAuth, c.postCalendar);
+planningRouter.get(`${b}/calendar/types`, requireAuth, c.getCalendarEventTypes);
 planningRouter.get(`${b}/calendar/availability`, requireAuth, c.getCalendarAvailability); planningRouter.post(`${b}/calendar/availability`, requireAuth, c.postCalendarAvailability);
 planningRouter.get(`${b}/calendar/resources`, requireAuth, c.getCalendarResources); planningRouter.post(`${b}/calendar/resources`, requireAuth, c.postCalendarResource); planningRouter.put(`${b}/calendar/resources/:resourceId`, requireAuth, c.putCalendarResource); planningRouter.delete(`${b}/calendar/resources/:resourceId`, requireAuth, c.deleteCalendarResource);
 planningRouter.get(`${b}/calendar/templates`, requireAuth, c.getCalendarTemplates); planningRouter.post(`${b}/calendar/templates`, requireAuth, c.postCalendarTemplate); planningRouter.put(`${b}/calendar/templates/:templateId`, requireAuth, c.putCalendarTemplate); planningRouter.delete(`${b}/calendar/templates/:templateId`, requireAuth, c.deleteCalendarTemplate);

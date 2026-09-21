@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 import { DecodedIdToken } from 'firebase-admin/auth';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { adminAuth, db } from '../config/firebase.js';
-import { assertCampaignAdmin, campaignRef, ForbiddenError, NotFoundError, ValidationError } from './access.service.js';
+import { assertCampaignAccess, assertCampaignAdmin, campaignRef, ForbiddenError, NotFoundError, ValidationError } from './access.service.js';
 import { sendInvitationEmail } from './email.service.js';
 import { createNotification } from './notifications.service.js';
 
@@ -55,7 +55,8 @@ export async function acceptInvitation(user: DecodedIdToken, token: string) { co
   await createNotification(invitation.senderUid, { type: 'member_joined', title: 'Nuevo miembro en tu campaña', message: `${user.email ?? 'Un usuario'} aceptó la invitación.`, metadata: { campId: invitation.campaignId } });
   return { orgId, campId: invitation.campaignId };
 }
-export async function listMembers(user: DecodedIdToken, orgId: string, campId: string) { assertCampaignAdmin(user, orgId, campId); const members = await campaignRef(orgId, campId).collection('members').get(); return members.docs.map(d => ({ uid: d.id, ...d.data() })); }
+/** Campaign members may inspect the roster; mutations remain administrator-only. */
+export async function listMembers(user: DecodedIdToken, orgId: string, campId: string) { assertCampaignAccess(user, orgId, campId); const members = await campaignRef(orgId, campId).collection('members').get(); return members.docs.map(d => ({ uid: d.id, ...d.data() })); }
 function memberData(input: MemberInput) {
   const role = input.role === 'admin' ? 'admin' : 'usuario';
   return { role, functionId: input.functionId ?? null, teamId: input.teamId ?? null };

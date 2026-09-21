@@ -11,6 +11,7 @@ const destroy = (action: (request: Request) => Promise<void>) => async (request:
 const user = (request: Request) => request.user!;
 
 export const getCalendar = handler(r => calendar.listEvents(user(r), ...ids(r)));
+export const getCalendarEventTypes = handler(r => calendar.listEventTypes(user(r), ...ids(r)));
 export const postCalendar = handler(r => calendar.createEvent(user(r), ...ids(r), r.body), 201);
 export const putCalendar = handler(r => calendar.updateEvent(user(r), ...ids(r), id(r, 'eventId'), r.body));
 export const deleteCalendar = destroy(r => calendar.deleteEvent(user(r), ...ids(r), id(r, 'eventId')));
