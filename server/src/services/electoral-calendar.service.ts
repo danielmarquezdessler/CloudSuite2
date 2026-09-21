@@ -3,6 +3,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { createHash, randomUUID } from 'node:crypto';
 import { assertCampaignAccess, assertCampaignManager, campaignRef, ConflictError, ForbiddenError, NotFoundError, ValidationError } from './access.service.js';
 import { db, storage } from '../config/firebase.js';
+import { createNotification } from './notifications.service.js';
 
 type Input = Record<string, unknown>;
 type Participant = { uid: string; required: boolean; status: 'pending' | 'confirmed' | 'declined' };
@@ -212,6 +213,18 @@ async function ensureEventTypeCatalog(orgId: string, campId: string) {
   return legacyInUse;
 }
 
+const publicationManager = (user: DecodedIdToken) => user.role === 'cliente' || user.role === 'admin';
+
+function preservePublicationAccessForLinkedUser(user: DecodedIdToken, current: CalendarEvent, input: Input): Input {
+  if (!current.isPublication || publicationManager(user)) return input;
+  return {
+    ...input,
+    isPublication: true,
+    linkedUserIds: ids(current.linkedUserIds),
+    allowLinkedEditing: current.allowLinkedEditing === true
+  };
+}
+
 async function rememberEventType(orgId: string, campId: string, type: string, user: DecodedIdToken) {
   if (defaultEventTypeValues.has(type)) return;
   const ref = eventTypeRef(orgId, campId, type);
@@ -321,6 +334,14 @@ export async function createEvent(user: DecodedIdToken, orgId: string, campId: s
   const event = { id: ref.id, ...data, revision: 1, status: data.status, participants: data.participants, resourceIds: data.resourceIds, startAt: data.startAt, endAt: data.endAt, createdBy: user.uid } as CalendarEvent;
   const task = await syncPublicationTask(orgId, campId, ref.id, event);
   if (data.isPublication) await ref.update({ planningTaskId: task.id });
+  if (data.isPublication) {
+    await Promise.all(data.linkedUserIds.filter((uid) => uid !== user.uid).map((uid) => createNotification(uid, {
+      type: 'calendar_publication_assigned',
+      title: 'Nueva publicación asignada',
+      message: data.title,
+      metadata: { path: `/planning/calendar?event=${encodeURIComponent(ref.id)}`, orgId, campId, eventId: ref.id }
+    })));
+  }
   return { eventId: ref.id, ...data, revision: 1, planningTaskId: data.isPublication ? task.id : null, conflicts: conflict };
 }
 
@@ -332,7 +353,7 @@ export async function updateEvent(user: DecodedIdToken, orgId: string, campId: s
   await assertEventEditable(user, orgId, campId, current);
   const expectedRevision = input.expectedRevision === undefined ? current.revision : Number(input.expectedRevision);
   if (expectedRevision !== current.revision) throw new ConflictError('El evento fue actualizado por otra persona.', { revision: current.revision, event: current });
-  const data = cleanEvent(input, current);
+  const data = cleanEvent(preservePublicationAccessForLinkedUser(user, current, input), current);
   await assertMembers(orgId, campId, data.participants.map((participant) => participant.uid));
   const conflict = await conflictsFor(orgId, campId, { ...data, id: eventId });
   if (conflict.length && input.confirmConflicts !== true) throw new ConflictError('Hay conflictos de agenda. Revisalos antes de guardar.', { conflicts: conflict });

@@ -254,7 +254,15 @@ export default function ElectoralCalendar() {
       ),
     ]);
     if (eventResult.error) setError(eventResult.error.message);
-    else setEvents(eventResult.data ?? []);
+    else {
+      const receivedEvents = eventResult.data ?? [];
+      setEvents(receivedEvents);
+      setSelected((current) =>
+        current
+          ? (receivedEvents.find((event) => event.id === current.id) ?? current)
+          : null,
+      );
+    }
     setMembers(memberResult.data ?? []);
     setTeams(teamResult.data ?? []);
     setResources(resourceResult.data ?? []);
@@ -435,7 +443,7 @@ export default function ElectoralCalendar() {
       const path = selected
         ? `${base}/calendar/${selected.id}`
         : `${base}/calendar`;
-      const response = await authenticatedRequest<{ eventId: string }>(
+      const response = await authenticatedRequest<CalendarEvent>(
         user,
         path,
         {
@@ -465,6 +473,13 @@ export default function ElectoralCalendar() {
       setModal(false);
       setConflicts([]);
       setNotice(selected ? "Evento actualizado." : "Evento creado.");
+      if (selected && response.data) {
+        setSelected((current) =>
+          current?.id === selected.id
+            ? { ...current, ...response.data, id: selected.id, canEdit: true }
+            : current,
+        );
+      }
       await load();
     } catch (reason) {
       setNotice(
@@ -896,6 +911,7 @@ export default function ElectoralCalendar() {
         conflicts={conflicts}
         typeOptions={typeOptions}
         editing={Boolean(selected)}
+        canManagePublication={canManage}
         onHide={() => setModal(false)}
         onChange={setForm}
         onCreateType={createType}
@@ -1448,6 +1464,7 @@ function EventModal({
   conflicts,
   typeOptions,
   editing,
+  canManagePublication,
   onHide,
   onChange,
   onCreateType,
@@ -1463,6 +1480,7 @@ function EventModal({
   conflicts: Array<{ title: string; startAt: string; endAt: string }>;
   typeOptions: Array<{ value: string; label: string }>;
   editing: boolean;
+  canManagePublication: boolean;
   onHide: () => void;
   onChange: (value: FormState) => void;
   onCreateType: (label: string) => Promise<{ value: string; label: string }>;
@@ -1567,6 +1585,7 @@ function EventModal({
                     className="form-check-input"
                     type="checkbox"
                     checked={form.isPublication}
+                    disabled={editing && !canManagePublication}
                     onChange={(event) =>
                       onChange({ ...form, isPublication: event.target.checked })
                     }
@@ -1576,7 +1595,7 @@ function EventModal({
                     Planificación
                   </span>
                 </label>
-                {form.isPublication && (
+                {form.isPublication && canManagePublication && (
                   <>
                     <label className="form-check">
                       <input
