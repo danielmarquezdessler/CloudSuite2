@@ -131,9 +131,12 @@ export async function listMembers(user: DecodedIdToken, orgId: string, campId: s
   const members = await Promise.all(snap.docs.map(async (doc) => {
     const membership = doc.data();
     const profile = (await db.collection('users').doc(doc.id).get()).data();
+    const storedRole = String(membership.smartPlannerRole ?? 'miembro');
+    const smartPlannerRole = ['pm', 'contador', 'miembro'].includes(storedRole) ? storedRole : 'miembro';
     return {
       uid: doc.id,
       ...membership,
+      smartPlannerRole,
       email: profile?.email ?? membership.email,
       displayName: profile?.displayName ?? membership.displayName,
       firstName: profile?.firstName ?? membership.firstName,
@@ -145,6 +148,7 @@ export async function listMembers(user: DecodedIdToken, orgId: string, campId: s
     const profile = (await db.collection('users').doc(user.uid).get()).data();
     members.unshift({
       uid: user.uid,
+      smartPlannerRole: 'miembro',
       email: profile?.email ?? user.email ?? '',
       displayName: profile?.displayName ?? user.name ?? user.email ?? 'Miembro',
       firstName: profile?.firstName,
