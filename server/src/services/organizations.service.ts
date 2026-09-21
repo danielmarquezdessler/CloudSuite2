@@ -58,7 +58,7 @@ export async function bootstrapOrganization(user: DecodedIdToken, input: Bootstr
     transaction.set(orgRef, {
       nombre: organizationName,
       ownerUid: user.uid,
-      enabledAddons: { smartPlanner: false, voteStream: false },
+      enabledAddons: { smartPlanner: false, voteStream: false, finance: false },
       createdAt: FieldValue.serverTimestamp()
     });
     transaction.set(orgRef.collection('members').doc(user.uid), {
@@ -143,8 +143,8 @@ export async function getCurrentUserData(user: DecodedIdToken) {
   // Mantener ambos flags juntos evita que el bootstrap entregue un estado
   // parcial (por ejemplo Vote Stream activo y SmartPlanner bloqueado).
   const isPrimaryValidationAccount = String(user.email ?? '').toLowerCase() === 'danielmarquez82@hotmail.com';
-  const completedAddons = { ...(organization.enabledAddons ?? {}), smartPlanner: true, voteStream: true };
-  if (isPrimaryValidationAccount && (organization.enabledAddons?.smartPlanner !== true || organization.enabledAddons?.voteStream !== true)) {
+  const completedAddons = { ...(organization.enabledAddons ?? {}), smartPlanner: true, voteStream: true, finance: true };
+  if (isPrimaryValidationAccount && (organization.enabledAddons?.smartPlanner !== true || organization.enabledAddons?.voteStream !== true || organization.enabledAddons?.finance !== true)) {
     await orgRef.set({ enabledAddons: completedAddons }, { merge: true });
     organization.enabledAddons = completedAddons;
   }
@@ -167,7 +167,7 @@ export async function getCurrentUserData(user: DecodedIdToken) {
     organization: {
       id: organizationSnapshot.id,
       nombre: organization.nombre,
-      enabledAddons: { smartPlanner: organization.enabledAddons?.smartPlanner === true, voteStream: organization.enabledAddons?.voteStream === true }
+      enabledAddons: { smartPlanner: organization.enabledAddons?.smartPlanner === true, voteStream: organization.enabledAddons?.voteStream === true, finance: organization.enabledAddons?.finance === true }
     },
     campaigns: campaignsSnapshot.docs
       .filter((campaign, index) => allCampaigns || camps[campaign.id] === true || campaignMemberships[index]?.exists)
@@ -205,6 +205,15 @@ export async function setVoteStreamEnabled(user: DecodedIdToken, orgId: string, 
   if (!organization.exists) throw new NotFoundError('La organización no existe.');
   await orgRef.set({ enabledAddons: { ...(organization.data()?.enabledAddons ?? {}), voteStream: enabled } }, { merge: true });
   return { enabledAddons: { ...(organization.data()?.enabledAddons ?? {}), voteStream: enabled } };
+}
+
+export async function setFinanceEnabled(user: DecodedIdToken, orgId: string, enabled: unknown) {
+  if (user.role !== 'admin') throw new ForbiddenError('Solo un administrador global puede administrar add-ons.');
+  if (typeof enabled !== 'boolean') throw new Error('El valor de Finanzas debe ser verdadero o falso.');
+  const orgRef = db.collection('organizations').doc(orgId); const organization = await orgRef.get();
+  if (!organization.exists) throw new NotFoundError('La organización no existe.');
+  await orgRef.set({ enabledAddons: { ...(organization.data()?.enabledAddons ?? {}), finance: enabled } }, { merge: true });
+  return { enabledAddons: { ...(organization.data()?.enabledAddons ?? {}), finance: enabled } };
 }
 
 type GlobalConfigurationInput = { partyName?: unknown; partyAcronym?: unknown; address?: unknown; lat?: unknown; lng?: unknown };

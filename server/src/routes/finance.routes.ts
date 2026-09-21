@@ -1,0 +1,13 @@
+import { NextFunction, Request, Response, Router } from 'express';
+import multer from 'multer';
+import { requireAuth } from '../middleware/requireAuth.js';
+import { requireAddon } from '../middleware/requireAddon.js';
+import * as controller from '../controllers/finance.controller.js';
+export const financeRouter = Router();
+const base = '/organizations/:orgId/campaigns/:campId/finance'; const guarded = [requireAuth, requireAddon('finance')] as const;
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024 } });
+const receipt = (req: Request, res: Response, next: NextFunction) => upload.single('receipt')(req, res, (error) => error instanceof multer.MulterError && error.code === 'LIMIT_FILE_SIZE' ? res.status(413).json({ message: 'El comprobante no puede superar los 15 MB.' }) : next(error));
+financeRouter.get(`${base}/dashboard`, ...guarded, controller.financeDashboard);
+financeRouter.get(`${base}/accounts`, ...guarded, controller.accounts); financeRouter.post(`${base}/accounts`, ...guarded, controller.createAccount); financeRouter.put(`${base}/accounts/:accountId`, ...guarded, controller.updateAccount); financeRouter.delete(`${base}/accounts/:accountId`, ...guarded, controller.removeAccount);
+financeRouter.get(`${base}/categories`, ...guarded, controller.categories); financeRouter.post(`${base}/categories`, ...guarded, controller.createCategory); financeRouter.put(`${base}/categories/:categoryId`, ...guarded, controller.updateCategory); financeRouter.delete(`${base}/categories/:categoryId`, ...guarded, controller.removeCategory);
+financeRouter.get(`${base}/transactions`, ...guarded, controller.transactions); financeRouter.post(`${base}/transactions`, ...guarded, receipt, controller.createTransaction); financeRouter.get(`${base}/transactions/:transactionId/receipt`, ...guarded, controller.receipt); financeRouter.put(`${base}/transactions/:transactionId`, ...guarded, receipt, controller.updateTransaction); financeRouter.delete(`${base}/transactions/:transactionId`, ...guarded, controller.removeTransaction);

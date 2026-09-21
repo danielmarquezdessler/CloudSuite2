@@ -1,6 +1,6 @@
 import { NextFunction, Request, Response, Router } from 'express';
 import multer from 'multer';
-import { bootstrapOrganizationController, getGlobalConfigurationController, getMeController, setSmartPlannerAddonController, setVoteStreamAddonController, updateGlobalConfigurationController, uploadPartyLogoController } from '../controllers/organizations.controller.js';
+import { bootstrapOrganizationController, getGlobalConfigurationController, getMeController, setFinanceAddonController, setSmartPlannerAddonController, setVoteStreamAddonController, updateGlobalConfigurationController, uploadPartyLogoController } from '../controllers/organizations.controller.js';
 import { requireAuth } from '../middleware/requireAuth.js';
 
 export const organizationsRouter = Router();
@@ -14,6 +14,7 @@ organizationsRouter.post('/organizations/bootstrap', requireAuth, bootstrapOrgan
 organizationsRouter.get('/me', requireAuth, getMeController);
 organizationsRouter.put('/organizations/:orgId/addons/smart-planner', requireAuth, setSmartPlannerAddonController);
 organizationsRouter.put('/organizations/:orgId/addons/vote-stream', requireAuth, setVoteStreamAddonController);
+organizationsRouter.put('/organizations/:orgId/addons/finance', requireAuth, setFinanceAddonController);
 organizationsRouter.get('/organizations/:orgId/global-configuration', requireAuth, getGlobalConfigurationController);
 organizationsRouter.put('/organizations/:orgId/global-configuration', requireAuth, updateGlobalConfigurationController);
 organizationsRouter.post('/organizations/:orgId/global-configuration/party-logo', requireAuth, partyLogoUpload, uploadPartyLogoController);
