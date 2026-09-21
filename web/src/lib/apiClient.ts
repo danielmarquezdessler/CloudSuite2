@@ -5,7 +5,7 @@ import { useLoadingBar } from '../context/LoadingBarContext';
 export const apiBaseUrl = import.meta.env.VITE_FIREBASE_API_URL ?? 'http://127.0.0.1:8080';
 
 export class ApiError extends Error {
-  constructor(message: string, public readonly status?: number) {
+  constructor(message: string, public readonly status?: number, public readonly details?: Record<string, unknown>) {
     super(message);
     this.name = 'ApiError';
   }
@@ -41,7 +41,7 @@ async function request<T>(path: string, init: RequestInit = {}, token?: string):
     const response = await fetch(`${apiBaseUrl}${path}`, { ...init, headers, signal: init.signal ?? controller.signal });
     if (response.status === 204) return { data: null, error: null, loading: false };
     const body = await response.json().catch(() => null) as (T & { message?: string }) | null;
-    if (!response.ok) return { data: null, error: new ApiError(messageForStatus(response.status, body?.message), response.status), loading: false };
+    if (!response.ok) return { data: null, error: new ApiError(messageForStatus(response.status, body?.message), response.status, body && typeof body === 'object' ? body as Record<string, unknown> : undefined), loading: false };
     return { data: body as T, error: null, loading: false };
   } catch (cause) {
     const timedOut = cause instanceof DOMException && cause.name === 'AbortError';

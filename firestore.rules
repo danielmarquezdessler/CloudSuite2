@@ -21,6 +21,10 @@ service cloud.firestore {
     match /organizations/{orgId}/campaigns/{campId}/visits/{visitId} { allow read: if campaignMember(orgId, campId); allow write: if false; }
     match /organizations/{orgId}/campaigns/{campId}/questionSets/{setId} { allow read: if campaignMember(orgId, campId); allow write: if false; }
     match /organizations/{orgId}/campaigns/{campId}/calendar/{eventId} { allow read: if campaignMember(orgId, campId); allow write: if false; }
+    // Calendar operational data is read-only from clients. Mutations, resource
+    // reservations and conflict checks are serialized by the backend.
+    match /organizations/{orgId}/campaigns/{campId}/calendarResources/{resourceId} { allow read: if campaignMember(orgId, campId); allow write: if false; }
+    match /organizations/{orgId}/campaigns/{campId}/calendarTemplates/{templateId} { allow read: if campaignMember(orgId, campId); allow write: if false; }
     match /organizations/{orgId}/campaigns/{campId}/circuitos/{circuitoId} { allow read: if campaignMember(orgId, campId); allow write: if false; }
     match /organizations/{orgId}/campaigns/{campId}/zones/{zoneId} { allow read: if campaignMember(orgId, campId); allow write: if false; }
     match /organizations/{orgId}/campaigns/{campId}/goals/{goalId} { allow read: if campaignMember(orgId, campId); allow write: if false; }

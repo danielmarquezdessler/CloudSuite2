@@ -44,6 +44,13 @@ Ningún componente puede renderizar dos o más elementos hermanos (bloques de te
 
 - `npm run notify:smartplanner-due` desde `server/` revisa las facturas pendientes o emitidas que vencen dentro de los próximos siete días y crea como máximo una notificación diaria por factura. En producción debe ejecutarse una vez por día mediante Cloud Scheduler/Cloud Run Job; no depende de una instancia web persistente.
 
+## Calendario Electoral
+
+- Los eventos, recursos, plantillas, reservas, confirmaciones y reprogramaciones se escriben exclusivamente mediante la API con Admin SDK; las reglas de Firestore son de solo lectura para clientes autorizados.
+- La colección histórica `calendar` conserva compatibilidad: los campos operativos se agregan sin migrar ni descartar eventos existentes.
+- Las reservas de recursos se validan transaccionalmente en backend y todo cambio de evento usa `revision` esperada para evitar sobrescribir una edición concurrente.
+- Integraciones con Ágoras, WireFlow, Google Calendar, recordatorios o enlaces compartidos sólo se muestran como disponibles cuando exista un contrato y una credencial/configuración real; nunca se simulan.
+
 ## Cómo desplegar a producción
 
 - Plataforma: Cloud Run (`cloudsuite-api`) y Firebase Hosting, ambos en el proyecto `politicfy-cloudsuite`; Cloud Run se publica en `southamerica-east1` y usa la cuenta `cloudsuite-api@politicfy-cloudsuite.iam.gserviceaccount.com`.

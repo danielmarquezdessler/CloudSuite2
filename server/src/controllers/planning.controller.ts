@@ -1,18 +1,33 @@
 import { Request, Response } from 'express';
-import { ForbiddenError, NotFoundError, ValidationError } from '../services/access.service.js';
+import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from '../services/access.service.js';
 import * as planning from '../services/planning.service.js';
+import * as calendar from '../services/electoral-calendar.service.js';
 
 const ids = (request: Request) => [String(request.params.orgId), String(request.params.campId)] as const;
 const id = (request: Request, key: string) => String(request.params[key]);
-function fail(response: Response, error: unknown) { if (error instanceof ForbiddenError) return response.status(403).json({ message: error.message }); if (error instanceof ValidationError) return response.status(400).json({ message: error.message }); if (error instanceof NotFoundError) return response.status(404).json({ message: error.message }); console.error(error); return response.status(500).json({ message: 'No pudimos completar la operación.' }); }
+function fail(response: Response, error: unknown) { if (error instanceof ForbiddenError) return response.status(403).json({ message: error.message }); if (error instanceof ValidationError) return response.status(400).json({ message: error.message }); if (error instanceof ConflictError) return response.status(409).json({ message: error.message, ...(error.details ?? {}) }); if (error instanceof NotFoundError) return response.status(404).json({ message: error.message }); console.error(error); return response.status(500).json({ message: 'No pudimos completar la operación.' }); }
 const handler = (action: (request: Request) => Promise<unknown>, status = 200) => async (request: Request, response: Response) => { try { response.status(status).json(await action(request)); } catch (error) { fail(response, error); } };
 const destroy = (action: (request: Request) => Promise<void>) => async (request: Request, response: Response) => { try { await action(request); response.status(204).end(); } catch (error) { fail(response, error); } };
 const user = (request: Request) => request.user!;
 
-export const getCalendar = handler(r => planning.listCalendar(user(r), ...ids(r)));
-export const postCalendar = handler(r => planning.createCalendar(user(r), ...ids(r), r.body), 201);
-export const putCalendar = handler(r => planning.updateCalendar(user(r), ...ids(r), id(r, 'eventId'), r.body));
-export const deleteCalendar = destroy(r => planning.deleteCalendar(user(r), ...ids(r), id(r, 'eventId')));
+export const getCalendar = handler(r => calendar.listEvents(user(r), ...ids(r)));
+export const postCalendar = handler(r => calendar.createEvent(user(r), ...ids(r), r.body), 201);
+export const putCalendar = handler(r => calendar.updateEvent(user(r), ...ids(r), id(r, 'eventId'), r.body));
+export const deleteCalendar = destroy(r => calendar.deleteEvent(user(r), ...ids(r), id(r, 'eventId')));
+export const postCalendarCancel = handler(r => calendar.cancelEvent(user(r), ...ids(r), id(r, 'eventId'), r.body.reason));
+export const getCalendarAvailability = handler(r => calendar.listAvailability(user(r), ...ids(r), r.query as Record<string, unknown>));
+export const postCalendarAvailability = handler(r => calendar.listAvailability(user(r), ...ids(r), r.body));
+export const postCalendarReschedulePreview = handler(r => calendar.reschedulePreview(user(r), ...ids(r), id(r, 'eventId'), r.body));
+export const postCalendarResponse = handler(r => calendar.respondToEvent(user(r), ...ids(r), id(r, 'eventId'), r.body.status));
+export const getCalendarResources = handler(r => calendar.listResources(user(r), ...ids(r)));
+export const postCalendarResource = handler(r => calendar.saveResource(user(r), ...ids(r), null, r.body), 201);
+export const putCalendarResource = handler(r => calendar.saveResource(user(r), ...ids(r), id(r, 'resourceId'), r.body));
+export const deleteCalendarResource = destroy(r => calendar.deleteResource(user(r), ...ids(r), id(r, 'resourceId')));
+export const getCalendarTemplates = handler(r => calendar.listTemplates(user(r), ...ids(r)));
+export const postCalendarTemplate = handler(r => calendar.saveTemplate(user(r), ...ids(r), null, r.body), 201);
+export const putCalendarTemplate = handler(r => calendar.saveTemplate(user(r), ...ids(r), id(r, 'templateId'), r.body));
+export const deleteCalendarTemplate = destroy(r => calendar.deleteTemplate(user(r), ...ids(r), id(r, 'templateId')));
+export const getCalendarIcs = async (r: Request, s: Response) => { try { const event = (await calendar.listEvents(user(r), ...ids(r))).find((entry) => entry.id === id(r, 'eventId')); if (!event) return s.status(404).json({ message: 'El evento no existe.' }); s.type('text/calendar').attachment(`${String(event.title ?? 'evento').replace(/[^a-z0-9_-]/gi, '_')}.ics`).send(calendar.eventIcs(event)); } catch (error) { fail(s, error); } };
 export const getCircuitos = handler(r => planning.listCircuitos(user(r), ...ids(r)));
 export const postCircuito = handler(r => planning.createCircuito(user(r), ...ids(r), r.body), 201);
 export const putCircuito = handler(r => planning.updateCircuito(user(r), ...ids(r), id(r, 'circuitoId'), r.body));

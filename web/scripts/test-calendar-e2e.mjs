@@ -1,0 +1,53 @@
+import { readFile } from 'node:fs/promises';
+import { spawn } from 'node:child_process';
+import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { chromium } from 'playwright';
+
+const webDir = fileURLToPath(new URL('../', import.meta.url));
+const serverDir = fileURLToPath(new URL('../../server/', import.meta.url));
+const parseEnv = (source) => Object.fromEntries(source.split(/\r?\n/).map((line) => line.trim()).filter((line) => line && !line.startsWith('#')).map((line) => [line.slice(0, line.indexOf('=')), line.slice(line.indexOf('=') + 1)]));
+const wait = (milliseconds) => new Promise((resolveWait) => setTimeout(resolveWait, milliseconds));
+const runPortSeed = Number(process.env.CALENDAR_E2E_PORT_SEED ?? (process.pid % 1000));
+const apiPort = 12000 + runPortSeed; const webPort = 13000 + runPortSeed; const apiUrl = `http://127.0.0.1:${apiPort}`; const webUrl = `http://127.0.0.1:${webPort}`;
+const chromiumPath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE ?? 'C:/Users/Admin/AppData/Local/ms-playwright/chromium-1234/chrome-win64/chrome.exe';
+const waitFor = async (url, label) => { for (let attempt = 0; attempt < 80; attempt += 1) { try { if ((await fetch(url)).ok) return; } catch { /* startup */ } await wait(300); } throw new Error(`${label} no inició.`); };
+
+let api; let vite; let browser; let page; let cleanup = async () => {};
+try {
+  const env = parseEnv(await readFile(new URL('../.env.test', import.meta.url), 'utf8'));
+  api = spawn(process.execPath, [resolve(serverDir, 'node_modules', 'tsx', 'dist', 'cli.mjs'), 'src/index.ts'], { cwd: serverDir, env: { ...process.env, PORT: String(apiPort), PROJECT_ID: 'politicfy-cloudsuite' }, stdio: ['ignore', 'pipe', 'pipe'] });
+  api.stderr.on('data', (chunk) => console.error(`[api] ${chunk}`));
+  await waitFor(`${apiUrl}/health`, 'API de calendario');
+  vite = spawn(process.execPath, [resolve(webDir, 'node_modules', 'vite', 'bin', 'vite.js'), '--host', '127.0.0.1', '--port', String(webPort)], { cwd: webDir, env: { ...process.env, VITE_FIREBASE_API_URL: apiUrl }, stdio: ['ignore', 'pipe', 'pipe'] });
+  vite.stderr.on('data', (chunk) => console.error(`[vite] ${chunk}`)); vite.on('exit', (code) => console.error(`[vite] exited ${code}`));
+  await waitFor(webUrl, 'Vite de calendario');
+  const { adminAuth, db } = await import('../../server/dist/config/firebase.js');
+  const authUser = await adminAuth.getUserByEmail(env.E2E_EMAIL); const profile = await db.collection('users').doc(authUser.uid).get();
+  const orgId = env.E2E_ORG_ID || profile.data()?.orgIds?.[0]; const campaignRef = db.collection('organizations').doc(orgId).collection('campaigns').doc(env.E2E_CAMPAIGN_ID);
+  if (!orgId || !env.E2E_CAMPAIGN_ID) throw new Error('No se pudo resolver organización/campaña E2E.');
+  const created = []; const createdResources = []; const createdTemplates = [];
+  cleanup = async () => { await Promise.all(created.map((id) => campaignRef.collection('calendar').doc(id).delete())); await Promise.all(createdResources.map((id) => campaignRef.collection('calendarResources').doc(id).delete())); await Promise.all(createdTemplates.map((id) => campaignRef.collection('calendarTemplates').doc(id).delete())); };
+  browser = await chromium.launch({ headless: true, executablePath: chromiumPath }); page = await browser.newPage({ viewport: { width: 1440, height: 980 } }); page.setDefaultTimeout(25_000);
+  await page.goto(webUrl); await page.getByLabel('Email').fill(env.E2E_EMAIL); await page.getByLabel('Contraseña').fill(env.E2E_PASSWORD); await page.getByRole('button', { name: 'Ingresar', exact: true }).click(); await page.waitForURL(/dashboard/);
+  await page.goto(`${webUrl}/planning/calendar`, { waitUntil: 'domcontentloaded' }); await page.locator('.cs-campaign-selector').waitFor({ state: 'visible' }); await page.waitForFunction(() => { const selector = document.querySelector('.cs-campaign-selector'); return Boolean(selector && !selector.hasAttribute('disabled')); }); await page.getByRole('heading', { name: 'Calendario Electoral', exact: true }).waitFor();
+  const actionLabels = await page.locator('button').allTextContents(); if (!actionLabels.some((label) => label.includes('Crear evento'))) throw new Error(`La agenda no presentó acciones de administración: ${actionLabels.filter(Boolean).join(' | ')}`);
+  for (const label of ['Mes', 'Semana', 'Día', 'Agenda', 'Equipos', 'Run of show']) await page.getByRole('button', { name: label, exact: true }).waitFor();
+  await page.getByRole('button', { name: /Operación/ }).click(); await page.getByRole('dialog').waitFor();
+  const resourceName = `Recurso E2E ${Date.now()}`; const templateName = `Plantilla E2E ${Date.now()}`;
+  await page.getByLabel('Nombre del recurso').fill(resourceName); const resourceCreated = page.waitForResponse((response) => response.request().method() === 'POST' && new URL(response.url()).pathname.endsWith('/calendar/resources')); await page.getByRole('button', { name: 'Agregar recurso', exact: true }).click(); const resourceResponse = await resourceCreated; if (resourceResponse.status() !== 201) throw new Error('No se creó el recurso operativo.'); const resource = await resourceResponse.json(); createdResources.push(resource.id); if (!(await campaignRef.collection('calendarResources').doc(resource.id).get()).exists) throw new Error('El recurso operativo no persistió en Firestore.');
+  await page.getByLabel('Nombre de plantilla').fill(templateName); await page.getByLabel('Título sugerido').fill('Actividad desde plantilla'); const templateCreated = page.waitForResponse((response) => response.request().method() === 'POST' && new URL(response.url()).pathname.endsWith('/calendar/templates')); await page.getByRole('button', { name: 'Agregar plantilla', exact: true }).click(); const templateResponse = await templateCreated; if (templateResponse.status() !== 201) throw new Error('No se creó la plantilla operativa.'); const template = await templateResponse.json(); createdTemplates.push(template.id); if (!(await campaignRef.collection('calendarTemplates').doc(template.id).get()).exists) throw new Error('La plantilla operativa no persistió en Firestore.'); await page.getByRole('button', { name: 'Cerrar', exact: true }).click();
+  const title = `E2E calendario ${Date.now()}`;
+  await page.getByRole('button', { name: /Crear evento/ }).click(); await page.getByRole('dialog').waitFor(); await page.getByLabel('Título').fill(title);
+  const firstParticipant = page.locator('.electoral-calendar__modal-section input[type="checkbox"]').first(); if (await firstParticipant.count()) await firstParticipant.check();
+  const creation = page.waitForResponse((response) => response.request().method() === 'POST' && new URL(response.url()).pathname.endsWith('/calendar'));
+  await page.getByRole('button', { name: 'Guardar evento', exact: true }).click(); const result = await creation; if (result.status() !== 201) throw new Error(`Creación de evento respondió ${result.status()}.`); const createdEvent = await result.json(); created.push(createdEvent.eventId);
+  const stored = await campaignRef.collection('calendar').doc(createdEvent.eventId).get();
+  if (!stored.exists || !stored.data()?.startAt || !stored.data()?.endAt || stored.data()?.revision !== 1) throw new Error('El evento operativo no se persistió con start/end/revision en Firestore.');
+  await page.getByText(title, { exact: true }).first().click(); await page.getByRole('heading', { name: title, exact: true }).waitFor(); await page.getByText('Exportar ICS', { exact: true }).waitFor();
+  await page.getByRole('button', { name: 'Semana', exact: true }).click(); await page.locator('.fc-timegrid').waitFor(); await page.getByRole('button', { name: 'Agenda', exact: true }).click(); await page.locator('.fc-list').waitFor();
+  await page.getByRole('button', { name: 'Editar evento', exact: true }).click(); await page.getByLabel('Título').fill(`${title} actualizado`); const update = page.waitForResponse((response) => response.request().method() === 'PUT' && response.url().endsWith(`/calendar/${createdEvent.eventId}`)); await page.getByRole('button', { name: 'Guardar evento', exact: true }).click(); if (!(await update).ok()) throw new Error('La edición no se guardó por la API.'); await page.getByTestId('calendar-find-availability').waitFor();
+  const updated = await campaignRef.collection('calendar').doc(createdEvent.eventId).get(); if (updated.data()?.title !== `${title} actualizado` || updated.data()?.revision !== 2) throw new Error('La edición no aplicó control de revisión en Firestore.');
+  await page.getByTestId('calendar-find-availability').click(); await page.getByRole('dialog').waitFor(); const availabilityPerson = page.locator('.modal .electoral-calendar__checkbox-grid input[type="checkbox"]').first(); if (await availabilityPerson.count()) { await availabilityPerson.check(); const availabilityResponse = page.waitForResponse((response) => response.request().method() === 'POST' && new URL(response.url()).pathname.endsWith('/calendar/availability')); await page.getByRole('button', { name: 'Consultar', exact: true }).click(); if (!(await availabilityResponse).ok()) throw new Error('La consulta de disponibilidad no respondió correctamente.'); await page.getByText(/Ocupado:|Sin bloqueos en el alcance consultado/).waitFor(); } await page.getByRole('button', { name: 'Cerrar', exact: true }).click();
+  console.log('CALENDAR E2E: agenda, vistas, recursos, plantillas, disponibilidad, creación, edición, exportación y persistencia real OK.');
+} finally { await cleanup(); await browser?.close(); vite?.kill(); api?.kill(); }

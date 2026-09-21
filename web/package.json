@@ -34,6 +34,7 @@
     "test:e2e:active-campaign": "node scripts/test-active-campaign-e2e-real.mjs",
     "visual:campaign-selector": "node scripts/capture-campaign-selector.mjs",
     "test:planning-stability": "node scripts/test-planning-stability.mjs",
+    "test:e2e:calendar": "node scripts/test-calendar-e2e.mjs",
     "test:e2e:execution-part-a": "node scripts/test-execution-part-a-real.mjs",
     "test:e2e:execution-part-b": "node scripts/test-execution-part-b-real.mjs",
     "test:e2e:execution-part-c": "node scripts/test-execution-part-c-real.mjs",

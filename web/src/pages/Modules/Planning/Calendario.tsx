@@ -1,2 +1,3 @@
-import PlanningWorkspace from './PlanningWorkspace';
-export default function Calendario() { return <PlanningWorkspace area="calendar" />; }
+import ElectoralCalendar from './ElectoralCalendar';
+
+export default function Calendario() { return <ElectoralCalendar />; }
