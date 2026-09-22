@@ -1,5 +1,28 @@
-import { Router } from 'express'; import { requireAuth } from '../middleware/requireAuth.js'; import { requireAddon } from '../middleware/requireAddon.js'; import { ForbiddenError } from '../services/access.service.js'; import * as s from '../services/treoSpend.service.js';
-export const treoSpendRouter=Router();const b='/organizations/:orgId/campaigns/:campId/treo/spend',g=[requireAuth,requireAddon('finance')] as const, ids=(r:any)=>[r.user!,String(r.params.orgId),String(r.params.campId)] as const;const run=(f:any,st=200)=>async(r:any,p:any)=>{try{p.status(st).json(await f(r))}catch(e){p.status(e instanceof ForbiddenError?403:e instanceof Error?400:500).json({message:e instanceof Error?e.message:'Error Treo'})}};
-treoSpendRouter.post(`${b}/migrate`,...g,run((r:any)=>s.migrate(...ids(r))));treoSpendRouter.get(`${b}/budgets`,...g,run((r:any)=>s.budgets(...ids(r))));treoSpendRouter.post(`${b}/budgets`,...g,run((r:any)=>s.saveBudget(...ids(r),r.body),201));treoSpendRouter.post(`${b}/budget-changes`,...g,run((r:any)=>s.requestBudgetChange(...ids(r),r.body),201));treoSpendRouter.post(`${b}/budget-changes/:id/approve`,...g,run((r:any)=>s.approveBudgetChange(...ids(r),String(r.params.id))));treoSpendRouter.get(`${b}/vendors`,...g,run((r:any)=>s.vendors(...ids(r))));treoSpendRouter.post(`${b}/vendors`,...g,run((r:any)=>s.saveVendor(...ids(r),r.body),201));treoSpendRouter.post(`${b}/orders`,...g,run((r:any)=>s.createOrder(...ids(r),r.body),201));treoSpendRouter.post(`${b}/orders/:id/receive`,...g,run((r:any)=>s.receive(...ids(r),String(r.params.id),r.body)));treoSpendRouter.post(`${b}/orders/:id/recognize`,...g,run((r:any)=>s.recognize(...ids(r),String(r.params.id),r.body)));
-treoSpendRouter.get(`${b}/queue`,...g,run((r:any)=>s.queue(...ids(r))));
-treoSpendRouter.post(`${b}/payments`,...g,run((r:any)=>s.preparePayment(...ids(r),r.body),201));treoSpendRouter.post(`${b}/payments/:id/:action`,...g,run((r:any)=>s.paymentAction(...ids(r),String(r.params.id),String(r.params.action))));treoSpendRouter.post(`${b}/advances`,...g,run((r:any)=>s.createAdvance(...ids(r),r.body),201));treoSpendRouter.post(`${b}/advances/:id/settle`,...g,run((r:any)=>s.settleAdvance(...ids(r),String(r.params.id),r.body)));
+import { Router } from 'express';
+import { requireAuth } from '../middleware/requireAuth.js';
+import { requireAddon } from '../middleware/requireAddon.js';
+import { ForbiddenError } from '../services/access.service.js';
+import * as s from '../services/treoSpend.service.js';
+
+export const treoSpendRouter = Router();
+const base = '/organizations/:orgId/campaigns/:campId/treo/spend';
+const guarded = [requireAuth, requireAddon('finance')] as const;
+const ids = (request: any) => [request.user!, String(request.params.orgId), String(request.params.campId)] as const;
+const run = (call: any, status = 200) => async (request: any, response: any) => { try { response.status(status).json(await call(request)); } catch (error) { response.status(error instanceof ForbiddenError ? 403 : error instanceof Error ? 400 : 500).json({ message: error instanceof Error ? error.message : 'Error Treo' }); } };
+
+treoSpendRouter.post(`${base}/migrate`, ...guarded, run((request: any) => s.migrate(...ids(request))));
+treoSpendRouter.get(`${base}/budgets`, ...guarded, run((request: any) => s.budgets(...ids(request))));
+treoSpendRouter.post(`${base}/budgets`, ...guarded, run((request: any) => s.saveBudget(...ids(request), request.body), 201));
+treoSpendRouter.post(`${base}/budget-changes`, ...guarded, run((request: any) => s.requestBudgetChange(...ids(request), request.body), 201));
+treoSpendRouter.post(`${base}/budget-changes/:id/approve`, ...guarded, run((request: any) => s.approveBudgetChange(...ids(request), String(request.params.id))));
+treoSpendRouter.get(`${base}/vendors`, ...guarded, run((request: any) => s.vendors(...ids(request))));
+treoSpendRouter.post(`${base}/vendors`, ...guarded, run((request: any) => s.saveVendor(...ids(request), request.body), 201));
+treoSpendRouter.post(`${base}/orders`, ...guarded, run((request: any) => s.createOrder(...ids(request), request.body), 201));
+treoSpendRouter.put(`${base}/orders/:id`, ...guarded, run((request: any) => s.updateOrder(...ids(request), String(request.params.id), request.body)));
+treoSpendRouter.post(`${base}/orders/:id/receive`, ...guarded, run((request: any) => s.receive(...ids(request), String(request.params.id), request.body)));
+treoSpendRouter.post(`${base}/orders/:id/recognize`, ...guarded, run((request: any) => s.recognize(...ids(request), String(request.params.id), request.body)));
+treoSpendRouter.get(`${base}/queue`, ...guarded, run((request: any) => s.queue(...ids(request))));
+treoSpendRouter.post(`${base}/payments`, ...guarded, run((request: any) => s.preparePayment(...ids(request), request.body), 201));
+treoSpendRouter.post(`${base}/payments/:id/:action`, ...guarded, run((request: any) => s.paymentAction(...ids(request), String(request.params.id), String(request.params.action))));
+treoSpendRouter.post(`${base}/advances`, ...guarded, run((request: any) => s.createAdvance(...ids(request), request.body), 201));
+treoSpendRouter.post(`${base}/advances/:id/settle`, ...guarded, run((request: any) => s.settleAdvance(...ids(request), String(request.params.id), request.body)));
