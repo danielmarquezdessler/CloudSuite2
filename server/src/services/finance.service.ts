@@ -30,6 +30,7 @@ const isoDate = (value: unknown) => { const raw = typeof value === 'string' ? va
  * resolved server-side from membership so the browser never grants access. */
 export async function assertTreoAccess(user: DecodedIdToken, orgId: string, campId: string) {
   assertCampaignAccess(user, orgId, campId);
+  if (!(await campaignRef(orgId, campId).get()).exists) throw new ForbiddenError('No tenés acceso a esta campaña.');
   const org = await db.collection('organizations').doc(orgId).get();
   if (org.data()?.enabledAddons?.finance !== true) throw new ForbiddenError('Treo no está habilitado en esta organización.');
   if (financeRoles.has(String(user.role))) return;
