@@ -38,6 +38,7 @@ import Finance from '../pages/Modules/Finance';
 import TreoAccountForm from '../pages/Modules/TreoAccountForm';
 import TreoMovementForm from '../pages/Modules/TreoMovementForm';
 import TreoOrderForm from '../pages/Modules/TreoOrderForm';
+import TreoBudgetForm from '../pages/Modules/TreoBudgetForm';
 import LiveVisits from '../pages/Modules/Execution/LiveVisits';
 import Heatmap from '../pages/Modules/Execution/Heatmap';
 import Undecided from '../pages/Modules/Execution/Undecided';
@@ -232,6 +233,7 @@ const routes = [
     { path: "/treo/movements/:movementId/edit", component: <TreoMovementForm /> },
     { path: "/treo/orders/new", component: <TreoOrderForm /> },
     { path: "/treo/orders/:orderId/edit", component: <TreoOrderForm /> },
+    { path: "/treo/budgets/new", component: <TreoBudgetForm /> },
     { path: "/finanzas", component: <Navigate to="/treo" replace /> },
     { path: "/vote-stream", component: <VoteStreamList /> },
     { path: "/vote-stream/mi-panel", component: <VoteStreamAgentPanel /> },

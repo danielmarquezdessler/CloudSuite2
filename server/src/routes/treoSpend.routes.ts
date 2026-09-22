@@ -12,7 +12,8 @@ const run = (call: any, status = 200) => async (request: any, response: any) => 
 
 treoSpendRouter.post(`${base}/migrate`, ...guarded, run((request: any) => s.migrate(...ids(request))));
 treoSpendRouter.get(`${base}/budgets`, ...guarded, run((request: any) => s.budgets(...ids(request))));
-treoSpendRouter.post(`${base}/budgets`, ...guarded, run((request: any) => s.saveBudget(...ids(request), request.body), 201));
+treoSpendRouter.post(`${base}/budgets`, ...guarded, run((request: any) => s.saveBudgetFull(...ids(request), request.body), 201));
+treoSpendRouter.put(`${base}/budgets/:id`, ...guarded, run((request: any) => s.updateBudgetFull(...ids(request), String(request.params.id), request.body)));
 treoSpendRouter.post(`${base}/budget-changes`, ...guarded, run((request: any) => s.requestBudgetChange(...ids(request), request.body), 201));
 treoSpendRouter.post(`${base}/budget-changes/:id/approve`, ...guarded, run((request: any) => s.approveBudgetChange(...ids(request), String(request.params.id))));
 treoSpendRouter.get(`${base}/vendors`, ...guarded, run((request: any) => s.vendors(...ids(request))));
