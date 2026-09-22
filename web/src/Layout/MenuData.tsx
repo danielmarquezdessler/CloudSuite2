@@ -421,7 +421,6 @@ const menuItems = [
             { id: 'planning-goals', label: 'Metas', icon: 'ph-duotone ph-target', link: '/planning/goals', dataPage: 'goals' },
             { id: 'planning-routes', label: 'Rutas', icon: 'ph-duotone ph-route', link: '/planning/routes', dataPage: 'routes' },
             { id: 'planning-surveys', label: 'Encuestas', icon: 'ph-duotone ph-clipboard-text', link: '/planning/surveys', dataPage: 'surveys' },
-            { id: 'planning-budget', label: 'Presupuesto', icon: 'ph-duotone ph-wallet', link: '/planning/budget', dataPage: 'budget' },
             { id: 'planning-advisor', label: 'Asesor IA', icon: 'ph-duotone ph-sparkle', link: '/planning/advisor', dataPage: 'advisor' }
         ]
     },

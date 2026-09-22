@@ -17,7 +17,6 @@ import Territorio from '../pages/Modules/Planning/Territorio';
 import Metas from '../pages/Modules/Planning/Metas';
 import Rutas from '../pages/Modules/Planning/Rutas';
 import Encuestas from '../pages/Modules/Planning/Encuestas';
-import Presupuesto from '../pages/Modules/Planning/Presupuesto';
 import Asesor from '../pages/Modules/Planning/Asesor';
 import SettingsPlaceholder from '../pages/Modules/System/SettingsPlaceholder';
 import AddonsAdmin from '../pages/Modules/System/AddonsAdmin';
@@ -263,7 +262,7 @@ const routes = [
     { path: "/planning/goals", component: <Metas /> },
     { path: "/planning/routes", component: <Rutas /> },
     { path: "/planning/surveys", component: <Encuestas /> },
-    { path: "/planning/budget", component: <Presupuesto /> },
+    { path: "/planning/budget", component: <Navigate to="/treo" replace /> },
     { path: "/planning/advisor", component: <Asesor /> },
     { path: "/settings", component: <SettingsPlaceholder /> },
     { path: "/execution/live", component: <LiveVisits /> },
