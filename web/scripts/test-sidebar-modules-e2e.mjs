@@ -94,15 +94,13 @@ try {
   await page.reload({ waitUntil: 'domcontentloaded' });
   await page.locator('nav.pc-sidebar').waitFor({ state: 'visible', timeout: 40_000 });
   await page.locator('[data-sidebar-module="organization"] > button').waitFor();
-  for (const [id, expected] of [['organization', 'true'], ['electoral-conversion', 'false'], ['planning', 'false'], ['execution', 'false']]) {
+  for (const [id, expected] of [['organization', 'true'], ['electoral-conversion', 'false'], ['planning', 'false'], ['execution', 'false'], ['addons', 'false']]) {
     const value = await expanded(page, id);
     if (value !== expected) throw new Error(`Estado inicial incorrecto para ${id}: esperado ${expected}, recibido ${value}.`);
   }
   const transition = await page.locator('[data-sidebar-module="organization"] > ul').evaluate((element) => getComputedStyle(element).transitionProperty);
   if (!transition.includes('max-height')) throw new Error(`La transición del acordeón no está configurada (transition-property=${transition}).`);
-  if (await page.locator('.cloudsuite-sidebar-addon__badge').getByText('Próximamente').count() !== 1) throw new Error('SmartPlanner debería mostrarse bloqueado con el badge Próximamente.');
-  if (!await page.locator('.cloudsuite-sidebar-addon__button').isDisabled()) throw new Error('SmartPlanner debe quedar no navegable cuando el add-on está deshabilitado.');
-  console.log('Estado inicial OK: solo Organización expandido; transición y gate de SmartPlanner verificados.');
+  console.log('Estado inicial OK: solo Organización expandido y transición de acordeón verificada.');
 
   // On a direct Planning route, its group must expand even if no preference was saved for it.
   await page.goto(`${webUrl}/planning/calendar`, { waitUntil: 'domcontentloaded' });
@@ -124,9 +122,8 @@ try {
   await page.screenshot({ path: resolve(screenshots, 'sidebar-module-groups.png'), fullPage: false });
   console.log('Persistencia localStorage OK: un único módulo restaurado tras recarga.');
 
-  // The persistent E2E account is a Cliente. Temporarily grant only its test
-  // token the existing admin role, exercise the real API/UI gate, and restore
-  // both claims and the exact Firestore add-on document in finally.
+  // The enabled add-ons must remain visible to every campaign collaborator;
+  // provisioning is controlled by the organization, not by a sidebar role gate.
   const { adminAuth, db } = await import('../../server/dist/config/firebase.js');
   const authUser = await adminAuth.getUserByEmail(env.E2E_EMAIL);
   const profile = await db.collection('users').doc(authUser.uid).get();
@@ -135,34 +132,27 @@ try {
   if (typeof orgId !== 'string' || typeof campId !== 'string') throw new Error('No fue posible resolver la organización/campaña E2E para verificar SmartPlanner.');
   const orgRef = db.collection('organizations').doc(orgId);
   const organization = await orgRef.get();
-  const originalClaims = authUser.customClaims ?? {};
   const originalEnabledAddons = organization.data()?.enabledAddons;
   restoreAdminVerification = async () => {
-    await adminAuth.setCustomUserClaims(authUser.uid, originalClaims);
     if (originalEnabledAddons === undefined) await orgRef.set({ enabledAddons: { smartPlanner: false } }, { merge: true });
     else await orgRef.set({ enabledAddons: originalEnabledAddons }, { merge: true });
   };
-  await adminAuth.setCustomUserClaims(authUser.uid, { ...originalClaims, role: 'admin', orgId, camps: { ...((originalClaims.camps && typeof originalClaims.camps === 'object') ? originalClaims.camps : {}), [campId]: true } });
+  await orgRef.set({ enabledAddons: { ...(originalEnabledAddons ?? {}), smartPlanner: true, finance: true, voteStream: true } }, { merge: true });
 
   await browser.close();
   browser = await chromium.launch({ headless: true, executablePath: chromiumPath });
-  const adminPage = await browser.newPage({ viewport: { width: 1440, height: 980 } });
-  adminPage.setDefaultTimeout(20_000);
-  await login(adminPage, env);
-  await adminPage.goto(`${webUrl}/system/addons`, { waitUntil: 'domcontentloaded' });
-  await adminPage.getByRole('heading', { name: 'Administración de add-ons' }).waitFor();
-  const enableRequest = adminPage.waitForResponse((response) => response.request().method() === 'PUT' && /\/addons\/smart-planner$/.test(new URL(response.url()).pathname) && response.status() === 200);
-  await adminPage.getByRole('button', { name: 'Habilitar SmartPlanner', exact: true }).click();
-  await enableRequest;
-  await adminPage.locator('.cloudsuite-sidebar-addon__button').waitFor({ state: 'visible' });
-  await adminPage.waitForFunction(() => {
-    const button = document.querySelector('.cloudsuite-sidebar-addon__button');
-    return Boolean(button && !button.disabled);
-  });
-  if (await adminPage.locator('.cloudsuite-sidebar-addon__button').isDisabled()) throw new Error('SmartPlanner siguió deshabilitado después de habilitar el add-on.');
-  if (await adminPage.locator('.cloudsuite-sidebar-addon__badge').count()) throw new Error('El badge Próximamente siguió visible después de habilitar SmartPlanner.');
-  console.log('Gate de SmartPlanner OK: administrador habilitó el add-on real y el sidebar reflejó el cambio.');
-  console.log('E2E sidebar OK: estado inicial, transición, acordeón estricto, autoexpansión, persistencia y SmartPlanner bloqueado verificados sin mocks.');
+  const collaboratorPage = await browser.newPage({ viewport: { width: 1440, height: 980 } });
+  collaboratorPage.setDefaultTimeout(20_000);
+  await login(collaboratorPage, env);
+  await collaboratorPage.locator('[data-sidebar-module="addons"] > button').click();
+  for (const [label, href] of [['SmartPlanner', '/smartplanner'], ['Treo', '/treo'], ['Vote Stream', '/vote-stream']]) {
+    const link = collaboratorPage.locator(`[data-sidebar-module="addons"] a[href="${href}"]`);
+    if (await link.count() !== 1 || (await link.textContent())?.trim() !== label) {
+      const available = await collaboratorPage.locator('[data-sidebar-module="addons"] a').evaluateAll((links) => links.map((item) => ({ href: item.getAttribute('href'), text: item.textContent?.trim() })));
+      throw new Error(`${label} no quedó visible para el colaborador: ${JSON.stringify(available)}.`);
+    }
+  }
+  console.log('E2E sidebar OK: acordeón, persistencia y ADDONS habilitados para colaborador sin mocks.');
 } finally {
   await browser?.close();
   await restoreAdminVerification?.();
