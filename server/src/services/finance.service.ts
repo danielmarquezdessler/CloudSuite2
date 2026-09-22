@@ -3,7 +3,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { randomUUID } from 'node:crypto';
 import { db, storage } from '../config/firebase.js';
 import { appendAudit } from './audit.service.js';
-import { assertCampaignAccess, campaignRef, ForbiddenError, NotFoundError, ValidationError } from './access.service.js';
+import { assertCampaignAccess, campaignAuthorizationPolicy, campaignRef, ForbiddenError, NotFoundError, ValidationError } from './access.service.js';
 
 type TransactionType = 'ingreso' | 'egreso';
 type TransactionStatus = 'pendiente' | 'confirmado';
@@ -44,6 +44,7 @@ export async function assertTreoAccess(user: DecodedIdToken, orgId: string, camp
   if (!(await campaignRef(orgId, campId).get()).exists) throw new ForbiddenError('No tenés acceso a esta campaña.');
   const org = await db.collection('organizations').doc(orgId).get();
   if (org.data()?.enabledAddons?.finance !== true) throw new ForbiddenError('Treo no está habilitado en esta organización.');
+  if (campaignAuthorizationPolicy.collaboratorsManageCampaignResources) return;
   if (financeRoles.has(String(user.role))) return;
   const member = await campaignRef(orgId, campId).collection('members').doc(user.uid).get();
   const treoRole = String(member.data()?.treoRole ?? member.data()?.smartPlannerRole ?? '');
