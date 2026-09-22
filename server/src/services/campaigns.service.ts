@@ -13,9 +13,7 @@ function organizationRef(orgId: string) {
 }
 
 function assertOrganizationClient(user: DecodedIdToken, orgId: string) {
-  if (user.orgId !== orgId || user.role !== 'cliente') {
-    throw new ForbiddenError('Solo el Cliente puede gestionar las campañas de la organización.');
-  }
+  if (user.orgId !== orgId) throw new ForbiddenError('No tenés acceso a esta organización.');
 }
 
 function campaignName(input: CampaignInput) {

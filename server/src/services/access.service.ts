@@ -9,6 +9,16 @@ export class ConflictError extends Error {
   constructor(message: string, public readonly details?: Record<string, unknown>) { super(message); }
 }
 
+/**
+ * Campaign product permissions are intentionally centralized. Until the
+ * per-profile matrix ships, every member with a campaign claim can manage the
+ * campaign resources available to an administrator. Flipping this policy is
+ * the single future control point for the stricter gates below.
+ */
+export const campaignAuthorizationPolicy = {
+  collaboratorsManageCampaignResources: true
+} as const;
+
 export function assertCampaignAccess(user: DecodedIdToken, orgId: string, campId: string) {
   const camps = user.camps as Record<string, boolean> | undefined;
   const allCampaigns = user.role === 'cliente' && user.allCamps === true;
@@ -29,12 +39,12 @@ export async function assertOrganizationRead(user: DecodedIdToken, orgId: string
 
 export function assertCampaignAdmin(user: DecodedIdToken, orgId: string, campId: string) {
   assertCampaignAccess(user, orgId, campId);
-  if (user.role !== 'cliente') throw new ForbiddenError('Solo el Cliente puede administrar esta campaña.');
+  if (!campaignAuthorizationPolicy.collaboratorsManageCampaignResources && user.role !== 'cliente') throw new ForbiddenError('Solo el Cliente puede administrar esta campaña.');
 }
 
 export function assertCampaignManager(user: DecodedIdToken, orgId: string, campId: string) {
   assertCampaignAccess(user, orgId, campId);
-  if (user.role !== 'cliente' && user.role !== 'admin') throw new ForbiddenError('Solo el Cliente o un admin puede importar electores.');
+  if (!campaignAuthorizationPolicy.collaboratorsManageCampaignResources && user.role !== 'cliente' && user.role !== 'admin') throw new ForbiddenError('Solo el Cliente o un admin puede importar electores.');
 }
 
 export function campaignRef(orgId: string, campId: string) {

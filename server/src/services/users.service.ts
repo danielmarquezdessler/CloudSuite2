@@ -22,7 +22,7 @@ function userAuthValidationError(error: unknown) {
 }
 
 function assertOrganizationAdmin(user: DecodedIdToken, orgId: string) {
-  if (user.orgId !== orgId || (user.role !== 'cliente' && user.role !== 'admin')) throw new ForbiddenError('Solo el Cliente o un administrador puede gestionar usuarios.');
+  if (user.orgId !== orgId) throw new ForbiddenError('No tenés acceso a esta organización.');
 }
 
 function normalize(input: CreateOrganizationUserInput) {
