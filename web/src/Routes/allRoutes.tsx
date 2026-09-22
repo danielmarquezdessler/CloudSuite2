@@ -36,6 +36,7 @@ import VoteStreamAgentPanel from '../pages/Modules/VoteStreamAgentPanel';
 import PublicVoteStreamRanking from '../pages/PublicVoteStreamRanking';
 import Finance from '../pages/Modules/Finance';
 import TreoAccountForm from '../pages/Modules/TreoAccountForm';
+import TreoMovementForm from '../pages/Modules/TreoMovementForm';
 import LiveVisits from '../pages/Modules/Execution/LiveVisits';
 import Heatmap from '../pages/Modules/Execution/Heatmap';
 import Undecided from '../pages/Modules/Execution/Undecided';
@@ -226,6 +227,8 @@ const routes = [
     { path: "/treo", component: <Finance /> },
     { path: "/treo/accounts/new", component: <TreoAccountForm /> },
     { path: "/treo/accounts/:accountId/edit", component: <TreoAccountForm /> },
+    { path: "/treo/movements/new", component: <TreoMovementForm /> },
+    { path: "/treo/movements/:movementId/edit", component: <TreoMovementForm /> },
     { path: "/finanzas", component: <Navigate to="/treo" replace /> },
     { path: "/vote-stream", component: <VoteStreamList /> },
     { path: "/vote-stream/mi-panel", component: <VoteStreamAgentPanel /> },
