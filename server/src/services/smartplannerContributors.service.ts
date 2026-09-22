@@ -1,7 +1,7 @@
 import { DecodedIdToken } from 'firebase-admin/auth';
 import { FieldValue } from 'firebase-admin/firestore';
 import { db } from '../config/firebase.js';
-import { assertCampaignAccess, ForbiddenError, NotFoundError, ValidationError } from './access.service.js';
+import { assertCampaignAccess, campaignAuthorizationPolicy, ForbiddenError, NotFoundError, ValidationError } from './access.service.js';
 
 const stages = ['prospecto', 'contactado', 'comprometido', 'confirmado'];
 const types = ['aportante', 'sponsor'];
@@ -12,6 +12,7 @@ async function writable(user: DecodedIdToken, orgId: string, campId: string) {
   assertCampaignAccess(user, orgId, campId);
   const org = await db.collection('organizations').doc(orgId).get();
   if (org.data()?.enabledAddons?.smartPlanner !== true) throw new ForbiddenError('SmartPlanner no está habilitado en el plan de esta organización.');
+  if (campaignAuthorizationPolicy.collaboratorsManageCampaignResources) return;
   if (user.role === 'cliente' || user.role === 'admin') return;
   const member = await campaign(orgId, campId).collection('members').doc(user.uid).get();
   if (!['contador', 'pm'].includes(String(member.data()?.smartPlannerRole ?? 'miembro'))) throw new ForbiddenError('Solo Contador, PM o Cliente puede administrar aportantes.');

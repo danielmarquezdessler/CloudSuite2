@@ -1,7 +1,7 @@
 import { DecodedIdToken } from 'firebase-admin/auth';
 import { FieldValue } from 'firebase-admin/firestore';
 import { db } from '../config/firebase.js';
-import { assertCampaignAccess, ForbiddenError, NotFoundError, ValidationError } from './access.service.js';
+import { assertCampaignAccess, campaignAuthorizationPolicy, ForbiddenError, NotFoundError, ValidationError } from './access.service.js';
 
 const campaign = (orgId: string, campId: string) => db.collection('organizations').doc(orgId).collection('campaigns').doc(campId);
 const categories = ['imprenta', 'sonido', 'medios', 'producción', 'catering', 'transporte', 'otro'];
@@ -16,6 +16,7 @@ async function readable(user: DecodedIdToken, orgId: string, campId: string) {
 
 async function writable(user: DecodedIdToken, orgId: string, campId: string) {
   await readable(user, orgId, campId);
+  if (campaignAuthorizationPolicy.collaboratorsManageCampaignResources) return;
   if (['cliente', 'admin'].includes(String(user.role))) return;
   const member = await campaign(orgId, campId).collection('members').doc(user.uid).get();
   if (!['contador', 'pm'].includes(String(member.data()?.smartPlannerRole ?? 'miembro'))) throw new ForbiddenError('No tenés permisos para administrar proveedores.');

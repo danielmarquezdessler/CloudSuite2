@@ -1,10 +1,10 @@
 import { DecodedIdToken } from 'firebase-admin/auth';
 import { FieldValue } from 'firebase-admin/firestore';
 import { db } from '../config/firebase.js';
-import { assertCampaignAccess, ForbiddenError, NotFoundError, ValidationError } from './access.service.js';
+import { assertCampaignAccess, campaignAuthorizationPolicy, ForbiddenError, NotFoundError, ValidationError } from './access.service.js';
 import { createNotification } from './notifications.service.js';
 const camp=(o:string,c:string)=>db.collection('organizations').doc(o).collection('campaigns').doc(c);
-async function access(u:DecodedIdToken,o:string,c:string,write=false){assertCampaignAccess(u,o,c);const org=await db.collection('organizations').doc(o).get();if(org.data()?.enabledAddons?.smartPlanner!==true)throw new ForbiddenError('SmartPlanner no está habilitado.');if(write&&!['cliente','admin'].includes(String(u.role))){const m=await camp(o,c).collection('members').doc(u.uid).get();if(m.data()?.smartPlannerRole!=='pm')throw new ForbiddenError('Solo PM o Cliente puede administrar este flujo.');}}
+async function access(u:DecodedIdToken,o:string,c:string,write=false){assertCampaignAccess(u,o,c);const org=await db.collection('organizations').doc(o).get();if(org.data()?.enabledAddons?.smartPlanner!==true)throw new ForbiddenError('SmartPlanner no está habilitado.');if(write&&!campaignAuthorizationPolicy.collaboratorsManageCampaignResources&&!['cliente','admin'].includes(String(u.role))){const m=await camp(o,c).collection('members').doc(u.uid).get();if(m.data()?.smartPlannerRole!=='pm')throw new ForbiddenError('Solo PM o Cliente puede administrar este flujo.');}}
 const out=(d:any)=>({id:d.id,...d.data(),createdAt:d.data().createdAt?.toDate?.().toISOString?.()??null});
 async function notifyCampaign(o:string,c:string,exclude:string,input:{type:string;title:string;message:string;metadata?:Record<string,unknown>}){const members=await camp(o,c).collection('members').get();await Promise.all(members.docs.filter(member=>member.id!==exclude).map(member=>createNotification(member.id,input)));}
 export async function protocols(u:DecodedIdToken,o:string,c:string){await access(u,o,c);return (await camp(o,c).collection('spCrisisProtocols').orderBy('createdAt','desc').get()).docs.map(out)}

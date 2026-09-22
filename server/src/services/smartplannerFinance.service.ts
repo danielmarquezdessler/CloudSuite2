@@ -2,14 +2,14 @@ import { DecodedIdToken } from 'firebase-admin/auth';
 import { FieldValue } from 'firebase-admin/firestore';
 import { randomUUID } from 'node:crypto';
 import { db, storage } from '../config/firebase.js';
-import { assertCampaignAccess, ForbiddenError, NotFoundError, ValidationError } from './access.service.js';
+import { assertCampaignAccess, campaignAuthorizationPolicy, ForbiddenError, NotFoundError, ValidationError } from './access.service.js';
 import { createNotification } from './notifications.service.js';
 
 const campaign = (orgId: string, campId: string) => db.collection('organizations').doc(orgId).collection('campaigns').doc(campId);
 const invoiceTypes = ['factura', 'nota_credito']; const invoiceStatuses = ['pendiente', 'pagada', 'vencida', 'anulada', 'borrador', 'emitida']; const contractStatuses = ['borrador', 'enviado', 'firmado', 'rechazado', 'cancelado']; const contractTypes = ['proveedor', 'aportante', 'personal'];
 const serialize = (doc: FirebaseFirestore.QueryDocumentSnapshot) => ({ id: doc.id, ...doc.data(), createdAt: doc.data().createdAt?.toDate?.().toISOString?.() ?? null });
 async function readable(user: DecodedIdToken, orgId: string, campId: string) { assertCampaignAccess(user, orgId, campId); const organization = await db.collection('organizations').doc(orgId).get(); if (organization.data()?.enabledAddons?.smartPlanner !== true) throw new ForbiddenError('SmartPlanner no está habilitado en el plan de esta organización.'); }
-async function writable(user: DecodedIdToken, orgId: string, campId: string) { await readable(user, orgId, campId); if (['cliente', 'admin'].includes(String(user.role))) return; const member = await campaign(orgId, campId).collection('members').doc(user.uid).get(); if (!['contador', 'pm'].includes(String(member.data()?.smartPlannerRole ?? 'miembro'))) throw new ForbiddenError('Solo Contador, PM o Cliente puede administrar finanzas.'); }
+async function writable(user: DecodedIdToken, orgId: string, campId: string) { await readable(user, orgId, campId); if (campaignAuthorizationPolicy.collaboratorsManageCampaignResources || ['cliente', 'admin'].includes(String(user.role))) return; const member = await campaign(orgId, campId).collection('members').doc(user.uid).get(); if (!['contador', 'pm'].includes(String(member.data()?.smartPlannerRole ?? 'miembro'))) throw new ForbiddenError('Solo Contador, PM o Cliente puede administrar finanzas.'); }
 const money = (value: unknown) => { const parsed = Number(value ?? 0); return Number.isFinite(parsed) ? Math.max(0, parsed) : 0; };
 async function notifyCampaign(orgId: string, campId: string, excludedUid: string, input: { type: string; title: string; message: string; metadata: Record<string, unknown> }) {
   const members = await campaign(orgId, campId).collection('members').get();
