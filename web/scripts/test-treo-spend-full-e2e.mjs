@@ -38,6 +38,7 @@ try {
   const [legacyBudget, legacyVendor, legacyProject] = await Promise.all([campaign.collection('treoBudgetLines').doc(`legacy-budget-${suffix}`).get(), campaign.collection('treoVendors').doc(`legacy-vendor-${suffix}`).get(), campaign.collection('treoProcurements').doc(`legacy-project-${suffix}`).get()]);
   if (!legacyBudget.exists || !legacyVendor.exists || !legacyProject.exists) throw new Error('Migración incompleta.');
   const budget = await post(`${base}/budgets`, { name: `Imprenta ${suffix}`, approved: 100000, stage: 'Campaña', activity: 'Volantes', costCenter: 'Territorio' });
+  const expansion = await post(`${base}/budget-changes`, { kind: 'ampliacion', toBudgetId: budget.id, amount: 20000, reason: 'Refuerzo de tirada' }); await post(`${base}/budget-changes/${expansion.id}/approve`, {}); if ((await campaign.collection('treoBudgetLines').doc(budget.id).get()).data().approved !== 120000) throw new Error('La ampliación aprobada no actualizó la partida.');
   const order = await post(`${base}/orders`, { budgetId: budget.id, vendorId: legacyVendor.id, object: 'Imprenta', amount: 100000, orderedQty: 100, operationId: `${suffix}:order` });
   await post(`${base}/orders/${order.id}/receive`, { receivedQty: 80, evidence: 'Acta parcial' }); let blocked = false;
   try { await post(`${base}/orders/${order.id}/recognize`, { amount: 100000, expenseAccountId: '5-1-01' }); } catch (error) { blocked = error.status === 400; } if (!blocked) throw new Error('3-way match no bloqueó 100 facturado y 80 recibido.');
