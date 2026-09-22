@@ -86,9 +86,6 @@ async function addon(user: DecodedIdToken, orgId: string, campId: string) {
 async function membership(user: DecodedIdToken, orgId: string, campId: string) { return campaign(orgId, campId).collection('members').doc(user.uid).get(); }
 async function manager(user: DecodedIdToken, orgId: string, campId: string) {
   await addon(user, orgId, campId);
-  if (user.role === 'cliente' || user.role === 'admin') return;
-  const member = await membership(user, orgId, campId);
-  if (!['contador', 'pm'].includes(String(member.data()?.smartPlannerRole ?? 'miembro'))) throw new ForbiddenError('No tenés permisos para administrar SmartPlanner.');
 }
 export async function listAreas(user: DecodedIdToken, orgId: string, campId: string) {
   await addon(user, orgId, campId); const ref = campaign(orgId, campId).collection('spAreas'); let snap = await ref.orderBy('order').get();
@@ -124,7 +121,7 @@ export async function deleteCategory(user: DecodedIdToken, orgId: string, campId
 export async function listSprints(user: DecodedIdToken, orgId: string, campId: string) { await addon(user, orgId, campId); return (await campaign(orgId, campId).collection('spSprints').orderBy('startDate', 'desc').get()).docs.map(serialize); }
 export async function saveSprint(user: DecodedIdToken, orgId: string, campId: string, id: string | null, input: Record<string, unknown>) { await manager(user, orgId, campId); const name = text(input.name, 160); const status = String(input.status ?? 'planificado'); if (!name || !['planificado', 'activo', 'cerrado'].includes(status)) throw new ValidationError('Nombre o estado de Sprint inválido.'); const ref = id ? campaign(orgId, campId).collection('spSprints').doc(id) : campaign(orgId, campId).collection('spSprints').doc(); const data: Sprint = { name, startDate: text(input.startDate, 20), endDate: text(input.endDate, 20), status: status as Sprint['status'] }; await ref.set({ ...data, ...(id ? { updatedAt: FieldValue.serverTimestamp() } : { createdAt: FieldValue.serverTimestamp() }) }, { merge: true }); return { id: ref.id, ...data }; }
 export async function deleteSprint(user: DecodedIdToken, orgId: string, campId: string, id: string) { await manager(user, orgId, campId); await campaign(orgId, campId).collection('spSprints').doc(id).delete(); }
-export async function listTasks(user: DecodedIdToken, orgId: string, campId: string) { await addon(user, orgId, campId); const member = await membership(user, orgId, campId); const role = String(member.data()?.smartPlannerRole ?? 'miembro'); let tasks: SmartPlannerTask[] = (await campaign(orgId, campId).collection('spTasks').orderBy('createdAt', 'desc').get()).docs.map(serialize); if (!['cliente', 'admin'].includes(String(user.role)) && !['contador', 'pm'].includes(role)) tasks = tasks.filter((task) => task.assignedTo === user.uid); return tasks; }
+export async function listTasks(user: DecodedIdToken, orgId: string, campId: string) { await addon(user, orgId, campId); return (await campaign(orgId, campId).collection('spTasks').orderBy('createdAt', 'desc').get()).docs.map(serialize) as SmartPlannerTask[]; }
 export async function listMembers(user: DecodedIdToken, orgId: string, campId: string) {
   await addon(user, orgId, campId);
   const snap = await campaign(orgId, campId).collection('members').get();
@@ -163,10 +160,7 @@ export async function saveTask(user: DecodedIdToken, orgId: string, campId: stri
   const ref = id ? campaign(orgId, campId).collection('spTasks').doc(id) : campaign(orgId, campId).collection('spTasks').doc();
   const existing = id ? await ref.get() : null;
   if (id && !existing?.exists) throw new NotFoundError('La tarea no existe.');
-  const member = await membership(user, orgId, campId);
-  const role = String(member.data()?.smartPlannerRole ?? 'miembro');
-  const canManage = ['cliente', 'admin'].includes(String(user.role)) || ['contador', 'pm'].includes(role);
-  if (id && !canManage && existing?.data()?.assignedTo !== user.uid) throw new ForbiddenError('Solo podés mover tus propias tareas.');
+  const canManage = true;
   const status = String(input.status ?? existing?.data()?.status ?? 'por_hacer');
   if (!statuses.includes(status as typeof statuses[number])) throw new ValidationError('El estado no es válido.');
   if (!canManage) {
@@ -203,7 +197,7 @@ export async function saveTask(user: DecodedIdToken, orgId: string, campId: stri
 /** Writes only the field supplied by PBI autosave; never reconstructs the whole task. */
 export async function patchTask(user: DecodedIdToken, orgId: string, campId: string, id: string, input: Record<string, unknown>) {
   await addon(user, orgId, campId); const ref = campaign(orgId, campId).collection('spTasks').doc(id); const existing = await ref.get(); if (!existing.exists) throw new NotFoundError('El PBI no existe.');
-  const member = await membership(user, orgId, campId); const role = String(member.data()?.smartPlannerRole ?? 'miembro'); const canManage = ['cliente', 'admin'].includes(String(user.role)) || ['contador', 'pm'].includes(role); if (!canManage && existing.data()?.assignedTo !== user.uid) throw new ForbiddenError('Solo podés actualizar tus propios PBIs.');
+  const canManage = true;
   const allowed = new Set(['title', 'description', 'status', 'priority', 'assignedTo', 'areaId', 'categoryId', 'userStory', 'acceptanceCriteria', 'checklist', 'storyPoints', 'risk', 'businessValue', 'timeCriticality', 'effort', 'targetDate', 'estimatedHours', 'registeredHours', 'progressPercent', 'sprintId', 'milestone', 'release', 'module', 'tags', 'version', 'blocked', 'blockedReason', 'relations', 'links']);
   const keys = Object.keys(input).filter((key) => allowed.has(key)); if (keys.length !== 1) throw new ValidationError('El autosave debe actualizar exactamente un campo del PBI.'); const key = keys[0]; if (!canManage && key !== 'status') throw new ForbiddenError('Solo podés mover el estado de tus propios PBIs.'); const raw = input[key]; const patch: Record<string, unknown> = { updatedAt: FieldValue.serverTimestamp() };
   if (key === 'title') { const value = text(raw, 500); if (!value) throw new ValidationError('El título de la tarea es obligatorio.'); patch.title = value; }
@@ -252,4 +246,4 @@ export async function listTaskActivity(user: DecodedIdToken, orgId: string, camp
   const ref = await taskRefFor(user, orgId, campId, taskId);
   return (await ref.collection('activity').orderBy('changedAt', 'desc').limit(250).get()).docs.map((document) => ({ id: document.id, ...document.data(), changedAt: document.data().changedAt?.toDate?.().toISOString?.() ?? null }));
 }
-export async function setRole(user: DecodedIdToken, orgId: string, campId: string, uid: string, smartPlannerRole: unknown) { if (user.role !== 'cliente' && user.role !== 'admin') throw new ForbiddenError('Solo Cliente o admin puede asignar roles de SmartPlanner.'); await addon(user, orgId, campId); const role = String(smartPlannerRole ?? 'miembro'); if (!['contador', 'pm', 'miembro'].includes(role)) throw new ValidationError('El rol de SmartPlanner no es válido.'); const ref = campaign(orgId, campId).collection('members').doc(uid); if (!(await ref.get()).exists) throw new NotFoundError('El miembro no existe.'); await ref.update({ smartPlannerRole: role, updatedAt: FieldValue.serverTimestamp() }); return { uid, smartPlannerRole: role }; }
+export async function setRole(user: DecodedIdToken, orgId: string, campId: string, uid: string, smartPlannerRole: unknown) { await manager(user, orgId, campId); const role = String(smartPlannerRole ?? 'miembro'); if (!['contador', 'pm', 'miembro'].includes(role)) throw new ValidationError('El rol de SmartPlanner no es válido.'); const ref = campaign(orgId, campId).collection('members').doc(uid); if (!(await ref.get()).exists) throw new NotFoundError('El miembro no existe.'); await ref.update({ smartPlannerRole: role, updatedAt: FieldValue.serverTimestamp() }); return { uid, smartPlannerRole: role }; }
