@@ -1,4 +1,4 @@
-import { DragEvent, useEffect, useMemo, useState } from 'react';
+import { DragEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import FeatherIcon from 'feather-icons-react';
 import { useTranslation } from 'react-i18next';
@@ -71,6 +71,7 @@ const NestedMenu = ({ menuItems, order = [], organizing = false, onOrderChange }
   const agentStreams = useAuthenticatedQuery<Array<{ id: string }>>(user, agentStreamsPath, [agentStreamsPath]);
   const [openModule, setOpenModule] = useState<string | null>(readOpenModule);
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  const routeThatSelectedModule = useRef<string | null>(null);
 
   const canRender = (item: MenuItem) => {
     if (item.adminOnly && role !== 'admin') return false;
@@ -86,8 +87,13 @@ const NestedMenu = ({ menuItems, order = [], organizing = false, onOrderChange }
   const orderedItems = useMemo(() => ordered(visibleItems, order), [visibleItems, order]);
 
   useEffect(() => {
+    // Data queries in an active module can re-render the layout. Only select the
+    // module automatically when navigation actually changes; otherwise a Treo
+    // refresh would reopen Addons after every click on another sidebar group.
     const activeModule = orderedItems.find((item) => item.submenu?.some((child) => child.link === router.pathname));
-    if (activeModule?.id) setOpenModule(activeModule.id);
+    if (!activeModule?.id || routeThatSelectedModule.current === router.pathname) return;
+    routeThatSelectedModule.current = router.pathname;
+    setOpenModule(activeModule.id);
   }, [orderedItems, router.pathname]);
 
   useEffect(() => { window.localStorage.setItem(SIDEBAR_STATE_KEY, JSON.stringify(openModule)); }, [openModule]);
