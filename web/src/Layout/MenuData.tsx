@@ -419,7 +419,7 @@ const menuItems = [
             { id: 'planning-territory', label: 'Territorio', icon: 'ph-duotone ph-map-trifold', link: '/planning/territory', dataPage: 'territory' },
             { id: 'planning-tasks', label: 'Tareas', icon: 'ph-duotone ph-clipboard-text', link: '/execution/tasks', dataPage: 'execution-tasks' },
             { id: 'planning-goals', label: 'Metas', icon: 'ph-duotone ph-target', link: '/planning/goals', dataPage: 'goals' },
-            { id: 'planning-routes', label: 'Rutas', icon: 'ph-duotone ph-route', link: '/planning/routes', dataPage: 'routes' },
+            { id: 'planning-routes', label: 'Rutas', icon: 'ph-duotone ph-path', link: '/planning/routes', dataPage: 'routes' },
             { id: 'planning-surveys', label: 'Encuestas', icon: 'ph-duotone ph-clipboard-text', link: '/planning/surveys', dataPage: 'surveys' },
             { id: 'planning-advisor', label: 'Asesor IA', icon: 'ph-duotone ph-sparkle', link: '/planning/advisor', dataPage: 'advisor' }
         ]
