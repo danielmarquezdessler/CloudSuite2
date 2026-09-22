@@ -72,6 +72,13 @@ function normalizeLegacy(document: FirebaseFirestore.QueryDocumentSnapshot | Fir
       return { uid: text(value.uid, 128), required: value.required !== false, status: ['pending', 'confirmed', 'declined'].includes(text(value.status)) ? text(value.status) as Participant['status'] : 'pending' };
     }).filter((participant) => participant.uid),
     resourceIds: ids(raw.resourceIds),
+    teamIds: ids(raw.teamIds),
+    labels: ids(raw.labels, 20),
+    linkedUserIds: ids(raw.linkedUserIds),
+    attachments: list(raw.attachments).slice(0, 30),
+    description: text(raw.description, 5000),
+    preparationMinutes: Math.max(0, Number(raw.preparationMinutes) || 0),
+    teardownMinutes: Math.max(0, Number(raw.teardownMinutes) || 0),
     revision: Number(raw.revision ?? 1),
     date: legacyDate
   };
@@ -158,15 +165,38 @@ async function assertEventEditable(user: DecodedIdToken, orgId: string, campId: 
 async function syncPublicationTask(orgId: string, campId: string, eventId: string, event: CalendarEvent) {
   const ref = tasks(orgId, campId).doc(`calendar-publication-${eventId}`);
   if (!event.isPublication) return ref;
+  const existing = await ref.get();
   const linkedUserIds = ids(event.linkedUserIds);
   await ref.set({
     title: String(event.title), description: String(event.description ?? ''), assignedTo: linkedUserIds[0] || String(event.createdBy ?? ''),
     linkedUserIds, dueDate: String(event.startAt).slice(0, 10), status: event.status === 'completed' ? 'completada' : event.status === 'cancelled' ? 'pendiente' : 'pendiente',
     priority: String(event.priority ?? 'medium') === 'critical' ? 'alta' : String(event.priority ?? 'media'), teamId: null,
     source: 'calendar_publication', sourceEventId: eventId, sourceEventPath: `/planning/calendar?event=${encodeURIComponent(eventId)}`,
-    archived: false, updatedAt: FieldValue.serverTimestamp()
+    archived: false,
+    ...(existing.exists ? {} : { createdAt: FieldValue.serverTimestamp(), assignedBy: String(event.createdBy ?? '') }),
+    updatedAt: FieldValue.serverTimestamp()
   }, { merge: true });
   return ref;
+}
+
+async function notifyPublicationLinkedUsers(user: DecodedIdToken, orgId: string, campId: string, eventId: string, title: string, linkedUserIds: string[]) {
+  await Promise.all(
+    ids(linkedUserIds)
+      .filter((uid) => uid !== user.uid)
+      .map((uid) =>
+        createNotification(uid, {
+          type: 'calendar_publication_assigned',
+          title: 'Nueva publicación asignada',
+          message: title,
+          metadata: {
+            path: `/planning/calendar?event=${encodeURIComponent(eventId)}`,
+            orgId,
+            campId,
+            eventId
+          }
+        }),
+      ),
+  );
 }
 
 async function archivePublicationTask(orgId: string, campId: string, eventId: string, user: DecodedIdToken) {
@@ -334,14 +364,7 @@ export async function createEvent(user: DecodedIdToken, orgId: string, campId: s
   const event = { id: ref.id, ...data, revision: 1, status: data.status, participants: data.participants, resourceIds: data.resourceIds, startAt: data.startAt, endAt: data.endAt, createdBy: user.uid } as CalendarEvent;
   const task = await syncPublicationTask(orgId, campId, ref.id, event);
   if (data.isPublication) await ref.update({ planningTaskId: task.id });
-  if (data.isPublication) {
-    await Promise.all(data.linkedUserIds.filter((uid) => uid !== user.uid).map((uid) => createNotification(uid, {
-      type: 'calendar_publication_assigned',
-      title: 'Nueva publicación asignada',
-      message: data.title,
-      metadata: { path: `/planning/calendar?event=${encodeURIComponent(ref.id)}`, orgId, campId, eventId: ref.id }
-    })));
-  }
+  if (data.isPublication) await notifyPublicationLinkedUsers(user, orgId, campId, ref.id, data.title, data.linkedUserIds);
   return { eventId: ref.id, ...data, revision: 1, planningTaskId: data.isPublication ? task.id : null, conflicts: conflict };
 }
 
@@ -364,6 +387,11 @@ export async function updateEvent(user: DecodedIdToken, orgId: string, campId: s
   await rememberEventType(orgId, campId, data.type, user);
   const task = await syncPublicationTask(orgId, campId, eventId, { ...current, ...data, id: eventId, revision, createdBy: current.createdBy } as CalendarEvent);
   if (data.isPublication) await ref.update({ planningTaskId: task.id });
+  const previousLinkedUsers = current.isPublication ? ids(current.linkedUserIds) : [];
+  const newlyLinkedUsers = data.isPublication
+    ? ids(data.linkedUserIds).filter((uid) => !previousLinkedUsers.includes(uid))
+    : [];
+  if (newlyLinkedUsers.length) await notifyPublicationLinkedUsers(user, orgId, campId, eventId, data.title, newlyLinkedUsers);
   return { eventId, ...data, revision, planningTaskId: data.isPublication ? task.id : null, conflicts: conflict };
 }
 

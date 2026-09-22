@@ -838,9 +838,10 @@ export default function ElectoralCalendar() {
                     )
                   }
                   eventDrop={eventDrop}
-                  eventClick={(arg) =>
-                    setSelected(arg.event.extendedProps as CalendarEvent)
-                  }
+                  eventClick={(arg) => {
+                    arg.jsEvent.preventDefault();
+                    setSelected(arg.event.extendedProps as CalendarEvent);
+                  }}
                   dateClick={(arg) => canEditEvents && showCreate(arg.date)}
                   datesSet={(arg) => setTitle(arg.view.title)}
                   headerToolbar={false}

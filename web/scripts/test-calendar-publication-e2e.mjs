@@ -214,6 +214,37 @@ try {
         `El colaborador recibió ${result.response.status} al leer ${path}.`,
       );
   }
+  const typeCatalogFirst = await request(collaboratorToken, `${base}/calendar/types`);
+  const typeCatalogSecond = await request(collaboratorToken, `${base}/calendar/types`);
+  const campaignDefaultTypes = [
+    "Lanzamiento de campaña",
+    "Actos políticos y mítines",
+    "Caminatas y recorridas territoriales (Timbreos)",
+    "Debates electorales",
+    "Conferencias de prensa",
+    "Entrevistas en medios de comunicación",
+    "Eventos de recaudación de fondos",
+    "Reuniones con líderes comunitarios, sindicales o empresariales",
+    "Visitas a instituciones, fábricas u ONGs",
+    "Reuniones de estrategia con el equipo o comité de campaña",
+    "Capacitación de voluntarios y fiscales de mesa",
+    "Grabación de spots publicitarios y sesiones de fotos",
+    "Mesas de difusión y entrega de volantes",
+    "Actos de cierre de campaña",
+    "Día de la elección (Votación del candidato y vigilia en el búnker)",
+    "Otros",
+  ];
+  if (
+    !typeCatalogFirst.response.ok ||
+    !typeCatalogSecond.response.ok ||
+    campaignDefaultTypes.some(
+      (label) =>
+        typeCatalogSecond.body?.filter((type) => type.label === label).length !== 1,
+    )
+  )
+    throw new Error(
+      "El catálogo de tipos de campaña no fue idempotente para el colaborador.",
+    );
   const ownProfile = await request(collaboratorToken, "/api/me");
   if (
     !ownProfile.response.ok ||
@@ -254,6 +285,44 @@ try {
       `El colaborador no pudo crear un evento: ${createdByCollaborator.response.status}.`,
     );
   eventIds.push(createdByCollaborator.body.eventId);
+  const convertedEventId = createdByCollaborator.body.eventId;
+  const convertedTaskId = `calendar-publication-${convertedEventId}`;
+  taskIds.push(convertedTaskId);
+  const converted = await request(ownerToken, `${base}/calendar/${convertedEventId}`, {
+    method: "PUT",
+    body: JSON.stringify({
+      isPublication: true,
+      linkedUserIds: [collaborator.uid],
+      allowLinkedEditing: true,
+      expectedRevision: createdByCollaborator.body.revision,
+    }),
+  });
+  if (converted.response.status !== 200)
+    throw new Error(
+      `El evento normal no pudo convertirse en Publicación: ${converted.response.status}.`,
+    );
+  const [convertedEvent, convertedTask] = await Promise.all([
+    campaign.collection("calendar").doc(convertedEventId).get(),
+    campaign.collection("tasks").doc(convertedTaskId).get(),
+  ]);
+  if (
+    convertedEvent.data()?.isPublication !== true ||
+    convertedEvent.data()?.planningTaskId !== convertedTaskId ||
+    !convertedTask.exists ||
+    !convertedTask.data()?.createdAt ||
+    convertedTask.data()?.sourceEventId !== convertedEventId
+  )
+    throw new Error(
+      "Convertir un evento existente a Publicación no creó ni vinculó su tarea espejo.",
+    );
+  const visibleTasks = await request(ownerToken, `${base}/tasks`);
+  if (
+    !visibleTasks.response.ok ||
+    !visibleTasks.body?.some((task) => task.id === convertedTaskId)
+  )
+    throw new Error(
+      "La tarea espejo convertida no apareció en la lista de Planificación → Tareas.",
+    );
   const typesAfterCreate = await request(
     collaboratorToken,
     `${base}/calendar/types`,
@@ -435,7 +504,7 @@ try {
       `El adjunto sin edición debía responder 403 y respondió ${attachmentForbidden.response.status}.`,
     );
   console.log(
-    "CALENDAR PUBLICATION E2E: notificación al vinculado, dos ediciones consecutivas, tarea espejo, adjunto Storage y 403 al deshabilitar edición OK.",
+    "CALENDAR PUBLICATION E2E: catálogo idempotente, conversión a Publicación visible en Tareas, notificación al vinculado, dos ediciones consecutivas, adjunto Storage y 403 al deshabilitar edición OK.",
   );
 } finally {
   await cleanup();

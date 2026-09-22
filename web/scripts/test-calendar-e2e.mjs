@@ -411,6 +411,12 @@ try {
     throw new Error(
       "El evento de publicación o su tarea espejo no se persistieron con los datos esperados en Firestore.",
     );
+  const typeFilter = page.getByRole("button", { name: "Filtrar por tipo" });
+  await typeFilter.click();
+  await page.getByRole("option", { name: customType, exact: true }).click();
+  await page.getByText(title, { exact: false }).first().waitFor();
+  await typeFilter.click();
+  await page.getByRole("option", { name: "Todos los tipos", exact: true }).click();
   await page.getByText(title, { exact: false }).first().click();
   await page.getByRole("heading", { name: title, exact: true }).waitFor();
   if (
