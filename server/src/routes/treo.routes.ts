@@ -1,0 +1,15 @@
+import { NextFunction, Request, Response, Router } from 'express';
+import multer from 'multer';
+import { requireAuth } from '../middleware/requireAuth.js';
+import { requireAddon } from '../middleware/requireAddon.js';
+import * as controller from '../controllers/treo.controller.js';
+export const treoRouter = Router();
+const base = '/organizations/:orgId/campaigns/:campId/treo';
+const guarded = [requireAuth, requireAddon('finance')] as const;
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024 } });
+const documentUpload = (request: Request, response: Response, next: NextFunction) => upload.single('document')(request, response, (error) => error instanceof multer.MulterError && error.code === 'LIMIT_FILE_SIZE' ? response.status(413).json({ message: 'El documento no puede superar los 15 MB.' }) : next(error));
+treoRouter.get(`${base}/workbench`, ...guarded, controller.workbench);
+treoRouter.get(`${base}/chart-of-accounts`, ...guarded, controller.chart); treoRouter.post(`${base}/chart-of-accounts`, ...guarded, controller.saveAccount); treoRouter.put(`${base}/chart-of-accounts/:accountId`, ...guarded, controller.saveAccount);
+treoRouter.get(`${base}/entries`, ...guarded, controller.entries); treoRouter.post(`${base}/entries`, ...guarded, controller.createEntry); treoRouter.post(`${base}/entries/:entryId/post`, ...guarded, controller.postEntry); treoRouter.post(`${base}/entries/:entryId/reverse`, ...guarded, controller.reverseEntry); treoRouter.post(`${base}/entries/:entryId/adjust`, ...guarded, controller.adjustEntry); treoRouter.delete(`${base}/entries/:entryId`, ...guarded, controller.removeEntry); treoRouter.get(`${base}/ledger`, ...guarded, controller.ledger);
+treoRouter.get(`${base}/documents`, ...guarded, controller.documents); treoRouter.get(`${base}/documents/:documentId/file`, ...guarded, controller.documentUrl); treoRouter.post(`${base}/documents`, ...guarded, documentUpload, controller.uploadDocument); treoRouter.post(`${base}/documents/:documentId/recognize`, ...guarded, controller.recognizeDocument); treoRouter.post(`${base}/documents/:documentId/pay`, ...guarded, controller.payDocument);
+treoRouter.post(`${base}/statements`, ...guarded, controller.importStatement); treoRouter.post(`${base}/reconciliations`, ...guarded, controller.reconcile);

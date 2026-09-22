@@ -26,12 +26,18 @@ const number = (value: unknown, name: string, min = 0) => { const parsed = Numbe
 const text = (value: unknown, name: string, max: number, required = false) => { const result = typeof value === 'string' ? value.trim() : ''; if (required && !result) throw new ValidationError(`${name} es obligatorio.`); return result.slice(0, max); };
 const isoDate = (value: unknown) => { const raw = typeof value === 'string' ? value : ''; const parsed = new Date(raw); if (!raw || Number.isNaN(parsed.valueOf())) throw new ValidationError('La fecha no es válida.'); return parsed; };
 
-async function financeAccess(user: DecodedIdToken, orgId: string, campId: string) {
+/** Central Treo gate. Campaign accountant/treasurer roles are deliberately
+ * resolved server-side from membership so the browser never grants access. */
+export async function assertTreoAccess(user: DecodedIdToken, orgId: string, campId: string) {
   assertCampaignAccess(user, orgId, campId);
   const org = await db.collection('organizations').doc(orgId).get();
   if (org.data()?.enabledAddons?.finance !== true) throw new ForbiddenError('Treo no está habilitado en esta organización.');
-  if (!financeRoles.has(String(user.role))) throw new ForbiddenError('Solo Cliente, Administrador o Tesorería pueden acceder a Treo.');
+  if (financeRoles.has(String(user.role))) return;
+  const member = await campaignRef(orgId, campId).collection('members').doc(user.uid).get();
+  const treoRole = String(member.data()?.treoRole ?? member.data()?.smartPlannerRole ?? '');
+  if (!['contador', 'tesorero', 'apoderado'].includes(treoRole)) throw new ForbiddenError('Solo Cliente, Administrador, Contador o Tesorería pueden acceder a Treo.');
 }
+const financeAccess = assertTreoAccess;
 const refs = (orgId: string, campId: string) => { const campaign = campaignRef(orgId, campId); return { campaign, accounts: campaign.collection('financeAccounts'), categories: campaign.collection('financeCategories'), transactions: campaign.collection('financeTransactions') }; };
 async function seedCategories(orgId: string, campId: string) { const { categories } = refs(orgId, campId); const batch = db.batch(); defaultCategories.forEach(([id, name, type]) => batch.set(categories.doc(id), { orgId, campaignId: campId, name, type, system: true, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() }, { merge: true })); await batch.commit(); }
 async function audit(user: DecodedIdToken, orgId: string, campId: string, action: string, resource: string, resourceId: string, before: unknown, after: unknown) { await appendAudit(orgId, campId, user, { action, resource, resourceId, changes: { before, after } }); }
