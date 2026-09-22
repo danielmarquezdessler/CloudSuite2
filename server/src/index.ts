@@ -13,6 +13,7 @@ import { voteStreamRouter } from './routes/voteStream.routes.js';
 import { financeRouter } from './routes/finance.routes.js';
 import { treoRouter } from './routes/treo.routes.js';
 import { treoFundingRouter } from './routes/treoFunding.routes.js';
+import { treoSpendRouter } from './routes/treoSpend.routes.js';
 import { getFirestoreStartupDiagnostic, verifyFirestoreReachability } from './config/firebase.js';
 
 const app = express();
@@ -43,6 +44,7 @@ app.use('/api', voteStreamRouter);
 app.use('/api', financeRouter);
 app.use('/api', treoRouter);
 app.use('/api', treoFundingRouter);
+app.use('/api', treoSpendRouter);
 
 async function startServer() {
   try {
