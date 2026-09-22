@@ -40,6 +40,12 @@ const legacyEventTypes = [
 const defaultEventTypeValues = new Set<string>(defaultEventTypes.map(([value]) => value));
 const legacyEventTypeLabels = new Map<string, string>(legacyEventTypes);
 const text = (value: unknown, max = 500) => typeof value === 'string' ? value.trim().slice(0, max) : '';
+const normalizedTypeLabel = (value: unknown, max = 80) => text(value, max).replace(/\s+/g, ' ').trim();
+const typeKey = (value: unknown) => normalizedTypeLabel(value).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('es-AR');
+const publicationTypeKey = typeKey('Publicación');
+const preferredTypeLabel = (value: unknown) => typeKey(value) === publicationTypeKey ? 'Publicación' : normalizedTypeLabel(value);
+const defaultEventTypeByKey = new Map<string, typeof defaultEventTypes[number]>();
+defaultEventTypes.forEach((entry) => { defaultEventTypeByKey.set(typeKey(entry[0]), entry); defaultEventTypeByKey.set(typeKey(entry[1]), entry); });
 const eventType = (value: unknown, fallback = 'event') => text(value, 80) || fallback;
 const list = (value: unknown) => Array.isArray(value) ? value : [];
 const ids = (value: unknown, max = 100) => Array.from(new Set(list(value).map((item) => text(item, 128)).filter(Boolean))).slice(0, max);
@@ -203,7 +209,15 @@ async function archivePublicationTask(orgId: string, campId: string, eventId: st
   await tasks(orgId, campId).doc(`calendar-publication-${eventId}`).set({ archived: true, archivedAt: FieldValue.serverTimestamp(), archivedBy: user.uid, source: 'calendar_publication', sourceEventId: eventId }, { merge: true });
 }
 
-const eventTypeRef = (orgId: string, campId: string, value: string) => eventTypes(orgId, campId).doc(createHash('sha256').update(value.toLocaleLowerCase()).digest('hex').slice(0, 32));
+const eventTypeRef = (orgId: string, campId: string, value: string) => eventTypes(orgId, campId).doc(createHash('sha256').update(typeKey(value)).digest('hex').slice(0, 32));
+
+async function commitCatalogWrites(writes: Array<(batch: FirebaseFirestore.WriteBatch) => void>) {
+  for (let index = 0; index < writes.length; index += 400) {
+    const batch = db.batch();
+    writes.slice(index, index + 400).forEach((write) => write(batch));
+    await batch.commit();
+  }
+}
 
 /**
  * Keeps the campaign catalogue on the new campaign-oriented defaults without
@@ -212,34 +226,56 @@ const eventTypeRef = (orgId: string, campId: string, value: string) => eventType
 async function ensureEventTypeCatalog(orgId: string, campId: string) {
   const [eventsSnapshot, typesSnapshot] = await Promise.all([calendars(orgId, campId).get(), eventTypes(orgId, campId).get()]);
   const legacyInUse = new Set<string>();
+  const eventTypeValues = new Map<string, Set<string>>();
   eventsSnapshot.docs.forEach((document) => {
     const value = text(document.data().type, 80) || 'event';
     if (legacyEventTypeLabels.has(value)) legacyInUse.add(value);
+    const key = typeKey(value);
+    if (key) eventTypeValues.set(key, (eventTypeValues.get(key) ?? new Set()).add(value));
   });
-
-  const stored = new Map(typesSnapshot.docs.map((document) => [text(document.data().value, 80), document]));
-  const batch = db.batch();
-  let writes = 0;
+  const writes: Array<(batch: FirebaseFirestore.WriteBatch) => void> = [];
+  const scheduleSet = (ref: FirebaseFirestore.DocumentReference, data: Input) => writes.push((batch) => batch.set(ref, data, { merge: true }));
+  const scheduleDelete = (ref: FirebaseFirestore.DocumentReference) => writes.push((batch) => batch.delete(ref));
+  const scheduleUpdate = (ref: FirebaseFirestore.DocumentReference, data: Input) => writes.push((batch) => batch.update(ref, data));
+  const storedAt = (ref: FirebaseFirestore.DocumentReference) => typesSnapshot.docs.find((document) => document.ref.path === ref.path);
+  const documentsByKey = new Map<string, FirebaseFirestore.QueryDocumentSnapshot[]>();
+  typesSnapshot.docs.forEach((document) => {
+    const value = normalizedTypeLabel(document.data().value, 80) || normalizedTypeLabel(document.data().label, 80);
+    const key = typeKey(value);
+    if (key) documentsByKey.set(key, (documentsByKey.get(key) ?? []).concat(document));
+  });
   defaultEventTypes.forEach(([value, label]) => {
-    const existing = stored.get(value);
-    if (!existing || text(existing.data().label, 80) !== label || existing.data().system !== true) {
-      const ref = eventTypeRef(orgId, campId, value);
-      batch.set(ref, { value, label, system: true, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() }, { merge: true });
-      writes += 1;
-    }
+    const ref = eventTypeRef(orgId, campId, value);
+    const existing = storedAt(ref);
+    if (!existing || text(existing.data().value, 80) !== value || text(existing.data().label, 80) !== label || existing.data().system !== true) scheduleSet(ref, { value, label, system: true, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() });
+    documentsByKey.get(typeKey(value))?.filter((document) => document.ref.path !== ref.path).forEach((document) => scheduleDelete(document.ref));
   });
   legacyEventTypes.forEach(([value, label]) => {
-    const existing = stored.get(value);
-    if (legacyInUse.has(value) && !existing) {
-      batch.set(eventTypeRef(orgId, campId, value), { value, label, legacy: true, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() });
-      writes += 1;
-    }
-    if (!legacyInUse.has(value) && existing) {
-      batch.delete(existing.ref);
-      writes += 1;
-    }
+    const records = documentsByKey.get(typeKey(value)) ?? [];
+    const ref = eventTypeRef(orgId, campId, value);
+    const existing = storedAt(ref);
+    if (legacyInUse.has(value)) {
+      if (!existing || text(existing.data().value, 80) !== value || text(existing.data().label, 80) !== label || existing.data().legacy !== true) scheduleSet(ref, { value, label, legacy: true, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() });
+    } else records.forEach((document) => scheduleDelete(document.ref));
   });
-  if (writes) await batch.commit();
+  const handledKeys = new Set([...defaultEventTypeByKey.keys(), ...legacyEventTypes.map(([value]) => typeKey(value))]);
+  const customKeys = new Set([...documentsByKey.keys(), ...eventTypeValues.keys()]);
+  customKeys.forEach((key) => {
+    if (!key || handledKeys.has(key)) return;
+    const records = documentsByKey.get(key) ?? [];
+    const values = [
+      ...records.flatMap((document) => [normalizedTypeLabel(document.data().label, 80), normalizedTypeLabel(document.data().value, 80)]),
+      ...(eventTypeValues.get(key) ?? []),
+    ].filter(Boolean);
+    const canonical = key === publicationTypeKey ? 'Publicación' : preferredTypeLabel(values[0]);
+    if (!canonical) return;
+    const ref = eventTypeRef(orgId, campId, canonical);
+    const existing = storedAt(ref);
+    if (!existing || text(existing.data().value, 80) !== canonical || text(existing.data().label, 80) !== canonical || existing.data().system === true) scheduleSet(ref, { value: canonical, label: canonical, system: false, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() });
+    records.filter((document) => document.ref.path !== ref.path).forEach((document) => scheduleDelete(document.ref));
+    eventsSnapshot.docs.filter((document) => typeKey(document.data().type) === key && text(document.data().type, 80) !== canonical).forEach((document) => scheduleUpdate(document.ref, { type: canonical, calendarEventTypeMigratedAt: FieldValue.serverTimestamp() }));
+  });
+  if (writes.length) await commitCatalogWrites(writes);
   return legacyInUse;
 }
 
@@ -256,32 +292,37 @@ function preservePublicationAccessForLinkedUser(user: DecodedIdToken, current: C
 }
 
 async function rememberEventType(orgId: string, campId: string, type: string, user: DecodedIdToken) {
-  if (defaultEventTypeValues.has(type)) return;
-  const ref = eventTypeRef(orgId, campId, type);
-  await ref.set({ value: type, label: type, createdBy: user.uid, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+  const defaultType = defaultEventTypeByKey.get(typeKey(type));
+  if (defaultType || defaultEventTypeValues.has(type)) return;
+  const label = preferredTypeLabel(type);
+  const ref = eventTypeRef(orgId, campId, label);
+  await ref.set({ value: label, label, createdBy: user.uid, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() }, { merge: true });
 }
 
 export async function listEventTypes(user: DecodedIdToken, orgId: string, campId: string) {
   assertCampaignAccess(user, orgId, campId);
   const legacyInUse = await ensureEventTypeCatalog(orgId, campId);
   const custom = await eventTypes(orgId, campId).get();
-  const options = new Map<string, { value: string; label: string }>(defaultEventTypes.map(([value, label]) => [value, { value, label }]));
+  const options = new Map<string, { value: string; label: string }>(defaultEventTypes.map(([value, label]) => [typeKey(value), { value, label }]));
   custom.docs.forEach((document) => {
-    const value = text(document.data().value, 80);
-    if (!value || (legacyEventTypeLabels.has(value) && !legacyInUse.has(value))) return;
-    options.set(value, { value, label: text(document.data().label, 80) || legacyEventTypeLabels.get(value) || value });
+    const value = normalizedTypeLabel(document.data().value, 80);
+    const label = normalizedTypeLabel(document.data().label, 80) || legacyEventTypeLabels.get(value) || value;
+    const key = typeKey(value || label);
+    if (!key || (legacyEventTypeLabels.has(value) && !legacyInUse.has(value))) return;
+    if (defaultEventTypeByKey.has(key)) return;
+    options.set(key, { value, label });
   });
   return [...options.values()];
 }
 
 export async function createEventType(user: DecodedIdToken, orgId: string, campId: string, input: Input) {
   assertCampaignAccess(user, orgId, campId);
-  const label = text(input.label, 80);
+  const label = preferredTypeLabel(input.label);
   if (!label) throw new ValidationError('El tipo necesita un nombre.');
-  const existingDefault = defaultEventTypes.find(([, defaultLabel]) => defaultLabel.localeCompare(label, 'es', { sensitivity: 'accent' }) === 0);
+  const existingDefault = defaultEventTypeByKey.get(typeKey(label));
   if (existingDefault) return { value: existingDefault[0], label: existingDefault[1] };
   const catalog = await listEventTypes(user, orgId, campId);
-  const existing = catalog.find((option) => option.label.localeCompare(label, 'es', { sensitivity: 'accent' }) === 0 || option.value.localeCompare(label, 'es', { sensitivity: 'accent' }) === 0);
+  const existing = catalog.find((option) => typeKey(option.label) === typeKey(label) || typeKey(option.value) === typeKey(label));
   if (existing) return existing;
   await rememberEventType(orgId, campId, label, user);
   return { value: label, label };
@@ -334,6 +375,7 @@ export async function listEvents(user: DecodedIdToken, orgId: string, campId: st
 export async function createEvent(user: DecodedIdToken, orgId: string, campId: string, input: Input) {
   assertCampaignAccess(user, orgId, campId);
   const data = cleanEvent(input);
+  data.type = (await createEventType(user, orgId, campId, { label: data.type })).value;
   const key = text(input.idempotencyKey, 200);
   const payloadHash = createHash('sha256').update(JSON.stringify(data)).digest('hex');
   let ref = calendars(orgId, campId).doc();
@@ -377,6 +419,7 @@ export async function updateEvent(user: DecodedIdToken, orgId: string, campId: s
   const expectedRevision = input.expectedRevision === undefined ? current.revision : Number(input.expectedRevision);
   if (expectedRevision !== current.revision) throw new ConflictError('El evento fue actualizado por otra persona.', { revision: current.revision, event: current });
   const data = cleanEvent(preservePublicationAccessForLinkedUser(user, current, input), current);
+  data.type = (await createEventType(user, orgId, campId, { label: data.type })).value;
   await assertMembers(orgId, campId, data.participants.map((participant) => participant.uid));
   const conflict = await conflictsFor(orgId, campId, { ...data, id: eventId });
   if (conflict.length && input.confirmConflicts !== true) throw new ConflictError('Hay conflictos de agenda. Revisalos antes de guardar.', { conflicts: conflict });

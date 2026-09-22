@@ -150,6 +150,7 @@ const typeColor: Record<string, string> = {
   event: "#0060f0",
 };
 const typeLabel = (type: string) => typeLabels[type] ?? type;
+const typeKey = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("es-AR").replace(/\s+/g, " ").trim();
 const statusLabel = (status: string) =>
   ({
     draft: "Borrador",
@@ -315,14 +316,15 @@ export default function ElectoralCalendar() {
   );
   const typeOptions = useMemo(() => {
     const options = new Map<string, { value: string; label: string }>(
-      savedTypeOptions.map((option) => [option.value, option]),
+      savedTypeOptions.map((option) => [typeKey(option.label || option.value), option]),
     );
     events
       .map((event) => event.type)
       .filter(Boolean)
-      .forEach((value) =>
-        options.set(value, { value, label: typeLabel(value) }),
-      );
+      .forEach((value) => {
+        const key = typeKey(typeLabel(value));
+        if (!options.has(key)) options.set(key, { value, label: typeLabel(value) });
+      });
     return [...options.values()];
   }, [events, savedTypeOptions]);
   const fullEvents = useMemo(
@@ -1420,13 +1422,9 @@ function CalendarTypeCombobox({
   const selected = options.find((option) => option.value === value);
   const shownValue = open ? query : selected?.label ?? typeLabel(value);
   const normalizedQuery = query.trim();
-  const filtered = options.filter((option) =>
-    option.label.toLocaleLowerCase().includes(normalizedQuery.toLocaleLowerCase()),
-  );
+  const filtered = options.filter((option) => typeKey(option.label).includes(typeKey(normalizedQuery)));
   const matchesExisting = options.some(
-    (option) =>
-      option.label.localeCompare(normalizedQuery, "es", { sensitivity: "accent" }) ===
-      0,
+    (option) => typeKey(option.label) === typeKey(normalizedQuery) || typeKey(option.value) === typeKey(normalizedQuery),
   );
   const choose = (next: string) => {
     onChange(next);
