@@ -237,7 +237,12 @@ try {
     throw new Error(
       `La agenda no presentó acciones de administración: ${actionLabels.filter(Boolean).join(" | ")}`,
     );
-  await page.getByText("Evento legado E2E", { exact: true }).first().click();
+  const legacyEvent = page
+    .locator(".fc-event")
+    .filter({ hasText: "Evento legado E2E" })
+    .first();
+  await legacyEvent.waitFor({ state: "visible" });
+  await legacyEvent.click();
   await page
     .getByRole("heading", { name: "Evento legado E2E", exact: true })
     .waitFor();
@@ -304,11 +309,13 @@ try {
     throw new Error("La plantilla operativa no persistió en Firestore.");
   await page.getByRole("button", { name: "Cerrar", exact: true }).click();
   const title = `E2E calendario ${Date.now()}`;
+  const description = `Descripción completa del evento ${Date.now()}`;
   const customType = `Operativo E2E ${Date.now()}`;
   await page.getByRole("button", { name: /Crear evento/ }).click();
   const eventDialog = page.getByRole("dialog");
   await eventDialog.waitFor();
   await eventDialog.getByLabel("Título").fill(title);
+  await eventDialog.getByLabel("Descripción").fill(description);
   const typeControl = eventDialog.getByRole("combobox", {
     name: "Tipo",
     exact: true,
@@ -406,6 +413,13 @@ try {
     );
   await page.getByText(title, { exact: false }).first().click();
   await page.getByRole("heading", { name: title, exact: true }).waitFor();
+  if (
+    (await page.getByTestId("calendar-event-description").textContent()) !==
+    description
+  )
+    throw new Error(
+      "El panel lateral no mostró la descripción completa del evento.",
+    );
   await page.getByText("Exportar ICS", { exact: true }).waitFor();
   await page.getByText("Publicación", { exact: true }).waitFor();
   await page.getByRole("button", { name: "Semana", exact: true }).click();

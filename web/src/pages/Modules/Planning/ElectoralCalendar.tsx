@@ -150,6 +150,17 @@ const typeColor: Record<string, string> = {
   event: "#0060f0",
 };
 const typeLabel = (type: string) => typeLabels[type] ?? type;
+const statusLabel = (status: string) =>
+  ({
+    draft: "Borrador",
+    confirmed: "Confirmado",
+    completed: "Completado",
+    cancelled: "Cancelado",
+  })[status] ?? status;
+const priorityLabel = (priority?: string) =>
+  ({ low: "Baja", medium: "Media", high: "Alta", critical: "Crítica" })[
+    priority ?? "medium"
+  ] ?? priority ?? "Media";
 const displayMember = (member: Member) =>
   member.displayName ||
   [member.firstName, member.lastName].filter(Boolean).join(" ") ||
@@ -842,6 +853,7 @@ export default function ElectoralCalendar() {
           <CalendarAside
             event={selected}
             members={members}
+            teams={teams}
             resources={resources}
             canManage={Boolean(selected?.canEdit)}
             currentUser={user}
@@ -948,6 +960,7 @@ export default function ElectoralCalendar() {
 function CalendarAside({
   event,
   members,
+  teams,
   resources,
   canManage,
   currentUser,
@@ -962,6 +975,7 @@ function CalendarAside({
 }: {
   event: CalendarEvent | null;
   members: Member[];
+  teams: Team[];
   resources: Resource[];
   canManage: boolean;
   currentUser: User | null;
@@ -989,6 +1003,13 @@ function CalendarAside({
   const eventResources = resources.filter((resource) =>
     event.resourceIds.includes(resource.id),
   );
+  const eventTeams = teams.filter((team) => event.teamIds.includes(team.id));
+  const eventLocation = event.location?.label || event.location?.address;
+  const formatEventDate = (value: string) =>
+    new Intl.DateTimeFormat("es-AR", {
+      dateStyle: "full",
+      timeStyle: event.allDay ? undefined : "short",
+    }).format(new Date(value));
   const ownParticipation = event.participants.find(
     (participant) => participant.uid === currentUser?.uid,
   );
@@ -1019,17 +1040,33 @@ function CalendarAside({
         </Inline>
         <Stack gap="xs">
           <h2>{event.title}</h2>
-          <p>
-            {new Intl.DateTimeFormat("es-AR", {
-              dateStyle: "full",
-              timeStyle: event.allDay ? undefined : "short",
-            }).format(new Date(event.startAt))}
+          <p>{formatEventDate(event.startAt)}</p>
+        </Stack>
+        <Stack gap="xs">
+          <h3>Descripción</h3>
+          <p
+            className="electoral-calendar__event-description"
+            data-testid="calendar-event-description"
+          >
+            {event.description?.trim() || "Sin descripción cargada."}
           </p>
-          {event.location?.label && (
+        </Stack>
+        <Stack gap="xs">
+          <h3>Detalles</h3>
+          <span>Estado: {statusLabel(event.status)}</span>
+          <span>Prioridad: {priorityLabel(event.priority)}</span>
+          <span>Inicio: {formatEventDate(event.startAt)}</span>
+          <span>Fin: {formatEventDate(event.endAt)}</span>
+          {event.allDay && <span>Evento de todo el día</span>}
+          {event.timezone && <span>Zona horaria: {event.timezone}</span>}
+          {eventLocation && (
             <span>
-              <i className="feather icon-map-pin" /> {event.location.label}
+              <i className="feather icon-map-pin" /> Lugar: {eventLocation}
             </span>
           )}
+          {event.labels?.length ? (
+            <span>Etiquetas: {event.labels.join(", ")}</span>
+          ) : null}
         </Stack>
         <Stack gap="sm">
           <h3>Preparación</h3>
@@ -1088,6 +1125,29 @@ function CalendarAside({
             <span>Sin recursos reservados.</span>
           )}
         </Stack>
+        {eventTeams.length ? (
+          <Stack gap="sm">
+            <h3>Equipos</h3>
+            {eventTeams.map((team) => (
+              <span key={team.id}>{team.name}</span>
+            ))}
+          </Stack>
+        ) : null}
+        {event.isPublication && event.linkedUserIds?.length ? (
+          <Stack gap="sm">
+            <h3>Usuarios vinculados</h3>
+            {event.linkedUserIds.map((uid) => (
+              <span key={uid}>
+                {displayMember(memberFor(uid) ?? { uid })}
+              </span>
+            ))}
+            <span>
+              {event.allowLinkedEditing
+                ? "Edición permitida"
+                : "Solo visualización"}
+            </span>
+          </Stack>
+        ) : null}
         {event.isPublication && (
           <PublicationAttachments
             event={event}
