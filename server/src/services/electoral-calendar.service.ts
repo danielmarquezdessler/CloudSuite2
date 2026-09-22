@@ -126,7 +126,12 @@ function cleanEvent(input: Input, current?: CalendarEvent) {
   const participants = input.participants === undefined && input.participantIds === undefined && input.optionalParticipantIds === undefined ? current?.participants ?? [] : cleanParticipants(input.participants ?? input.participantIds, input.optionalParticipantIds);
   const resourceIds = input.resourceIds === undefined ? current?.resourceIds ?? [] : ids(input.resourceIds, 40);
   const locationRaw = input.location && typeof input.location === 'object' ? input.location as Input : (current?.location as Input | undefined) ?? {};
-  const isPublication = input.isPublication === undefined ? current?.isPublication === true : input.isPublication === true;
+  // "Publicación" is also a first-class event type.  Derive the mode from a
+  // submitted type when the explicit switch is absent so changing an existing
+  // event to Publicación cannot leave its mirror task behind.
+  const isPublication = input.isPublication === undefined
+    ? (input.type === undefined ? current?.isPublication === true : typeKey(type) === publicationTypeKey)
+    : input.isPublication === true;
   const linkedUserIds = input.linkedUserIds === undefined ? ids(current?.linkedUserIds) : ids(input.linkedUserIds);
   const allowLinkedEditing = input.allowLinkedEditing === undefined ? current?.allowLinkedEditing === true : input.allowLinkedEditing === true;
   return {
@@ -430,6 +435,12 @@ export async function updateEvent(user: DecodedIdToken, orgId: string, campId: s
   await rememberEventType(orgId, campId, data.type, user);
   const task = await syncPublicationTask(orgId, campId, eventId, { ...current, ...data, id: eventId, revision, createdBy: current.createdBy } as CalendarEvent);
   if (data.isPublication) await ref.update({ planningTaskId: task.id });
+  else if (current.isPublication) {
+    // Removing publication mode has the same conservation semantics as
+    // deleting the event: retain the linked task as an archived trace.
+    await archivePublicationTask(orgId, campId, eventId, user);
+    await ref.update({ planningTaskId: null });
+  }
   const previousLinkedUsers = current.isPublication ? ids(current.linkedUserIds) : [];
   const newlyLinkedUsers = data.isPublication
     ? ids(data.linkedUserIds).filter((uid) => !previousLinkedUsers.includes(uid))

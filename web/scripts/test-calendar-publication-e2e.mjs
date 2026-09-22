@@ -124,6 +124,13 @@ try {
   const eventIds = [];
   const taskIds = [];
   const storagePaths = [];
+  const candidateIds = [];
+  const goalIds = [];
+  const routeIds = [];
+  const surveyIds = [];
+  const areaIds = [];
+  const pbiIds = [];
+  const voterIds = [];
   cleanup = async () => {
     const notificationDocs = await db
       .collection("users")
@@ -142,6 +149,13 @@ try {
     await Promise.all(
       taskIds.map((id) => campaign.collection("tasks").doc(id).delete()),
     );
+    await Promise.all(candidateIds.map((id) => campaign.collection("candidates").doc(id).delete()));
+    await Promise.all(goalIds.map((id) => campaign.collection("goals").doc(id).delete()));
+    await Promise.all(routeIds.map((id) => campaign.collection("routes").doc(id).delete()));
+    await Promise.all(surveyIds.map((id) => campaign.collection("surveys").doc(id).delete()));
+    await Promise.all(pbiIds.map((id) => campaign.collection("spTasks").doc(id).delete()));
+    await Promise.all(areaIds.map((id) => campaign.collection("spAreas").doc(id).delete()));
+    await Promise.all(voterIds.map((id) => campaign.collection("voters").doc(id).delete()));
     await Promise.all([
       db.collection("users").doc(collaborator.uid).delete(),
       db
@@ -180,7 +194,7 @@ try {
         displayName: collaborator.displayName,
         role: "usuario",
         joinedAt: new Date(),
-        smartPlannerRole: "contador",
+        smartPlannerRole: "miembro",
       }),
   ]);
   const collaboratorSignIn = await json(
@@ -258,11 +272,60 @@ try {
   if (
     !smartPlannerMembers.response.ok ||
     smartPlannerMembers.body?.find((member) => member.uid === collaborator.uid)
-      ?.smartPlannerRole !== "contador"
+      ?.smartPlannerRole !== "miembro"
   )
     throw new Error(
       "Roles SmartPlanner no devolvió el rol asignado del colaborador.",
     );
+  const collaboratorCandidate = await request(collaboratorToken, `${base}/candidates`, {
+    method: "POST",
+    body: JSON.stringify({ name: `Candidato colaborador ${suffix}`, type: "Concejal", party: "E2E" }),
+  });
+  if (collaboratorCandidate.response.status !== 201)
+    throw new Error(`El colaborador no pudo crear un candidato: ${collaboratorCandidate.response.status}.`);
+  candidateIds.push(collaboratorCandidate.body.id);
+  const collaboratorGoal = await request(collaboratorToken, `${base}/goals`, {
+    method: "POST",
+    body: JSON.stringify({ type: "coverage", target: 10, description: `Meta colaborador ${suffix}` }),
+  });
+  if (collaboratorGoal.response.status !== 201)
+    throw new Error(`El colaborador no pudo crear una meta: ${collaboratorGoal.response.status}.`);
+  goalIds.push(collaboratorGoal.body.goalId);
+  const routeVoter = campaign.collection("voters").doc();
+  await routeVoter.set({ name: `Elector ruta ${suffix}`, address: "E2E", state: "unvisited" });
+  voterIds.push(routeVoter.id);
+  const collaboratorRoute = await request(collaboratorToken, `${base}/routes`, {
+    method: "POST",
+    body: JSON.stringify({ name: `Ruta colaborador ${suffix}`, assignedUid: collaborator.uid, voters: [{ voterId: routeVoter.id }] }),
+  });
+  if (collaboratorRoute.response.status !== 201)
+    throw new Error(`El colaborador no pudo crear una ruta: ${collaboratorRoute.response.status}.`);
+  routeIds.push(collaboratorRoute.body.routeId);
+  const collaboratorSurvey = await request(collaboratorToken, `${base}/surveys`, {
+    method: "POST",
+    body: JSON.stringify({ name: `Encuesta colaborador ${suffix}`, type: "pre_campaign", questions: [{ id: "q1", text: "¿Cómo está?", type: "text", isRequired: false }] }),
+  });
+  if (collaboratorSurvey.response.status !== 201)
+    throw new Error(`El colaborador no pudo crear una encuesta: ${collaboratorSurvey.response.status}.`);
+  surveyIds.push(collaboratorSurvey.body.surveyId);
+  const collaboratorArea = await request(collaboratorToken, `${base}/smartplanner/areas`, {
+    method: "POST",
+    body: JSON.stringify({ name: `Área colaborador ${suffix}`, description: "Cobertura de autorización", color: "#0060F0" }),
+  });
+  if (collaboratorArea.response.status !== 201)
+    throw new Error(`El colaborador no pudo crear un área SmartPlanner: ${collaboratorArea.response.status}.`);
+  areaIds.push(collaboratorArea.body.id);
+  const collaboratorPbi = await request(collaboratorToken, `${base}/smartplanner/tasks`, {
+    method: "POST",
+    body: JSON.stringify({ title: `PBI colaborador ${suffix}`, areaId: collaboratorArea.body.id, assignedTo: collaborator.uid, priority: "media", startDate: "2026-09-22", dueDate: "2026-09-23", description: "Cobertura de autorización" }),
+  });
+  if (collaboratorPbi.response.status !== 201)
+    throw new Error(`El colaborador no pudo crear un PBI: ${collaboratorPbi.response.status}.`);
+  pbiIds.push(collaboratorPbi.body.id);
+  const collaboratorAudit = await request(collaboratorToken, `${base}/audit-log`);
+  if (!collaboratorAudit.response.ok)
+    throw new Error(`El colaborador no pudo leer Control de Revisión: ${collaboratorAudit.response.status}.`);
+  console.log("COLLABORATOR ACCESS E2E: candidato, meta, ruta, encuesta, Control de Revisión y PBI creados/consultados con rol miembro.");
   const visibleType = `Tipo colaborador ${suffix}`;
   const createdByCollaborator = await request(
     collaboratorToken,
@@ -291,7 +354,9 @@ try {
   const converted = await request(ownerToken, `${base}/calendar/${convertedEventId}`, {
     method: "PUT",
     body: JSON.stringify({
-      isPublication: true,
+      // Match the UI path: switching the type itself to Publicación must
+      // activate the mirror, even when the legacy boolean is not submitted.
+      type: "Publicación",
       linkedUserIds: [collaborator.uid],
       allowLinkedEditing: true,
       expectedRevision: createdByCollaborator.body.revision,
@@ -331,6 +396,19 @@ try {
     throw new Error(
       "El tipo personalizado del colaborador no persistió en el catálogo.",
     );
+
+  const convertedAgain = await request(ownerToken, `${base}/calendar/${convertedEventId}`, {
+    method: "PUT",
+    body: JSON.stringify({
+      type: "Otros",
+      expectedRevision: converted.body.revision,
+    }),
+  });
+  if (!convertedAgain.response.ok)
+    throw new Error(`No se pudo quitar el modo Publicación: ${convertedAgain.response.status}.`);
+  const archivedConvertedTask = await campaign.collection("tasks").doc(convertedTaskId).get();
+  if (archivedConvertedTask.data()?.archived !== true)
+    throw new Error("Quitar el modo Publicación debía archivar la tarea espejo, no borrarla.");
 
   const created = await request(ownerToken, `${base}/calendar`, {
     method: "POST",
