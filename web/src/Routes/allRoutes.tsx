@@ -49,6 +49,7 @@ import Productivity from '../pages/Modules/Execution/Productivity';
 import Incidents from '../pages/Modules/Execution/Incidents';
 import DailySummary from '../pages/Modules/Execution/DailySummary';
 import Issues from '../pages/Modules/Execution/Issues';
+import { Navigate } from 'react-router-dom';
 // import AffiliateDashboard from "../pages/AffiliateDashboard";
 // import InvoiceDashboard from "../pages/InvoiceDashboard";
 // import FinaceDashboard from "../pages/FinaceDashboard";
@@ -227,7 +228,8 @@ const routes = [
     { path: "/visit/:voterId", component: <VisitScreen /> },
     { path: "/control-de-revision", component: <AuditLog /> },
     { path: "/system/addons", component: <AddonsAdmin /> },
-    { path: "/finanzas", component: <Finance /> },
+    { path: "/treo", component: <Finance /> },
+    { path: "/finanzas", component: <Navigate to="/treo" replace /> },
     { path: "/vote-stream", component: <VoteStreamList /> },
     { path: "/vote-stream/mi-panel", component: <VoteStreamAgentPanel /> },
     { path: "/vote-stream/agente", component: <VoteStreamAgentPanel /> },

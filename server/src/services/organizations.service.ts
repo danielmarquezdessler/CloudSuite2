@@ -248,7 +248,7 @@ export async function setVoteStreamEnabled(user: DecodedIdToken, orgId: string, 
 
 export async function setFinanceEnabled(user: DecodedIdToken, orgId: string, enabled: unknown) {
   if (user.role !== 'admin') throw new ForbiddenError('Solo un administrador global puede administrar add-ons.');
-  if (typeof enabled !== 'boolean') throw new Error('El valor de Finanzas debe ser verdadero o falso.');
+  if (typeof enabled !== 'boolean') throw new Error('El valor de Treo debe ser verdadero o falso.');
   const orgRef = db.collection('organizations').doc(orgId); const organization = await orgRef.get();
   if (!organization.exists) throw new NotFoundError('La organización no existe.');
   await orgRef.set({ enabledAddons: { ...(organization.data()?.enabledAddons ?? {}), finance: enabled } }, { merge: true });

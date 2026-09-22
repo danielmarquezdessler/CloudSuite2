@@ -29,8 +29,8 @@ const isoDate = (value: unknown) => { const raw = typeof value === 'string' ? va
 async function financeAccess(user: DecodedIdToken, orgId: string, campId: string) {
   assertCampaignAccess(user, orgId, campId);
   const org = await db.collection('organizations').doc(orgId).get();
-  if (org.data()?.enabledAddons?.finance !== true) throw new ForbiddenError('Finanzas no está habilitado en esta organización.');
-  if (!financeRoles.has(String(user.role))) throw new ForbiddenError('Solo Cliente, Administrador o Tesorería pueden acceder a Finanzas.');
+  if (org.data()?.enabledAddons?.finance !== true) throw new ForbiddenError('Treo no está habilitado en esta organización.');
+  if (!financeRoles.has(String(user.role))) throw new ForbiddenError('Solo Cliente, Administrador o Tesorería pueden acceder a Treo.');
 }
 const refs = (orgId: string, campId: string) => { const campaign = campaignRef(orgId, campId); return { campaign, accounts: campaign.collection('financeAccounts'), categories: campaign.collection('financeCategories'), transactions: campaign.collection('financeTransactions') }; };
 async function seedCategories(orgId: string, campId: string) { const { categories } = refs(orgId, campId); const batch = db.batch(); defaultCategories.forEach(([id, name, type]) => batch.set(categories.doc(id), { orgId, campaignId: campId, name, type, system: true, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() }, { merge: true })); await batch.commit(); }

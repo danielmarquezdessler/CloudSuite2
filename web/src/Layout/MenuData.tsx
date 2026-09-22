@@ -436,7 +436,7 @@ const menuItems = [
         type: 'HASHMENU', id: 'addons', label: 'Addons', icon: 'ph-duotone ph-puzzle-piece',
         submenu: [
             { id: 'smart-planner', label: 'SmartPlanner', icon: 'ph-duotone ph-sparkle', addon: 'smartPlanner', link: '/smartplanner' },
-            { id: 'finance', label: 'Finanzas', icon: 'ph-duotone ph-wallet', addon: 'finance', managerOnly: true, link: '/finanzas' },
+            { id: 'finance', label: 'Treo', icon: 'ph-duotone ph-wallet', addon: 'finance', managerOnly: true, link: '/treo' },
             { id: 'vote-stream', label: 'Vote Stream', icon: 'ph-duotone ph-chart-bar', addon: 'voteStream', managerOnly: true, link: '/vote-stream' },
             { id: 'vote-stream-agent', label: 'Mi panel de Sondeo', icon: 'ph-duotone ph-chart-bar', addon: 'voteStream', agentOnly: true, link: '/vote-stream/mi-panel' }
         ]

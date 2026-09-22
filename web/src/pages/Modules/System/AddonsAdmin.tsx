@@ -22,7 +22,7 @@ export default function AddonsAdmin() {
     setSaving(addon);
     setNotice('');
     const route = addon === 'smartPlanner' ? 'smart-planner' : addon === 'voteStream' ? 'vote-stream' : 'finance';
-    const label = addon === 'smartPlanner' ? 'SmartPlanner' : addon === 'voteStream' ? 'Vote Stream' : 'Finanzas';
+    const label = addon === 'smartPlanner' ? 'SmartPlanner' : addon === 'voteStream' ? 'Vote Stream' : 'Treo';
     const result = await authenticatedRequest<{ enabledAddons: typeof enabledAddons }>(user, `/api/organizations/${organizationId}/addons/${route}`, {
       method: 'PUT',
       body: JSON.stringify({ enabled: !enabledAddons[addon] })
@@ -56,8 +56,8 @@ export default function AddonsAdmin() {
         <Inline gap="md" wrap><span className={`cd-state-pill ${enabledAddons.voteStream ? 'is-success' : ''}`}>{enabledAddons.voteStream ? 'Habilitado' : 'Deshabilitado'}</span><PrimaryButton icon={enabledAddons.voteStream ? 'check' : 'plus'} onClick={() => void updateAddon('voteStream')} disabled={Boolean(saving)}>{saving === 'voteStream' ? 'Guardando…' : enabledAddons.voteStream ? 'Deshabilitar Vote Stream' : 'Habilitar Vote Stream'}</PrimaryButton></Inline>
       </Stack>}
     </ContentPanel>
-    <ContentPanel icon="pie" title="Finanzas" subtitle="Caja, ingresos y egresos de campaña.">
-      {!isGlobalAdmin ? <EmptyState icon="award" title="Acceso restringido" description="Solo un administrador global puede modificar los add-ons de una organización." /> : <Stack gap="md"><p className="mb-0">Habilitá el núcleo transaccional para Cliente y Administrador.</p><Inline gap="md" wrap><span className={`cd-state-pill ${enabledAddons.finance ? 'is-success' : ''}`}>{enabledAddons.finance ? 'Habilitado' : 'Deshabilitado'}</span><PrimaryButton icon={enabledAddons.finance ? 'check' : 'plus'} onClick={() => void updateAddon('finance')} disabled={Boolean(saving)}>{saving === 'finance' ? 'Guardando…' : enabledAddons.finance ? 'Deshabilitar Finanzas' : 'Habilitar Finanzas'}</PrimaryButton></Inline></Stack>}
+    <ContentPanel icon="pie" title="Treo" subtitle="Contabilidad, caja, ingresos y egresos de campaña.">
+      {!isGlobalAdmin ? <EmptyState icon="award" title="Acceso restringido" description="Solo un administrador global puede modificar los add-ons de una organización." /> : <Stack gap="md"><p className="mb-0">Habilitá el núcleo transaccional para Cliente y Administrador.</p><Inline gap="md" wrap><span className={`cd-state-pill ${enabledAddons.finance ? 'is-success' : ''}`}>{enabledAddons.finance ? 'Habilitado' : 'Deshabilitado'}</span><PrimaryButton icon={enabledAddons.finance ? 'check' : 'plus'} onClick={() => void updateAddon('finance')} disabled={Boolean(saving)}>{saving === 'finance' ? 'Guardando…' : enabledAddons.finance ? 'Deshabilitar Treo' : 'Habilitar Treo'}</PrimaryButton></Inline></Stack>}
     </ContentPanel>
   </Stack></PageContainer>;
 }
