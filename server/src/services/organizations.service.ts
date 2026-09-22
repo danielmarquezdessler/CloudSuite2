@@ -10,6 +10,42 @@ export class ConflictError extends Error {}
 export class NotFoundError extends Error {}
 export class ForbiddenError extends Error {}
 
+const sidebarOrderIds = new Set([
+  'dashboard',
+  'organization',
+  'electoral-conversion',
+  'planning',
+  'execution',
+  'addons',
+  'reports',
+  'support',
+  'system'
+]);
+
+function sidebarOrder(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  const unique = new Set<string>();
+  for (const candidate of value) {
+    if (typeof candidate === 'string' && sidebarOrderIds.has(candidate)) unique.add(candidate);
+  }
+  return [...unique];
+}
+
+export async function getSidebarPreferences(user: DecodedIdToken) {
+  const snapshot = await db.collection('users').doc(user.uid).collection('preferences').doc('sidebar').get();
+  return { order: sidebarOrder(snapshot.data()?.order) };
+}
+
+export async function updateSidebarPreferences(user: DecodedIdToken, input: { order?: unknown }) {
+  if (!Array.isArray(input.order)) throw new Error('El orden del menú no es válido.');
+  const order = sidebarOrder(input.order);
+  await db.collection('users').doc(user.uid).collection('preferences').doc('sidebar').set({
+    order,
+    updatedAt: FieldValue.serverTimestamp()
+  }, { merge: true });
+  return { order };
+}
+
 interface BootstrapInput {
   organizationName: string;
 }

@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { ConflictError, ForbiddenError, NotFoundError, bootstrapOrganization, getCurrentUserData, getGlobalConfiguration, setFinanceEnabled, setSmartPlannerEnabled, setVoteStreamEnabled, updateGlobalConfiguration, uploadPartyLogo } from '../services/organizations.service.js';
+import { ConflictError, ForbiddenError, NotFoundError, bootstrapOrganization, getCurrentUserData, getGlobalConfiguration, getSidebarPreferences, setFinanceEnabled, setSmartPlannerEnabled, setVoteStreamEnabled, updateGlobalConfiguration, updateSidebarPreferences, uploadPartyLogo } from '../services/organizations.service.js';
 
 const orgId = (request: Request) => Array.isArray(request.params.orgId) ? request.params.orgId[0] : request.params.orgId;
 const fail = (response: Response, error: unknown, fallback: string) => {
@@ -36,6 +36,16 @@ export async function getMeController(request: Request, response: Response) {
     }
     response.status(500).json({ message: 'No pudimos obtener el perfil.' });
   }
+}
+
+export async function getSidebarPreferencesController(request: Request, response: Response) {
+  try { response.json(await getSidebarPreferences(request.user!)); }
+  catch (error) { fail(response, error, 'No pudimos obtener las preferencias del menú.'); }
+}
+
+export async function updateSidebarPreferencesController(request: Request, response: Response) {
+  try { response.json(await updateSidebarPreferences(request.user!, request.body ?? {})); }
+  catch (error) { fail(response, error, 'No pudimos guardar las preferencias del menú.'); }
 }
 
 export async function setSmartPlannerAddonController(request: Request, response: Response) {
