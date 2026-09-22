@@ -21,11 +21,6 @@ import Asesor from '../pages/Modules/Planning/Asesor';
 import SettingsPlaceholder from '../pages/Modules/System/SettingsPlaceholder';
 import AddonsAdmin from '../pages/Modules/System/AddonsAdmin';
 import SmartPlanner from '../pages/Modules/SmartPlanner/SmartPlanner';
-import Contributors from '../pages/Modules/SmartPlanner/Contributors';
-import Providers from '../pages/Modules/SmartPlanner/Providers';
-import Invoices from '../pages/Modules/SmartPlanner/Invoices';
-import Contracts from '../pages/Modules/SmartPlanner/Contracts';
-import Materials from '../pages/Modules/SmartPlanner/Materials';
 import Operations from '../pages/Modules/SmartPlanner/Operations';
 import CrewSuggestions from '../pages/Modules/SmartPlanner/CrewSuggestions';
 import Messages from '../pages/Modules/SmartPlanner/Messages';
@@ -237,11 +232,11 @@ const routes = [
     { path: "/smartplanner", component: <SmartPlanner /> },
     { path: "/smartplanner/backlog", component: <Backlog /> },
     { path: "/smartplanner/pbi/:pbiId", component: <PbiDetail /> },
-    { path: "/smartplanner/contributors", component: <Contributors /> },
-    { path: "/smartplanner/providers", component: <Providers /> },
-    { path: "/smartplanner/invoices", component: <Invoices /> },
-    { path: "/smartplanner/contracts", component: <Contracts /> },
-    { path: "/smartplanner/materials", component: <Materials /> },
+    { path: "/smartplanner/contributors", component: <Navigate to="/treo" replace /> },
+    { path: "/smartplanner/providers", component: <Navigate to="/treo" replace /> },
+    { path: "/smartplanner/invoices", component: <Navigate to="/treo" replace /> },
+    { path: "/smartplanner/contracts", component: <Navigate to="/treo" replace /> },
+    { path: "/smartplanner/materials", component: <Navigate to="/treo" replace /> },
     { path: "/smartplanner/operations", component: <Operations /> },
     { path: "/smartplanner/crews", component: <CrewSuggestions /> },
     { path: "/smartplanner/messages", component: <Messages /> },

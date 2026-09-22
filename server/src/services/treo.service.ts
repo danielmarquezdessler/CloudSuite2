@@ -8,7 +8,7 @@ import { assertTreoAccess } from './finance.service.js';
 
 type EntryLine = { accountId: string; debit: number; credit: number; dimensions?: Record<string, string> };
 const accountSeed = [
-  ['1.1.01', 'Caja', 'activo'], ['1.1.02', 'Bancos', 'activo'], ['1.1.03', 'Medios digitales', 'activo'],
+  ['1.1.01', 'Caja', 'activo'], ['1.1.02', 'Bancos', 'activo'], ['1.1.03', 'Medios digitales', 'activo'], ['1.1.04', 'Anticipos a rendir', 'activo'],
   ['2.1.01', 'Proveedores por pagar', 'pasivo'], ['2.1.02', 'Fondos restringidos', 'pasivo'],
   ['3.1.01', 'Fondos de campaña', 'patrimonio'], ['4.1.01', 'Aportes', 'ingreso'], ['2.1.03', 'Préstamos por pagar', 'pasivo'], ['2.1.04', 'Fondos públicos por rendir', 'pasivo'],
   ['5.1.01', 'Publicidad', 'egreso'], ['5.1.02', 'Actos y territorio', 'egreso'], ['5.1.03', 'Viáticos y logística', 'egreso'], ['5.1.04', 'Comisiones financieras', 'egreso']
