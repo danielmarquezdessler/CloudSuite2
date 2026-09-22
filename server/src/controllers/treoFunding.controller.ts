@@ -1,0 +1,15 @@
+import { Request, Response } from 'express';
+import * as service from '../services/treoFunding.service.js';
+import { ForbiddenError, NotFoundError, ValidationError } from '../services/access.service.js';
+const ids = (r: Request): [string, string] => [String(r.params.orgId), String(r.params.campId)];
+const run = (fn: (r: Request) => Promise<unknown>, status = 200) => async (r: Request, p: Response) => { try { p.status(status).json(await fn(r)); } catch (e) { p.status(e instanceof ForbiddenError ? 403 : e instanceof NotFoundError ? 404 : e instanceof ValidationError || e instanceof Error ? 400 : 500).json({ message: e instanceof Error ? e.message : 'No pudimos completar la operación de financiamiento.' }); } };
+export const contributors = run((r) => service.contributors(r.user!, ...ids(r)));
+export const saveContributor = run((r) => service.saveContributor(r.user!, ...ids(r), r.params.contributorId ? String(r.params.contributorId) : null, r.body), 201);
+export const contributions = run((r) => service.listContributions(r.user!, ...ids(r)));
+export const createContribution = run((r) => service.createContribution(r.user!, ...ids(r), r.body), 201);
+export const contributionAction = run((r) => service.transitionContribution(r.user!, ...ids(r), String(r.params.contributionId), String(r.params.action), r.body));
+export const createInKind = run((r) => service.createInKind(r.user!, ...ids(r), r.body), 201);
+export const approveInKind = run((r) => service.approveInKind(r.user!, ...ids(r), String(r.params.inKindId), r.body));
+export const sources = run((r) => service.sources(r.user!, ...ids(r)));
+export const createSource = run((r) => service.createSource(r.user!, ...ids(r), r.body), 201);
+export const disburseSource = run((r) => service.disburseSource(r.user!, ...ids(r), String(r.params.sourceId), r.body));
