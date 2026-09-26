@@ -8,6 +8,7 @@ const env = Object.fromEntries((await readFile(envFile, 'utf8')).split(/\r?\n/).
   const separator = line.indexOf('=');
   return [line.slice(0, separator), line.slice(separator + 1)];
 }));
+const { adminAuth, db } = await import('../../server/dist/config/firebase.js');
 
 const allPages = [
   ['Dashboard', '/dashboard'], ['Funciones', '/organization/functions'], ['Equipos', '/organization/teams'],
@@ -49,6 +50,18 @@ try {
   await page.getByLabel('Contraseña').fill(env.E2E_PASSWORD);
   await page.getByRole('button', { name: 'Ingresar', exact: true }).click();
   await page.waitForURL(/dashboard/);
+  // Establish the same explicit campaign context used by the real E2E suites.
+  // Relying on the first background /api/me refresh is racy when this audit
+  // immediately sweeps dozens of routes.
+  const authUser = await adminAuth.getUserByEmail(env.E2E_EMAIL);
+  const profile = await db.collection('users').doc(authUser.uid).get();
+  const organizationId = env.E2E_ORG_ID || profile.data()?.orgIds?.[0];
+  const campaignId = env.E2E_CAMPAIGN_ID || (organizationId
+    ? (await db.collection('organizations').doc(organizationId).collection('campaigns').limit(1).get()).docs[0]?.id
+    : null);
+  if (!campaignId) throw new Error('No se encontró una campaña E2E para la auditoría de padding.');
+  await page.evaluate(({ uid, id }) => localStorage.setItem(`cloudsuite.activeCampaign.${uid}`, id), { uid: authUser.uid, id: campaignId });
+  await page.reload({ waitUntil: 'domcontentloaded' });
   // Wait for the real active-campaign context, otherwise a fast route sweep can
   // audit loading fallbacks instead of the authenticated page content.
   await page.locator('.cs-campaign-selector').waitFor({ state: 'visible' });
