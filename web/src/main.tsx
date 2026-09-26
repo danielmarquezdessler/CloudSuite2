@@ -20,6 +20,7 @@ import { AuthProvider } from './context/AuthContext.tsx';
 import { CampaignProvider } from './context/CampaignContext.tsx';
 import { OfflineSyncProvider } from './context/OfflineSyncContext.tsx';
 import { LoadingBarProvider } from './context/LoadingBarContext.tsx';
+import ScrollToTop from './components/Shared/ScrollToTop.tsx';
 
 
 const store = configureStore({ reducer: rootReducer, devTools: true });
@@ -27,6 +28,7 @@ const store = configureStore({ reducer: rootReducer, devTools: true });
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.Fragment>
     <BrowserRouter>
+      <ScrollToTop />
       <Provider store={store}>
         <LoadingBarProvider>
           <AuthProvider>
